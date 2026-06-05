@@ -1,7 +1,7 @@
 // Netlify Function: verifies a MyFatoorah payment and (if paid) activates the
-// clinic's plan in Supabase using the service-role key (server-side only).
+// clinic's plan in Supabase. Uses Supabase's REST API directly via fetch (no
+// supabase-js → avoids the realtime/WebSocket dependency, works on any Node).
 // Secrets: MYFATOORAH_TOKEN, MYFATOORAH_BASE, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-import { createClient } from '@supabase/supabase-js'
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } })
@@ -44,14 +44,21 @@ export default async (req) => {
   const supaUrl = process.env.SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!supaUrl || !serviceKey) return json({ ok: false, error: 'supabase_not_configured' }, 503)
+  const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' }
 
   try {
-    const supa = createClient(supaUrl, serviceKey, { auth: { persistSession: false } })
-    const { data: row, error } = await supa.from('clinics').select('data').eq('id', clinicId).maybeSingle()
-    if (error || !row) return json({ ok: false, error: 'clinic_not_found' }, 404)
-    const nextData = { ...row.data, tier, paid: true, paidAt: new Date().toISOString() }
-    const up = await supa.from('clinics').update({ data: nextData }).eq('id', clinicId)
-    if (up.error) return json({ ok: false, error: 'update_failed', message: up.error.message }, 500)
+    // fetch current clinic data
+    const getR = await fetch(`${supaUrl}/rest/v1/clinics?id=eq.${clinicId}&select=data`, { headers })
+    const rows = await getR.json()
+    if (!Array.isArray(rows) || rows.length === 0) return json({ ok: false, error: 'clinic_not_found' }, 404)
+
+    const nextData = { ...rows[0].data, tier, paid: true, paidAt: new Date().toISOString() }
+    const upR = await fetch(`${supaUrl}/rest/v1/clinics?id=eq.${clinicId}`, {
+      method: 'PATCH',
+      headers: { ...headers, Prefer: 'return=minimal' },
+      body: JSON.stringify({ data: nextData }),
+    })
+    if (!upR.ok) return json({ ok: false, error: 'update_failed', message: await upR.text() }, 500)
     return json({ ok: true, tier, clinicId })
   } catch (e) {
     return json({ ok: false, error: 'server_error', message: String(e) }, 500)
