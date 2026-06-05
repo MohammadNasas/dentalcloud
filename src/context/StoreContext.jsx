@@ -67,11 +67,11 @@ export function StoreProvider({ children }) {
     const pid = getPaymentReturn()
     if (!pid) return
     clearPaymentReturn()
-    if (pid === 'error') { setPaymentResult({ ok: false }); return }
+    if (pid === 'error') { setPaymentResult({ ok: false, reason: 'gateway' }); return }
     ;(async () => {
       const res = await verifyPayment(pid)
       if (res.ok) { await loadSession(); setPaymentResult({ ok: true, tier: res.tier }) }
-      else setPaymentResult({ ok: false, status: res.status })
+      else setPaymentResult({ ok: false, status: res.status, error: res.error, message: res.message })
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
