@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { Check, Sparkles, Crown, GraduationCap, Building2, X, ArrowRight, Star } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { TIERS } from '../lib/db'
+import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { Modal } from '../components/ui'
 import { cx } from '../lib/utils'
@@ -76,7 +76,7 @@ export default function Packages() {
 
               <div className="mt-4 flex items-end gap-1">
                 <span className="text-4xl font-extrabold text-ink-800">${tier.price}</span>
-                <span className="mb-1 text-sm text-ink-400">{t('packages.month')}</span>
+                <span className="mb-1 text-sm text-ink-400"> {tierPeriodLabel(tier, t)}</span>
               </div>
               <p className="mt-2 text-sm text-ink-500">{t(`packages.${tier.id}Desc`)}</p>
 
@@ -142,7 +142,7 @@ export default function Packages() {
               <div className="mt-5 flex items-center justify-between rounded-xl bg-ink-50 p-4">
                 <div>
                   <p className="text-sm text-ink-400">{L(TIERS[buying])}</p>
-                  <p className="text-2xl font-extrabold text-ink-800">${TIERS[buying].price}<span className="text-sm font-normal text-ink-400">{t('packages.month')}</span></p>
+                  <p className="text-2xl font-extrabold text-ink-800">${TIERS[buying].price}<span className="text-sm font-normal text-ink-400"> {tierPeriodLabel(TIERS[buying], t)}</span></p>
                 </div>
                 <button onClick={confirmBuy} className="btn-primary !py-3 !px-6" style={{ background: PACKAGE_FEATURES[buying].accent }}>
                   {t('packages.buyNow')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} />

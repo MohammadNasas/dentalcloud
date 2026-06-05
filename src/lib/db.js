@@ -11,9 +11,14 @@ import { DEFAULT_PRICES } from './treatments'
 const DB_KEY = 'dentacare.db.v1'
 
 export const TIERS = {
-  student: { id: 'student', en: 'Student', ar: 'الطالب', price: 5 },
-  economy: { id: 'economy', en: 'Economy', ar: 'العيادات الصغيرة', price: 60 },
-  pro: { id: 'pro', en: 'Pro', ar: 'الاحترافية', price: 100 },
+  student: { id: 'student', en: 'Student', ar: 'الطالب', price: 5, period: 'lifetime' },
+  economy: { id: 'economy', en: 'Economy', ar: 'العيادات الصغيرة', price: 60, period: 'year' },
+  pro: { id: 'pro', en: 'Pro', ar: 'الاحترافية', price: 100, period: 'year' },
+}
+
+// Billing period label for a tier ($5 = one-time/lifetime, others = yearly).
+export function tierPeriodLabel(tier, t) {
+  return tier?.period === 'lifetime' ? t('packages.lifetime') : t('packages.perYear')
 }
 
 // Doctor palette — each doctor gets a distinct calendar colour.

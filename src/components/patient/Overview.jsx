@@ -24,6 +24,7 @@ export default function Overview({ patient, onTab }) {
     const o = ALLERGIES.options.find((x) => x.key === k)
     if (o) alerts.push({ type: 'allergy', label: L(o) })
   })
+  ;(patient.history?.customAllergies || []).forEach((label) => alerts.push({ type: 'allergy', label }))
   const systems = patient.history?.systems || {}
   Object.values(systems).flat().forEach((k) => {
     if (RISK_KEYS.includes(k)) {
@@ -35,7 +36,10 @@ export default function Overview({ patient, onTab }) {
   })
   if (patient.history?.medical?.pregnant) alerts.push({ type: 'risk', label: lang === 'ar' ? 'حامل' : 'Pregnant' })
 
-  const meds = (patient.history?.medications || []).map((k) => L(MEDICATIONS.options.find((x) => x.key === k) || { en: k, ar: k }))
+  const meds = [
+    ...(patient.history?.medications || []).map((k) => L(MEDICATIONS.options.find((x) => x.key === k) || { en: k, ar: k })),
+    ...(patient.history?.customMedications || []),
+  ]
 
   const recent = [...records].filter((r) => r.toothId !== '0' || r.itemKey)
     .sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 5)

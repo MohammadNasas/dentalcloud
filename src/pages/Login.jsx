@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { TIERS, DEMO_LOGIN } from '../lib/db'
+import { TIERS, DEMO_LOGIN, tierPeriodLabel } from '../lib/db'
 import { Field, Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
 
@@ -120,7 +120,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
           {Object.values(TIERS).map((tier) => (
             <div key={tier.id} className="flex-1 rounded-xl bg-white/10 p-3 backdrop-blur">
               <p className="text-sm font-bold text-white">{L(tier)}</p>
-              <p className="text-2xl font-extrabold text-white">${tier.price}<span className="text-sm font-normal text-white/60">{t('packages.month')}</span></p>
+              <p className="text-2xl font-extrabold text-white">${tier.price}<span className="text-sm font-normal text-white/60"> {tierPeriodLabel(tier, t)}</span></p>
             </div>
           ))}
         </div>

@@ -5,7 +5,7 @@ import {
   GraduationCap, Building2, Languages, Cloud,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
-import { TIERS } from '../lib/db'
+import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/PackagePreviews'
 import { cx } from '../lib/utils'
@@ -60,13 +60,13 @@ export default function Landing({ onEnter }) {
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <button onClick={() => onEnter('register')} className="btn-primary !px-6 !py-3 text-base">
-                {lang === 'ar' ? 'ابدأ مجاناً' : 'Get started'} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} />
+                {lang === 'ar' ? 'أنشئ عيادتك الآن' : 'Set up your clinic'} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} />
               </button>
               <button onClick={() => onEnter('signin')} className="btn-outline !px-6 !py-3 text-base">{t('auth.signIn')}</button>
             </div>
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-400">
               <span className="flex items-center gap-1.5"><ShieldCheck size={15} className="text-brand-500" /> {lang === 'ar' ? 'بياناتك محمية' : 'Your data is protected'}</span>
-              <span className="flex items-center gap-1.5"><Check size={15} className="text-brand-500" /> {lang === 'ar' ? 'يبدأ من $5/شهر' : 'From $5/month'}</span>
+              <span className="flex items-center gap-1.5"><Sparkles size={15} className="text-amber-500" /> {lang === 'ar' ? 'باقة الطالب $5 لمرة واحدة — للأبد' : 'Student plan: $5 once — forever'}</span>
             </div>
           </motion.div>
 
@@ -137,7 +137,7 @@ export default function Landing({ onEnter }) {
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white" style={{ background: accent }}><Icon size={22} /></div>
                   <div><h3 className="font-extrabold text-ink-800">{L(tier)}</h3><p className="text-xs font-semibold text-ink-400">{t(`tier.${tier.id}Tag`)}</p></div>
                 </div>
-                <div className="mt-4 flex items-end gap-1"><span className="text-4xl font-extrabold text-ink-800">${tier.price}</span><span className="mb-1 text-sm text-ink-400">{t('packages.month')}</span></div>
+                <div className="mt-4 flex items-end gap-1"><span className="text-4xl font-extrabold text-ink-800">${tier.price}</span><span className="mb-1 text-sm text-ink-400"> {tierPeriodLabel(tier, t)}</span></div>
                 <ul className="my-5 flex-1 space-y-2">
                   {feats.slice(0, 7).map((f, i) => <li key={i} className="flex items-start gap-2 text-sm text-ink-600"><Check size={15} className="mt-0.5 shrink-0" style={{ color: accent }} />{L(f)}</li>)}
                 </ul>

@@ -1,4 +1,5 @@
-import { Stethoscope, HeartPulse, Pill, AlertTriangle, ClipboardCheck, Info } from 'lucide-react'
+import { useState } from 'react'
+import { Stethoscope, HeartPulse, Pill, AlertTriangle, ClipboardCheck, Info, Plus, X } from 'lucide-react'
 import { useI18n } from '../../i18n/I18nContext'
 import { useStore } from '../../context/StoreContext'
 import {
@@ -26,6 +27,9 @@ export default function HistoryForm({ patient }) {
     const cur = h[field] || []
     writeHistory({ [field]: cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key] })
   }
+  // Custom "Other" entries → added as their own chips (stored as arrays).
+  const addCustom = (field, val) => writeHistory({ [field]: [...(h[field] || []), val] })
+  const removeCustom = (field, idx) => writeHistory({ [field]: (h[field] || []).filter((_, i) => i !== idx) })
   const setExam = (sec, val) => updatePatient(patient.id, { exam: { ...exam, [sec]: val } })
   const toggleExamCheck = (sec, key) => {
     const cur = Array.isArray(exam[sec]) ? exam[sec] : []
@@ -99,9 +103,9 @@ export default function HistoryForm({ patient }) {
           ))}
         </div>
         <div className="mt-3">
-          <p className="label">{lang === 'ar' ? 'أمراض أخرى (اكتبها)' : 'Other conditions'}</p>
-          <input className="input" value={h.systemsOther || ''} onChange={(e) => writeHistory({ systemsOther: e.target.value })}
-            placeholder={lang === 'ar' ? 'اكتب أي مرض غير موجود بالقائمة…' : 'Type any condition not listed…'} />
+          <p className="label">{lang === 'ar' ? 'أمراض أخرى (أضِفها)' : 'Other conditions (add)'}</p>
+          <TagInput items={h.customSystems || []} onAdd={(v) => addCustom('customSystems', v)} onRemove={(i) => removeCustom('customSystems', i)}
+            placeholder={lang === 'ar' ? 'اكتب المرض ثم اضغط +' : 'Type a condition, then +'} />
         </div>
       </div>
 
@@ -133,16 +137,20 @@ export default function HistoryForm({ patient }) {
       <div className="card p-5">
         <h3 className="mb-4 flex items-center gap-2 font-bold text-ink-800"><AlertTriangle size={18} className="text-amber-500" /> {L(ALLERGIES.title)}</h3>
         <Chips options={ALLERGIES.options} selected={h.allergies || []} onToggle={(k) => toggleArr('allergies', k)} danger />
-        {(h.allergies || []).includes('other') && (
-          <input className="input mt-3" value={h.allergiesOther || ''} onChange={(e) => writeHistory({ allergiesOther: e.target.value })}
-            placeholder={lang === 'ar' ? 'حدّد نوع الحساسية…' : 'Specify the allergy…'} />
-        )}
+        <div className="mt-3">
+          <p className="label">{lang === 'ar' ? 'حساسية أخرى (أضِفها)' : 'Other allergies (add)'}</p>
+          <TagInput items={h.customAllergies || []} onAdd={(v) => addCustom('customAllergies', v)} onRemove={(i) => removeCustom('customAllergies', i)} danger
+            placeholder={lang === 'ar' ? 'اكتب نوع الحساسية ثم +' : 'Type an allergy, then +'} />
+        </div>
       </div>
       <div className="card p-5">
         <h3 className="mb-4 flex items-center gap-2 font-bold text-ink-800"><Pill size={18} className="text-brand-500" /> {L(MEDICATIONS.title)}</h3>
         <Chips options={MEDICATIONS.options} selected={h.medications || []} onToggle={(k) => toggleArr('medications', k)} />
-        <input className="input mt-3" value={h.medicationsOther || ''} onChange={(e) => writeHistory({ medicationsOther: e.target.value })}
-          placeholder={lang === 'ar' ? 'اكتب أسماء الأدوية…' : 'Type medication names…'} />
+        <div className="mt-3">
+          <p className="label">{lang === 'ar' ? 'أدوية أخرى (أضِفها)' : 'Other medications (add)'}</p>
+          <TagInput items={h.customMedications || []} onAdd={(v) => addCustom('customMedications', v)} onRemove={(i) => removeCustom('customMedications', i)}
+            placeholder={lang === 'ar' ? 'اكتب اسم الدواء ثم +' : 'Type a medication, then +'} />
+        </div>
       </div>
 
       {/* Social */}
@@ -182,4 +190,29 @@ export default function HistoryForm({ patient }) {
       </div>
     )
   }
+}
+
+// Type a custom value → press Enter or + to add it as a removable chip.
+function TagInput({ items, onAdd, onRemove, placeholder, danger }) {
+  const [v, setV] = useState('')
+  const add = () => { const val = v.trim(); if (val) { onAdd(val); setV('') } }
+  return (
+    <div>
+      {items.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {items.map((it, i) => (
+            <span key={i} className={cx('chip', danger ? 'bg-rose-50 text-rose-600' : 'bg-brand-50 text-brand-700')}>
+              {it}
+              <button type="button" onClick={() => onRemove(i)} className="ms-0.5 hover:text-rose-600"><X size={11} /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <input className="input" value={v} onChange={(e) => setV(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add() } }} placeholder={placeholder} />
+        <button type="button" onClick={add} className="btn-outline shrink-0 !px-3"><Plus size={16} /></button>
+      </div>
+    </div>
+  )
 }

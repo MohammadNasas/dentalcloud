@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { TIERS, DOCTOR_COLORS } from '../lib/db'
+import { TIERS, DOCTOR_COLORS, tierPeriodLabel } from '../lib/db'
 import { DEFAULT_PRICES, INSTRUCTIONS } from '../lib/treatments'
 import FeatureLock from '../components/FeatureLock'
 import { Modal, Field, Segmented, Avatar, Badge } from '../components/ui'
@@ -299,7 +299,7 @@ function PlanSection() {
         <div className="flex items-center justify-between rounded-xl bg-gradient-to-br from-brand-50 to-brand-100/40 p-4">
           <div>
             <p className="text-2xl font-extrabold text-ink-800">{L(tier)}</p>
-            <p className="text-sm text-ink-400">${tier.price}{t('packages.month')}</p>
+            <p className="text-sm text-ink-400">${tier.price} {tierPeriodLabel(tier, t)}</p>
           </div>
           <button onClick={() => navigate('/packages')} className="btn-primary"><Crown size={16} /> {t('packages.title')}</button>
         </div>
