@@ -53,6 +53,9 @@ export default function Packages() {
           const isCurrent = current === tier.id
           const popular = tier.id === 'economy'
           const features = fullFeatures(tier.id)
+          const own = PACKAGE_FEATURES[tier.id].features
+          const inheritsId = PACKAGE_FEATURES[tier.id].inherits
+          const isExpanded = expanded[tier.id]
           return (
             <motion.div
               key={tier.id}
@@ -83,17 +86,31 @@ export default function Packages() {
               <div className="my-5 h-px bg-ink-100" />
 
               <ul className="mb-4 flex-1 space-y-2.5">
-                {features.slice(0, expanded[tier.id] ? features.length : 9).map((f, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-ink-600">
-                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: accent }} />
-                    <span>{L(f)}</span>
-                  </li>
-                ))}
+                {isExpanded ? (
+                  features.map((f, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-ink-600">
+                      <Check size={16} className="mt-0.5 shrink-0" style={{ color: accent }} /><span>{L(f)}</span>
+                    </li>
+                  ))
+                ) : (
+                  <>
+                    {inheritsId && (
+                      <li className="flex items-start gap-2 text-sm font-bold" style={{ color: accent }}>
+                        <Check size={16} className="mt-0.5 shrink-0" /> {t('packages.everythingIn')} «{L(TIERS[inheritsId])}»
+                      </li>
+                    )}
+                    {own.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-ink-600">
+                        <Check size={16} className="mt-0.5 shrink-0" style={{ color: accent }} /><span>{L(f)}</span>
+                      </li>
+                    ))}
+                  </>
+                )}
               </ul>
-              {features.length > 9 && (
+              {inheritsId && (
                 <button onClick={() => setExpanded((e) => ({ ...e, [tier.id]: !e[tier.id] }))}
                   className="mb-4 text-start text-xs font-bold hover:underline" style={{ color: accent }}>
-                  {expanded[tier.id] ? t('common.less') : `+${features.length - 9} ${t('common.more')}`}
+                  {isExpanded ? t('common.less') : (lang === 'ar' ? 'عرض كل المزايا' : 'See all features')}
                 </button>
               )}
 

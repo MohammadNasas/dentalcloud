@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
-import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
+import { PACKAGE_FEATURES } from '../lib/packages'
 import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/PackagePreviews'
 import { cx } from '../lib/utils'
 
@@ -129,7 +129,9 @@ export default function Landing({ onEnter }) {
         <div className="grid gap-5 lg:grid-cols-3">
           {Object.values(TIERS).map((tier) => {
             const Icon = TIER_ICON[tier.id]; const accent = PACKAGE_FEATURES[tier.id].accent
-            const popular = tier.id === 'economy'; const feats = fullFeatures(tier.id)
+            const popular = tier.id === 'economy'
+            const own = PACKAGE_FEATURES[tier.id].features
+            const inheritsId = PACKAGE_FEATURES[tier.id].inherits
             return (
               <div key={tier.id} className={cx('card relative flex flex-col p-6', popular && 'ring-2 ring-brand-400')}>
                 {popular && <div className="absolute top-0 flex items-center gap-1 rounded-b-lg bg-brand-500 px-3 py-1 text-xs font-bold text-white end-5"><Star size={12} /> {t('packages.mostPopular')}</div>}
@@ -139,7 +141,12 @@ export default function Landing({ onEnter }) {
                 </div>
                 <div className="mt-4 flex items-end gap-1"><span className="text-4xl font-extrabold text-ink-800">${tier.price}</span><span className="mb-1 text-sm text-ink-400"> {tierPeriodLabel(tier, t)}</span></div>
                 <ul className="my-5 flex-1 space-y-2">
-                  {feats.slice(0, 7).map((f, i) => <li key={i} className="flex items-start gap-2 text-sm text-ink-600"><Check size={15} className="mt-0.5 shrink-0" style={{ color: accent }} />{L(f)}</li>)}
+                  {inheritsId && (
+                    <li className="flex items-start gap-2 text-sm font-bold" style={{ color: accent }}>
+                      <Check size={15} className="mt-0.5 shrink-0" /> {t('packages.everythingIn')} «{L(TIERS[inheritsId])}»
+                    </li>
+                  )}
+                  {own.map((f, i) => <li key={i} className="flex items-start gap-2 text-sm text-ink-600"><Check size={15} className="mt-0.5 shrink-0" style={{ color: accent }} />{L(f)}</li>)}
                 </ul>
                 <button onClick={() => onEnter('register')} className="btn w-full text-white" style={{ background: accent }}>{t('packages.buyNow')}</button>
               </div>
