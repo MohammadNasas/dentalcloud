@@ -6,6 +6,7 @@ import { Modal } from './components/ui'
 import Layout from './components/Layout'
 import PublicEntry from './pages/PublicEntry'
 import ResetPassword from './pages/ResetPassword'
+import Paywall from './pages/Paywall'
 import Dashboard from './pages/Dashboard'
 import Patients from './pages/Patients'
 import PatientProfile from './pages/PatientProfile'
@@ -44,13 +45,15 @@ function PaymentResultOverlay({ result, onClose }) {
 }
 
 export default function App() {
-  const { booting, currentUser, recovery, paymentResult, dismissPaymentResult } = useStore()
+  const { booting, currentUser, recovery, paymentResult, dismissPaymentResult, mode, clinic } = useStore()
 
   const overlay = paymentResult ? <PaymentResultOverlay result={paymentResult} onClose={dismissPaymentResult} /> : null
 
   if (booting) return <Splash />
   if (recovery) return <ResetPassword />
   if (!currentUser) return <>{<PublicEntry />}{overlay}</>
+  // Cloud accounts must pay before entering the app.
+  if (mode === 'cloud' && clinic && !clinic.paid) return <>{<Paywall />}{overlay}</>
 
   return (
     <>

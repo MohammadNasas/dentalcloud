@@ -86,6 +86,7 @@ export function seedDB() {
     name: 'Bright Smile Dental',
     nameAr: 'عيادة الابتسامة المشرقة',
     tier: 'pro',
+    paid: true,
     createdAt: new Date().toISOString(),
     prices: DEFAULT_PRICES.map((p) => ({ ...p })),
     settings: {

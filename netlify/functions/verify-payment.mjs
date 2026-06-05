@@ -49,7 +49,7 @@ export default async (req) => {
     const supa = createClient(supaUrl, serviceKey, { auth: { persistSession: false } })
     const { data: row, error } = await supa.from('clinics').select('data').eq('id', clinicId).maybeSingle()
     if (error || !row) return json({ ok: false, error: 'clinic_not_found' }, 404)
-    const nextData = { ...row.data, tier, paidAt: new Date().toISOString() }
+    const nextData = { ...row.data, tier, paid: true, paidAt: new Date().toISOString() }
     const up = await supa.from('clinics').update({ data: nextData }).eq('id', clinicId)
     if (up.error) return json({ ok: false, error: 'update_failed', message: up.error.message }, 500)
     return json({ ok: true, tier, clinicId })

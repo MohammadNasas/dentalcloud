@@ -32,9 +32,9 @@ const LOCAL = {
   payments: 'payments', suggestions: 'suggestions', doctors: 'users',
 }
 
-function newClinic(clinicName, tier) {
+function newClinic(clinicName, tier, paid = false) {
   return {
-    name: clinicName, nameAr: clinicName, tier,
+    name: clinicName, nameAr: clinicName, tier, paid,
     createdAt: new Date().toISOString(), prices: [],
     settings: { currency: 'JOD', appointmentReminders: true, logo: null },
     customInstructions: {},
@@ -81,7 +81,7 @@ const localBackend = {
       return { ok: false, error: 'userExists' }
     const clinicId = localGenId('clinic')
     const userId = localGenId('user')
-    const clinic = { id: clinicId, ...newClinic(clinicName, tier) }
+    const clinic = { id: clinicId, ...newClinic(clinicName, tier, true) } // local mode = no payment
     const user = {
       id: userId, clinicId, username: email, ...newDoctor(doctorName, email, specialty),
       passwordHash: hashPassword(password),
