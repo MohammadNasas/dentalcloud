@@ -10,13 +10,29 @@ import { TIERS, DEMO_LOGIN } from '../lib/db'
 import { Field, Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
 
-export default function Login() {
+export default function Login({ initialTab = 'signin', onBack }) {
   const { t, L, lang, toggleLang, isRTL } = useI18n()
-  const { login, register, resetPassword, mode } = useStore()
-  const [tab, setTab] = useState('signin')
+  const { login, register, resetPassword, mode, otpEmail, verifyOtp, resendOtp, cancelOtp } = useStore()
+  const [tab, setTab] = useState(initialTab)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [forgot, setForgot] = useState({ open: false, email: '', sent: false })
+  const [otpCode, setOtpCode] = useState('')
+  const [resent, setResent] = useState(false)
+
+  async function doVerify(e) {
+    e.preventDefault()
+    setError('')
+    if (otpCode.length < 6) { setError(t('auth.otpTooShort')); return }
+    setBusy(true)
+    const res = await verifyOtp(otpCode)
+    setBusy(false)
+    if (!res.ok) setError(t(`auth.${res.error || 'wrongCode'}`))
+  }
+  async function doResend() {
+    setError(''); setResent(false)
+    await resendOtp(); setResent(true)
+  }
 
   const [signin, setSignin] = useState({ email: '', password: '' })
   const [reg, setReg] = useState({
@@ -114,10 +130,16 @@ export default function Login() {
       <div className="flex flex-1 items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-md">
           <div className="mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-2 lg:hidden">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white"><Stethoscope size={20} /></div>
-              <span className="text-xl font-extrabold text-ink-800">{t('app.name')}</span>
-            </div>
+            {onBack ? (
+              <button onClick={onBack} className="flex items-center gap-1.5 text-sm font-bold text-ink-500 hover:text-brand-600">
+                <ArrowRight size={16} className={cx(!isRTL && 'rotate-180')} /> {t('common.back')}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2 lg:hidden">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white"><Stethoscope size={20} /></div>
+                <span className="text-xl font-extrabold text-ink-800">{t('app.name')}</span>
+              </div>
+            )}
             <div className="ms-auto flex items-center gap-2">
               <ModeChip />
               <button onClick={toggleLang} className="btn-outline !py-2">
@@ -132,7 +154,27 @@ export default function Login() {
             </div>
           )}
 
-          {forgot.open ? (
+          {otpEmail ? (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-2xl font-extrabold text-ink-800">{t('auth.verifyEmail')}</h2>
+                <p className="text-sm text-ink-400">{t('auth.otpSentTo')} <b dir="ltr">{otpEmail}</b></p>
+              </div>
+              <form onSubmit={doVerify} className="space-y-4">
+                <Field label={t('auth.verificationCode')}>
+                  <input className="input text-center text-lg font-bold tracking-[0.4em]" dir="ltr" inputMode="numeric" autoFocus
+                    value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" />
+                </Field>
+                {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{error}</p>}
+                {resent && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600">{t('auth.codeResent')}</p>}
+                <button disabled={busy} className="btn-primary w-full !py-3">{busy ? <Spinner /> : t('auth.verify')}</button>
+              </form>
+              <div className="flex items-center justify-between text-sm">
+                <button type="button" onClick={doResend} className="font-bold text-brand-600 hover:underline">{t('auth.resendCode')}</button>
+                <button type="button" onClick={cancelOtp} className="text-ink-400 hover:text-ink-600">{t('common.cancel')}</button>
+              </div>
+            </div>
+          ) : forgot.open ? (
             <div className="space-y-4">
               <button type="button" onClick={() => { setForgot({ open: false, email: '', sent: false }); setError('') }}
                 className="text-sm font-semibold text-ink-500 hover:text-brand-600">

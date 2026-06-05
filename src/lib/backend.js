@@ -141,6 +141,8 @@ const localBackend = {
 
   async resetPassword() { return { ok: false, error: 'localMode' } },
   async updatePassword() { return { ok: false, error: 'localMode' } },
+  async verifyOtp() { return { ok: true } },
+  async resendOtp() { return { ok: true } },
   onAuthEvent() { return { data: { subscription: { unsubscribe() {} } } } },
 }
 
@@ -152,6 +154,18 @@ async function loadMe(uid) {
   const c = await supabase.from('clinics').select('*').eq('id', user.clinicId).maybeSingle()
   const clinic = c.data ? { ...c.data.data, id: c.data.id } : null
   return { user, clinic }
+}
+
+// Creates the clinic + owner-doctor rows for a freshly-authenticated user.
+async function createClinicForUser(uid, { clinicName, doctorName, email, specialty, tier = 'student' }) {
+  const clinicId = crypto.randomUUID ? crypto.randomUUID() : localGenId()
+  const clinicObj = { id: clinicId, ...newClinic(clinicName, tier) }
+  const doctorObj = { id: uid, clinicId, ...newDoctor(doctorName, email, specialty) }
+  let r = await supabase.from('clinics').insert({ id: clinicId, owner_id: uid, data: clinicObj })
+  if (r.error) return { ok: false, error: 'dbError', message: r.error.message }
+  r = await supabase.from('doctors').insert({ id: uid, clinic_id: clinicId, data: doctorObj })
+  if (r.error) return { ok: false, error: 'dbError', message: r.error.message }
+  return { ok: true }
 }
 
 const cloudBackend = {
@@ -170,8 +184,9 @@ const cloudBackend = {
     return { ok: true }
   },
 
-  async signUp({ clinicName, doctorName, email, password, specialty, tier = 'student' }) {
-    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password })
+  async signUp(payload) {
+    const email = (payload.email || '').trim()
+    const { data, error } = await supabase.auth.signUp({ email, password: payload.password })
     if (error) {
       const msg = error.message || ''
       if (/registered|exists/i.test(msg)) return { ok: false, error: 'userExists' }
@@ -180,18 +195,24 @@ const cloudBackend = {
     // Supabase returns an empty identities array when the email already exists.
     if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0)
       return { ok: false, error: 'userExists' }
-    if (!data.session) return { ok: false, error: 'confirmEmail' } // email confirmation is ON
 
-    const uid = data.user.id
-    const clinicId = this.genId()
-    const clinicObj = { id: clinicId, ...newClinic(clinicName, tier) }
-    const doctorObj = { id: uid, clinicId, ...newDoctor(doctorName, email.trim(), specialty) }
+    if (data.session) {
+      // Email confirmation is OFF → create the clinic immediately.
+      return await createClinicForUser(data.user.id, { ...payload, email })
+    }
+    // Email confirmation is ON → ask for the code, create clinic after verifying.
+    return { ok: false, needsOtp: true, email, pending: { ...payload, email } }
+  },
 
-    let r = await supabase.from('clinics').insert({ id: clinicId, owner_id: uid, data: clinicObj })
-    if (r.error) return { ok: false, error: 'dbError', message: r.error.message }
-    r = await supabase.from('doctors').insert({ id: uid, clinic_id: clinicId, data: doctorObj })
-    if (r.error) return { ok: false, error: 'dbError', message: r.error.message }
-    return { ok: true }
+  // Verify the emailed signup code, then create the clinic.
+  async verifyOtp(email, token, pending) {
+    const { data, error } = await supabase.auth.verifyOtp({ email: email.trim(), token: token.trim(), type: 'signup' })
+    if (error || !data.session) return { ok: false, error: 'wrongCode', message: error?.message }
+    return await createClinicForUser(data.user.id, pending)
+  },
+  async resendOtp(email) {
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() })
+    return { ok: !error, error: error?.message }
   },
 
   async signOut() { await supabase.auth.signOut() },

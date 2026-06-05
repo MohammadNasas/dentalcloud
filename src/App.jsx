@@ -2,7 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Stethoscope } from 'lucide-react'
 import { useStore } from './context/StoreContext'
 import Layout from './components/Layout'
-import Login from './pages/Login'
+import PublicEntry from './pages/PublicEntry'
 import ResetPassword from './pages/ResetPassword'
 import Dashboard from './pages/Dashboard'
 import Patients from './pages/Patients'
@@ -31,7 +31,7 @@ export default function App() {
 
   if (booting) return <Splash />
   if (recovery) return <ResetPassword />
-  if (!currentUser) return <Login />
+  if (!currentUser) return <PublicEntry />
 
   return (
     <Routes>

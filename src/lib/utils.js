@@ -37,9 +37,46 @@ export function colorFromStringDark(str = '') {
   return `hsl(${hue} 45% 42%)`
 }
 
+// Comprehensive currency list (MENA + major world). symbol shown in amounts.
+export const CURRENCIES = {
+  JOD: { symbol: 'د.أ', en: 'Jordanian Dinar', ar: 'دينار أردني' },
+  ILS: { symbol: '₪', en: 'Israeli Shekel', ar: 'شيكل إسرائيلي' },
+  USD: { symbol: '$', en: 'US Dollar', ar: 'دولار أمريكي' },
+  EUR: { symbol: '€', en: 'Euro', ar: 'يورو' },
+  GBP: { symbol: '£', en: 'British Pound', ar: 'جنيه إسترليني' },
+  SAR: { symbol: 'ر.س', en: 'Saudi Riyal', ar: 'ريال سعودي' },
+  AED: { symbol: 'د.إ', en: 'UAE Dirham', ar: 'درهم إماراتي' },
+  QAR: { symbol: 'ر.ق', en: 'Qatari Riyal', ar: 'ريال قطري' },
+  KWD: { symbol: 'د.ك', en: 'Kuwaiti Dinar', ar: 'دينار كويتي' },
+  BHD: { symbol: 'د.ب', en: 'Bahraini Dinar', ar: 'دينار بحريني' },
+  OMR: { symbol: 'ر.ع', en: 'Omani Rial', ar: 'ريال عماني' },
+  EGP: { symbol: 'ج.م', en: 'Egyptian Pound', ar: 'جنيه مصري' },
+  LBP: { symbol: 'ل.ل', en: 'Lebanese Pound', ar: 'ليرة لبنانية' },
+  SYP: { symbol: 'ل.س', en: 'Syrian Pound', ar: 'ليرة سورية' },
+  IQD: { symbol: 'ع.د', en: 'Iraqi Dinar', ar: 'دينار عراقي' },
+  YER: { symbol: 'ر.ي', en: 'Yemeni Rial', ar: 'ريال يمني' },
+  TRY: { symbol: '₺', en: 'Turkish Lira', ar: 'ليرة تركية' },
+  MAD: { symbol: 'د.م', en: 'Moroccan Dirham', ar: 'درهم مغربي' },
+  DZD: { symbol: 'د.ج', en: 'Algerian Dinar', ar: 'دينار جزائري' },
+  TND: { symbol: 'د.ت', en: 'Tunisian Dinar', ar: 'دينار تونسي' },
+  LYD: { symbol: 'ل.د', en: 'Libyan Dinar', ar: 'دينار ليبي' },
+  SDG: { symbol: 'ج.س', en: 'Sudanese Pound', ar: 'جنيه سوداني' },
+  IRR: { symbol: '﷼', en: 'Iranian Rial', ar: 'ريال إيراني' },
+  CAD: { symbol: 'C$', en: 'Canadian Dollar', ar: 'دولار كندي' },
+  AUD: { symbol: 'A$', en: 'Australian Dollar', ar: 'دولار أسترالي' },
+  CHF: { symbol: 'Fr', en: 'Swiss Franc', ar: 'فرنك سويسري' },
+  JPY: { symbol: '¥', en: 'Japanese Yen', ar: 'ين ياباني' },
+  CNY: { symbol: '¥', en: 'Chinese Yuan', ar: 'يوان صيني' },
+  INR: { symbol: '₹', en: 'Indian Rupee', ar: 'روبية هندية' },
+  PKR: { symbol: '₨', en: 'Pakistani Rupee', ar: 'روبية باكستانية' },
+  RUB: { symbol: '₽', en: 'Russian Ruble', ar: 'روبل روسي' },
+  ZAR: { symbol: 'R', en: 'South African Rand', ar: 'راند جنوب أفريقي' },
+}
+
 export function money(n, currency = 'JOD') {
   const v = Number(n || 0)
-  return `${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency}`
+  const sym = CURRENCIES[currency]?.symbol || currency
+  return `${v.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${sym}`
 }
 
 export function clamp(n, min, max) {

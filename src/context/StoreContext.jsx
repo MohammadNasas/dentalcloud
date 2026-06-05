@@ -22,6 +22,7 @@ const EMPTY = {
 export function StoreProvider({ children }) {
   const [booting, setBooting] = useState(true)
   const [recovery, setRecovery] = useState(false)
+  const [pendingOtp, setPendingOtp] = useState(null) // { email, pending } when email confirmation is on
   const [state, setState] = useState(EMPTY)
   const stateRef = useRef(state)
   useEffect(() => { stateRef.current = state }, [state])
@@ -84,8 +85,18 @@ export function StoreProvider({ children }) {
   const register = useCallback(async (payload) => {
     const res = await backend.signUp(payload)
     if (res.ok) await loadSession()
+    else if (res.needsOtp) setPendingOtp({ email: res.email, pending: res.pending })
     return res
   }, [loadSession])
+
+  const verifyOtp = useCallback(async (token) => {
+    if (!pendingOtp) return { ok: false }
+    const res = await backend.verifyOtp(pendingOtp.email, token, pendingOtp.pending)
+    if (res.ok) { setPendingOtp(null); await loadSession() }
+    return res
+  }, [pendingOtp, loadSession])
+  const resendOtp = useCallback(() => (pendingOtp ? backend.resendOtp(pendingOtp.email) : Promise.resolve({ ok: false })), [pendingOtp])
+  const cancelOtp = useCallback(() => setPendingOtp(null), [])
 
   const logout = useCallback(() => {
     setState(EMPTY)
@@ -223,6 +234,7 @@ export function StoreProvider({ children }) {
 
   const value = {
     booting, recovery, mode: backend.mode,
+    otpEmail: pendingOtp?.email || null, verifyOtp, resendOtp, cancelOtp,
     clinic, currentUser, tier, can,
     login, logout, register, resetPassword, updatePassword,
     patients: state.patients, doctors: state.doctors, appointments: state.appointments,

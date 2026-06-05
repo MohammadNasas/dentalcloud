@@ -10,7 +10,7 @@ import { TIERS, DOCTOR_COLORS } from '../lib/db'
 import { DEFAULT_PRICES, INSTRUCTIONS } from '../lib/treatments'
 import FeatureLock from '../components/FeatureLock'
 import { Modal, Field, Segmented, Avatar, Badge } from '../components/ui'
-import { cx } from '../lib/utils'
+import { cx, CURRENCIES } from '../lib/utils'
 
 const SECTIONS = [
   { id: 'clinic', icon: Building2, key: 'clinic' },
@@ -68,7 +68,9 @@ function ClinicSection() {
         <Field label={`${t('settings.clinicName')} (ع)`}><input className="input" value={nameAr} onChange={(e) => setNameAr(e.target.value)} /></Field>
         <Field label={t('settings.currency')}>
           <select className="input" value={currency} onChange={(e) => setCurrency(e.target.value)}>
-            {['JOD', 'USD', 'EUR', 'SAR', 'AED', 'EGP', 'GBP', 'KWD', 'QAR'].map((c) => <option key={c} value={c}>{c}</option>)}
+            {Object.entries(CURRENCIES).map(([code, c]) => (
+              <option key={code} value={code}>{code} — {lang === 'ar' ? c.ar : c.en} ({c.symbol})</option>
+            ))}
           </select>
         </Field>
         <Field label={t('settings.language')}>
