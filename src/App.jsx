@@ -11,6 +11,7 @@ import Appointments from './pages/Appointments'
 import Payments from './pages/Payments'
 import Reports from './pages/Reports'
 import Instructions from './pages/Instructions'
+import Download from './pages/Download'
 import Packages from './pages/Packages'
 import Settings from './pages/Settings'
 
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/payments" element={<Payments />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/instructions" element={<Instructions />} />
+        <Route path="/download" element={<Download />} />
         <Route path="/packages" element={<Packages />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

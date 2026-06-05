@@ -3,11 +3,12 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, CalendarDays, Wallet, BarChart3, Package,
-  Settings, LogOut, Menu, X, Lock, Globe, Stethoscope, FileText,
+  Settings, LogOut, Menu, X, Lock, Globe, Stethoscope, FileText, Download,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS } from '../lib/db'
+import { isElectron } from '../lib/downloads'
 import { cx } from '../lib/utils'
 import { Avatar } from './ui'
 
@@ -18,9 +19,10 @@ const NAV = [
   { to: '/payments', key: 'payments', icon: Wallet },
   { to: '/instructions', key: 'instructions', icon: FileText },
   { to: '/reports', key: 'reports', icon: BarChart3, feature: 'reports' },
+  { to: '/download', key: 'download', icon: Download, webOnly: true },
   { to: '/packages', key: 'packages', icon: Package },
   { to: '/settings', key: 'settings', icon: Settings },
-]
+].filter((item) => !(item.webOnly && isElectron))
 
 export default function Layout() {
   const { t, L, lang, toggleLang } = useI18n()
