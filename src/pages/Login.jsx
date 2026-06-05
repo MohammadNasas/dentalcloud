@@ -162,8 +162,8 @@ export default function Login({ initialTab = 'signin', onBack }) {
               </div>
               <form onSubmit={doVerify} className="space-y-4">
                 <Field label={t('auth.verificationCode')}>
-                  <input className="input text-center text-lg font-bold tracking-[0.4em]" dir="ltr" inputMode="numeric" autoFocus
-                    value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="••••••" />
+                  <input className="input text-center text-lg font-bold tracking-[0.3em]" dir="ltr" inputMode="numeric" autoFocus
+                    value={otpCode} onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="••••••••" />
                 </Field>
                 {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{error}</p>}
                 {resent && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600">{t('auth.codeResent')}</p>}
