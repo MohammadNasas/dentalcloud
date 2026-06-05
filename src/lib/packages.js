@@ -11,6 +11,8 @@ export const PACKAGE_FEATURES = {
       { en: 'Fees / paid / remaining tracking', ar: 'تتبّع الأجور / المدفوع / المتبقي' },
       { en: 'Export to Word (per patient & all patients)', ar: 'تصدير إلى Word (لكل مريض وللكل)' },
       { en: 'Treatment timeline', ar: 'الخط الزمني للعلاج' },
+      { en: 'Current-state vs treatment view per tooth', ar: 'تبديل بين الحالة والعلاج لكل سن' },
+      { en: 'Printable instruction sheets', ar: 'أوراق تعليمات للطباعة' },
     ],
   },
   economy: {
@@ -34,9 +36,8 @@ export const PACKAGE_FEATURES = {
       { en: 'Before/after photos & X-ray gallery', ar: 'معرض صور قبل/بعد وأشعة' },
       { en: 'Monthly performance reports & charts', ar: 'تقارير ورسوم أداء شهرية' },
       { en: 'Split payments (cash + card together)', ar: 'دفع مقسّم (نقد + بطاقة معاً)' },
-      { en: 'Printable & editable treatment instructions', ar: 'تعليمات علاج قابلة للطباعة والتعديل' },
-      { en: 'Current-state ⇄ treatment-done navigation per tooth', ar: 'تنقّل بين الحالة الحالية والعلاج المنجز لكل سن' },
       { en: 'Collection rate & revenue analytics', ar: 'تحليلات نسبة التحصيل والإيراد' },
+      { en: 'Priority support', ar: 'دعم بأولوية' },
     ],
   },
 }
