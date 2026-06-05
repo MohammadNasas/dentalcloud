@@ -1,0 +1,85 @@
+{
+  "name": "dental-clinic-manager",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "DentaCare - Dental Clinic Management System",
+  "author": "DentaCare",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "electron": "electron .",
+    "icon": "node scripts/make-icon.cjs",
+    "pack": "vite build && electron-builder --dir",
+    "dist": "vite build && electron-builder",
+    "release": "vite build && electron-builder --publish always"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.107.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "docx": "^8.5.0",
+    "file-saver": "^2.0.5",
+    "framer-motion": "^11.3.19",
+    "lucide-react": "^0.427.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "electron": "^31.7.6",
+    "electron-builder": "^24.13.3",
+    "png-to-ico": "^2.1.8",
+    "postcss": "^8.4.40",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^3.4.7",
+    "vite": "^5.4.0"
+  },
+  "build": {
+    "appId": "com.dentacare.clinic",
+    "productName": "DentaCare",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "publish": [
+      { "provider": "github" }
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64", "ia32"] }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "DentaCare-Windows-${arch}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DentaCare",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        { "target": "dmg", "arch": ["x64", "arm64"] }
+      ],
+      "category": "public.app-category.medical",
+      "icon": "build/icon.png",
+      "artifactName": "DentaCare-macOS-${arch}.${ext}"
+    },
+    "dmg": {
+      "title": "DentaCare ${version}"
+    }
+  }
+}
