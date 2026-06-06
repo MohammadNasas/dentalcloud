@@ -204,6 +204,7 @@ const COMPLIMENTARY_HASHES = [
   '50fb0c52d73b7b0963f9e2da16b619e1e14bf257ff868c856f581409d07471ed',
   '9822c4c55a9c90f13a3d6b132f13f8f235c2df649bb6547c014f8e77afeaff64',
   'f74ec02046e1787f8bcb6fbd3263a32be7d68cc1933f3d6ef2facaf48af2606f',
+  '0a63e0c92d3dc6a4f0a0daf8635d7355b6d16cca0eb51c0e5e679e5bd9788194',
 ]
 async function sha256hex(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
