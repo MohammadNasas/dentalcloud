@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Plus, Trash2, Printer, Stethoscope, Layers, Eye, Wrench } from 'lucide-react'
 import { useI18n } from '../../i18n/I18nContext'
 import { useStore } from '../../context/StoreContext'
@@ -160,6 +160,7 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
     .filter((r) => r.toothId === toothId)
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
+  const customInputRef = useRef(null)
   const [itemKey, setItemKey] = useState('caries')
   const [customLabel, setCustomLabel] = useState('')
   const [surfaces, setSurfaces] = useState([])
@@ -209,6 +210,10 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
         surfaces: [], status, date: new Date(date).toISOString(),
         doctorId, price: kind === 'treatment' ? Number(price) || 0 : 0, notes,
       })
+      setCustomLabel('')
+      // إعادة الفوكس على الحقل فوراً عشان يقدر يضيف إدخال ثاني بدون ما يكبس
+      setTimeout(() => customInputRef.current?.focus(), 30)
+      return
     } else {
       addToothRecord({
         patientId: patient.id, toothId, dentition,
@@ -288,12 +293,17 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
           </div>
 
           {isOther && (
-            <Field label={lang === 'ar' ? 'اسم آخر (اكتبه ثم اضغط +)' : 'Custom name (type, then +)'}>
+            <Field label={lang === 'ar' ? 'اسم آخر — اكتبه واضغط Enter أو ＋' : 'Custom name — type and press Enter or ＋'}>
               <div className="flex gap-2">
-                <input className="input" value={customLabel} autoFocus
+                <input
+                  ref={customInputRef}
+                  className="input"
+                  value={customLabel}
+                  autoFocus
                   onChange={(e) => setCustomLabel(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); save() } }}
-                  placeholder={lang === 'ar' ? 'اكتب الاسم…' : 'Type a name…'} />
+                  placeholder={lang === 'ar' ? 'اكتب الاسم واضغط Enter…' : 'Type a name and press Enter…'}
+                />
                 <button type="button" onClick={save} disabled={!customLabel.trim()}
                   className="btn-primary shrink-0 !px-3.5" title={lang === 'ar' ? 'إضافة' : 'Add'}>
                   <Plus size={18} />

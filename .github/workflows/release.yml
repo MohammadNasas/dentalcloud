@@ -1,6 +1,5 @@
 name: Build & Release
 
-# Runs when you push a version tag like v1.0.0 (or manually).
 on:
   push:
     tags: ['v*']
@@ -10,11 +9,13 @@ permissions:
   contents: write
 
 jobs:
+  # ── المرحلة 1: بناء كل نظام وحفظ الملفات مؤقتاً ──────────────────────────
   build:
     strategy:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -25,9 +26,45 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Build & publish installers
+      - name: Build installer (no publish)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        run: npm run release
+        run: npm run dist
+
+      # رفع الملفات المبنية كـ artifact مؤقت
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          retention-days: 3
+          path: |
+            release/*.exe
+            release/*.exe.blockmap
+            release/*.dmg
+            release/*.dmg.blockmap
+            release/*.yml
+            release/*.yaml
+
+  # ── المرحلة 2: بعد ما الكل يبني، انشر release واحد بكل الملفات ────────────
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release with all installers
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**
+          draft: false
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
