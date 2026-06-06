@@ -13,7 +13,7 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 640,
     backgroundColor: '#f4f7fa',
-    title: 'SmarTooth',
+    title: 'DentalCloud',
     icon: path.join(__dirname, '..', 'build', 'icon.ico'),
     show: false,
     autoHideMenuBar: true,
