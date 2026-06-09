@@ -45,6 +45,7 @@ export function StoreProvider({ children }) {
         currentUser: me.user,
         doctors: data.doctors, patients: data.patients, toothRecords: data.toothRecords,
         appointments: data.appointments, payments: data.payments, suggestions: data.suggestions,
+        labOrders: data.labOrders || [],
       })
     } else {
       setState(EMPTY)
