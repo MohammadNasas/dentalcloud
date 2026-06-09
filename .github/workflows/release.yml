@@ -23,24 +23,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
-      - name: Build web app (Vite)
+      - name: Build & package installer (no publish)
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        run: npm run build
-
-      - name: Package installer (no publish)
-        env:
-          # منع التوقيع على macOS — ما في certificate في CI
+          # macOS: skip code signing — no certificate in CI
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          CSC_LINK: ''
-          CSC_KEY_PASSWORD: ''
-        run: npx electron-builder --publish never
+          USE_HARD_LINKS: false
+        run: npm run dist:ci
 
       # رفع الملفات المبنية كـ artifact مؤقت
       - name: Upload artifacts
@@ -69,7 +64,7 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: List artifacts (debug)
+      - name: List artifacts
         run: ls -la artifacts/
 
       - name: Create GitHub Release with all installers
