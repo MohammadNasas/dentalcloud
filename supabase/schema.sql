@@ -57,12 +57,20 @@ create table if not exists public.suggestions (
   created_at timestamptz default now()
 );
 
+create table if not exists public.lab_orders (
+  id uuid primary key default gen_random_uuid(),
+  clinic_id uuid not null references public.clinics(id) on delete cascade,
+  data jsonb not null default '{}',
+  updated_at timestamptz default now()
+);
+
 create index if not exists idx_doctors_clinic on public.doctors(clinic_id);
 create index if not exists idx_patients_clinic on public.patients(clinic_id);
 create index if not exists idx_tooth_clinic on public.tooth_records(clinic_id);
 create index if not exists idx_appt_clinic on public.appointments(clinic_id);
 create index if not exists idx_pay_clinic on public.payments(clinic_id);
 create index if not exists idx_sugg_clinic on public.suggestions(clinic_id);
+create index if not exists idx_lab_clinic on public.lab_orders(clinic_id);
 
 -- ── Helper: the clinic the current logged-in user belongs to ─────────────
 create or replace function public.current_clinic_id()
@@ -78,6 +86,7 @@ alter table public.tooth_records enable row level security;
 alter table public.appointments  enable row level security;
 alter table public.payments      enable row level security;
 alter table public.suggestions   enable row level security;
+alter table public.lab_orders    enable row level security;
 
 -- ── Policies ─────────────────────────────────────────────────────────────
 -- clinics
@@ -109,7 +118,7 @@ create policy doctors_delete on public.doctors for delete
 do $$
 declare t text;
 begin
-  foreach t in array array['patients','tooth_records','appointments','payments','suggestions']
+  foreach t in array array['patients','tooth_records','appointments','payments','suggestions','lab_orders']
   loop
     execute format('drop policy if exists %1$s_all on public.%1$s;', t);
     execute format(

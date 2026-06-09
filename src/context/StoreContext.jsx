@@ -11,13 +11,13 @@ export const FEATURE_MIN_TIER = {
   priceCatalog: 'economy', perio: 'economy', plaque: 'economy',
   priorityTeeth: 'economy', reminders: 'economy', apptWorkLog: 'economy',
   paymentMethods: 'economy',
-  photos: 'pro', reports: 'pro', splitPayments: 'pro',
+  photos: 'pro', reports: 'pro', splitPayments: 'pro', lab: 'pro',
   // instructions are available to every plan (their own main section)
 }
 
 const EMPTY = {
   clinic: null, currentUser: null,
-  doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [],
+  doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [],
 }
 
 export function StoreProvider({ children }) {
@@ -247,6 +247,20 @@ export function StoreProvider({ children }) {
     return s
   }, [clinic, currentUser, upsert])
 
+  const addLabOrder = useCallback((data) => {
+    const order = {
+      id: backend.genId(), clinicId: clinic.id, createdBy: currentUser?.id,
+      createdAt: new Date().toISOString(), status: 'sent', toothIds: [], pieces: 1, ...data,
+    }
+    upsert('labOrders', 'lab_orders', order)
+    return order
+  }, [clinic, currentUser, upsert])
+  const updateLabOrder = useCallback((id, patch) => {
+    const old = stateRef.current.labOrders.find((o) => o.id === id)
+    if (old) upsert('labOrders', 'lab_orders', { ...old, ...patch })
+  }, [upsert])
+  const deleteLabOrder = useCallback((id) => drop('labOrders', 'lab_orders', id), [drop])
+
   const resetToDemo = useCallback(() => {
     if (backend.mode !== 'local') { logout(); return }
     resetDB(); seedDB()
@@ -263,11 +277,13 @@ export function StoreProvider({ children }) {
     login, logout, register, resetPassword, updatePassword,
     patients: state.patients, doctors: state.doctors, appointments: state.appointments,
     toothRecords: state.toothRecords, payments: state.payments, suggestions: state.suggestions,
+    labOrders: state.labOrders,
     getPatient, getDoctor, recordsForPatient, apptsForPatient, paymentsForPatient, balanceForPatient,
     addPatient, updatePatient, deletePatient,
     addToothRecord, updateToothRecord, deleteToothRecord,
     addAppointment, updateAppointment, deleteAppointment,
     addPayment, deletePayment,
+    addLabOrder, updateLabOrder, deleteLabOrder,
     updateClinic, setTier, addUser, updateUser, deleteUser, addSuggestion, resetToDemo,
   }
 

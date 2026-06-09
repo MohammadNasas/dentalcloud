@@ -24,12 +24,12 @@ import {
 // logical table -> Supabase table name
 const SB = {
   patients: 'patients', toothRecords: 'tooth_records', appointments: 'appointments',
-  payments: 'payments', suggestions: 'suggestions', doctors: 'doctors',
+  payments: 'payments', suggestions: 'suggestions', doctors: 'doctors', lab_orders: 'lab_orders',
 }
 // logical table -> local db collection name
 const LOCAL = {
   patients: 'patients', toothRecords: 'toothRecords', appointments: 'appointments',
-  payments: 'payments', suggestions: 'suggestions', doctors: 'users',
+  payments: 'payments', suggestions: 'suggestions', doctors: 'users', lab_orders: 'labOrders',
 }
 
 function newClinic(clinicName, tier, paid = false) {
@@ -102,10 +102,12 @@ const localBackend = {
   async bootstrap(clinicId) {
     const db = getOrInitDB()
     const f = (arr) => arr.filter((x) => x.clinicId === clinicId)
+    if (!db.labOrders) db.labOrders = []
     return {
       clinic: db.clinics.find((c) => c.id === clinicId),
       doctors: f(db.users), patients: f(db.patients), toothRecords: f(db.toothRecords),
       appointments: f(db.appointments), payments: f(db.payments), suggestions: f(db.suggestions),
+      labOrders: f(db.labOrders),
     }
   },
 
@@ -218,13 +220,16 @@ const cloudBackend = {
   async signOut() { await supabase.auth.signOut() },
 
   async bootstrap() {
-    const out = { clinic: null, doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [] }
+    const out = { clinic: null, doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [] }
     const cl = await supabase.from('clinics').select('*').limit(1).maybeSingle()
     if (cl.data) out.clinic = { ...cl.data.data, id: cl.data.id }
     const pairs = [['doctors', 'doctors'], ['patients', 'patients'], ['tooth_records', 'toothRecords'],
-      ['appointments', 'appointments'], ['payments', 'payments'], ['suggestions', 'suggestions']]
+      ['appointments', 'appointments'], ['payments', 'payments'], ['suggestions', 'suggestions'],
+      ['lab_orders', 'labOrders']]
     for (const [sb, key] of pairs) {
-      const r = await supabase.from(sb).select('*')
+      const r = await supabase.from(sb).select('*').maybeSingle ? await supabase.from(sb).select('*') : { data: [] }
+      // lab_orders table may not exist yet — skip gracefully
+      if (r.error) { console.warn(`bootstrap: table ${sb} not ready`, r.error.message); continue }
       out[key] = (r.data || []).map((row) => ({ ...row.data, id: row.id, clinicId: row.clinic_id }))
     }
     return out

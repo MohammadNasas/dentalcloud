@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, CalendarDays, Wallet, BarChart3, Package,
-  Settings, LogOut, Menu, X, Lock, Globe, Stethoscope, FileText, Download,
+  Settings, LogOut, Menu, X, Lock, Globe, Stethoscope, FileText, Download, FlaskConical,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -18,6 +18,7 @@ const NAV = [
   { to: '/appointments', key: 'appointments', icon: CalendarDays, feature: 'appointments' },
   { to: '/payments', key: 'payments', icon: Wallet },
   { to: '/instructions', key: 'instructions', icon: FileText },
+  { to: '/lab', key: 'lab', icon: FlaskConical, feature: 'lab' },
   { to: '/reports', key: 'reports', icon: BarChart3, feature: 'reports' },
   { to: '/download', key: 'download', icon: Download, webOnly: true },
   { to: '/packages', key: 'packages', icon: Package },

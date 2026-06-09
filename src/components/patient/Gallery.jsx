@@ -38,20 +38,40 @@ export default function Gallery({ patient }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photos.length])
 
+  const [uploadError, setUploadError] = useState('')
+
   async function onFiles(files) {
     setBusy(true)
+    setUploadError('')
     try {
-      const next = [...photos]
+      const currentPhotos = patient.photos || []
+      const next = [...currentPhotos]
+      let added = 0
       for (const file of files) {
         if (!file.type.startsWith('image/')) continue
-        const dataUrl = await fileToResizedDataURL(file)
-        const id = genId('img')
-        await putImage(id, dataUrl)
-        setUrls((u) => ({ ...u, [id]: dataUrl }))
-        next.push({ id, category, caption: '', date: new Date().toISOString() })
+        try {
+          const dataUrl = await fileToResizedDataURL(file)
+          const id = genId('img')
+          await putImage(id, dataUrl)
+          setUrls((u) => ({ ...u, [id]: dataUrl }))
+          next.push({ id, category, caption: '', date: new Date().toISOString() })
+          added++
+        } catch (err) {
+          console.error('Failed to process image:', err)
+          setUploadError(lang === 'ar' ? 'فشل تحميل إحدى الصور، حاول مرة أخرى' : 'Failed to upload an image, try again')
+        }
       }
-      updatePatient(patient.id, { photos: next })
+      if (added > 0) updatePatient(patient.id, { photos: next })
+    } catch (err) {
+      console.error('Gallery upload error:', err)
+      setUploadError(lang === 'ar' ? 'حدث خطأ أثناء الرفع' : 'Upload error, please try again')
     } finally { setBusy(false) }
+  }
+
+  function onDrop(e) {
+    e.preventDefault()
+    const files = [...(e.dataTransfer?.files || [])]
+    if (files.length) onFiles(files)
   }
 
   async function remove(id) {
@@ -63,13 +83,27 @@ export default function Gallery({ patient }) {
 
   return (
     <div className="space-y-4">
-      <div className="card flex flex-wrap items-center gap-3 p-4">
-        <Segmented value={category} onChange={setCategory} size="sm"
-          options={Object.entries(CATEGORIES).map(([k, v]) => ({ value: k, label: L(v) }))} />
-        <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => onFiles([...e.target.files])} />
-        <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-primary ms-auto">
-          <Upload size={16} /> {busy ? t('export.exporting') : t('common.upload')}
-        </button>
+      <div className="card p-4 space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Segmented value={category} onChange={setCategory} size="sm"
+            options={Object.entries(CATEGORIES).map(([k, v]) => ({ value: k, label: L(v) }))} />
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden
+            onChange={(e) => { if (e.target.files?.length) { onFiles([...e.target.files]); e.target.value = '' } }} />
+          <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-primary ms-auto">
+            <Upload size={16} /> {busy ? (lang === 'ar' ? 'جاري الرفع…' : 'Uploading…') : t('common.upload')}
+          </button>
+        </div>
+        {/* Drag-and-drop zone */}
+        <div
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={onDrop}
+          onClick={() => fileRef.current?.click()}
+          className="cursor-pointer rounded-xl border-2 border-dashed border-ink-200 px-4 py-5 text-center text-sm text-ink-400 transition-colors hover:border-brand-400 hover:bg-brand-50/30"
+        >
+          <Upload size={20} className="mx-auto mb-1 text-ink-300" />
+          {lang === 'ar' ? 'اسحب الصور هنا أو اضغط للاختيار' : 'Drag images here or click to choose'}
+        </div>
+        {uploadError && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{uploadError}</p>}
       </div>
 
       {photos.length === 0 ? (

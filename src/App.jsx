@@ -17,6 +17,7 @@ import Instructions from './pages/Instructions'
 import Download from './pages/Download'
 import Packages from './pages/Packages'
 import Settings from './pages/Settings'
+import Lab from './pages/Lab'
 
 function Splash() {
   return (
@@ -74,6 +75,7 @@ export default function App() {
           <Route path="/instructions" element={<Instructions />} />
           <Route path="/download" element={<Download />} />
           <Route path="/packages" element={<Packages />} />
+          <Route path="/lab" element={<Lab />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

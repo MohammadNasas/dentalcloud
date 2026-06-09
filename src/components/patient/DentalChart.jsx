@@ -172,10 +172,12 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
   const [notes, setNotes] = useState('')
   const [instrFor, setInstrFor] = useState(null)
 
+  const customPrices = (clinic?.prices || []).filter((p) => p.key.startsWith('custom_'))
   const isOther = itemKey === 'otherCondition' || itemKey === 'otherTreatment'
+  const isCustomPrice = customPrices.some((p) => p.key === itemKey)
   const item = DENTAL_ITEMS[itemKey]
   const needsSurfaces = item?.scope === 'surface'
-  const isTreatment = isOther ? itemKey === 'otherTreatment' : item?.kind === 'treatment'
+  const isTreatment = isCustomPrice ? true : isOther ? itemKey === 'otherTreatment' : item?.kind === 'treatment'
 
   function pickItem(k) {
     setItemKey(k)
@@ -185,6 +187,11 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
       setPrice(pr ? String(pr.price) : '')
     } else setPrice('')
     if (it.scope !== 'surface') { setSurfaces([]); setCariesClass('') }
+  }
+  function pickCustomPrice(priceItem) {
+    setItemKey(priceItem.key)
+    setPrice(String(priceItem.price || ''))
+    setSurfaces([]); setCariesClass(''); setCustomLabel('')
   }
   function pickOther(kind) {
     setItemKey(kind === 'treatment' ? 'otherTreatment' : 'otherCondition')
@@ -201,6 +208,19 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
   }
 
   function save() {
+    if (isCustomPrice) {
+      const priceItem = customPrices.find((p) => p.key === itemKey)
+      if (!priceItem) return
+      addToothRecord({
+        patientId: patient.id, toothId, dentition,
+        itemKey: 'other', kind: 'treatment',
+        label: { en: priceItem.en || priceItem.ar, ar: priceItem.ar || priceItem.en },
+        surfaces: [], status, date: new Date(date).toISOString(),
+        doctorId, price: Number(price) || 0, notes,
+      })
+      setNotes(''); setSurfaces([]); setCariesClass(''); setCustomLabel(''); setPrice('')
+      return
+    }
     if (isOther) {
       if (!customLabel.trim()) return
       const kind = itemKey === 'otherTreatment' ? 'treatment' : 'condition'
@@ -211,7 +231,6 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
         doctorId, price: kind === 'treatment' ? Number(price) || 0 : 0, notes,
       })
       setCustomLabel('')
-      // إعادة الفوكس على الحقل فوراً عشان يقدر يضيف إدخال ثاني بدون ما يكبس
       setTimeout(() => customInputRef.current?.focus(), 30)
       return
     } else {
@@ -287,6 +306,14 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
             <div className="flex flex-wrap gap-1.5">
               {TREATMENT_KEYS.map((k) => (
                 <ItemChip key={k} k={k} active={itemKey === k} onClick={() => pickItem(k)} lang={lang} />
+              ))}
+              {customPrices.map((p) => (
+                <button key={p.key} onClick={() => pickCustomPrice(p)}
+                  className={cx('inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs font-semibold transition-all',
+                    itemKey === p.key ? 'border-violet-400 bg-violet-50 text-violet-700 ring-2 ring-violet-400/20' : 'border-ink-200 bg-white text-ink-600 hover:border-ink-300')}>
+                  <span className="h-2.5 w-2.5 rounded-full bg-violet-400" />
+                  {lang === 'ar' ? (p.ar || p.en) : (p.en || p.ar)}
+                </button>
               ))}
               <OtherChip active={itemKey === 'otherTreatment'} onClick={() => pickOther('treatment')} lang={lang} />
             </div>
