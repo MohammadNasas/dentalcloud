@@ -16,6 +16,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
   const [tab, setTab] = useState(initialTab)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('_rememberMe') !== 'false')
   const [forgot, setForgot] = useState({ open: false, email: '', sent: false })
   const [otpCode, setOtpCode] = useState('')
   const [resent, setResent] = useState(false)
@@ -53,6 +54,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
   async function doSignin(e) {
     e.preventDefault()
     setError(''); setBusy(true)
+    localStorage.setItem('_rememberMe', String(rememberMe))
     const res = await login(signin.email, signin.password)
     setBusy(false)
     if (!res.ok) setError(t(`auth.${res.error || 'wrongCreds'}`))
@@ -224,12 +226,17 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 <input className="input" type="password" dir="ltr" value={signin.password}
                   onChange={(e) => setSignin({ ...signin, password: e.target.value })} placeholder="••••" />
               </Field>
-              {isCloud && (
-                <div className="text-end">
+              <div className="flex items-center justify-between">
+                <label className="flex cursor-pointer items-center gap-2 select-none">
+                  <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border-ink-300 accent-brand-600 cursor-pointer" />
+                  <span className="text-sm text-ink-600">{t('auth.rememberMe')}</span>
+                </label>
+                {isCloud && (
                   <button type="button" onClick={() => { setForgot({ open: true, email: signin.email, sent: false }); setError('') }}
                     className="text-xs font-bold text-brand-600 hover:underline">{t('auth.forgotPassword')}</button>
-                </div>
-              )}
+                )}
+              </div>
               {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{error}</p>}
               <button disabled={busy} className="btn-primary w-full !py-3">
                 {busy ? <Spinner /> : <>{t('auth.signIn')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
