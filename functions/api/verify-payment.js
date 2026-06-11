@@ -1,8 +1,10 @@
-// Cloudflare Pages Function: verifies a MyFatoorah payment and (if paid) activates
+// Cloudflare Pages Function: verifies a Lahza payment and (if paid) activates
 // the clinic's plan in Supabase. Uses Supabase's REST API directly via fetch
 // (no supabase-js → works natively on the Cloudflare Workers runtime).
 // Route: POST /api/verify-payment
-// Env vars: MYFATOORAH_TOKEN, MYFATOORAH_BASE, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// Env vars: LAHZA_SECRET_KEY, LAHZA_BASE (optional), SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+const PRICES = { student: 5, economy: 60, pro: 100 }
+
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -19,36 +21,55 @@ export const onRequestOptions = () =>
   })
 
 export const onRequestPost = async ({ request, env }) => {
-  const token = env.MYFATOORAH_TOKEN
-  const base = env.MYFATOORAH_BASE || 'https://apitest.myfatoorah.com'
-  if (!token) return json({ ok: false, error: 'not_configured' }, 503)
+  const secret = env.LAHZA_SECRET_KEY
+  const base = (env.LAHZA_BASE || 'https://api.lahza.io').replace(/\/$/, '')
+  if (!secret) return json({ ok: false, error: 'not_configured' }, 503)
 
   let payload
   try { payload = await request.json() } catch { return json({ ok: false, error: 'bad_json' }, 400) }
-  const { paymentId } = payload || {}
-  if (!paymentId) return json({ ok: false, error: 'no_payment_id' }, 400)
+  const { reference } = payload || {}
+  if (!reference) return json({ ok: false, error: 'no_reference' }, 400)
 
-  // 1) Check the payment status with MyFatoorah
-  let inv
+  // 1) Check the payment status with Lahza
+  let tx
   try {
-    const r = await fetch(`${base}/v2/GetPaymentStatus`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Key: paymentId, KeyType: 'PaymentId' }),
+    const r = await fetch(`${base}/transaction/verify/${encodeURIComponent(reference)}`, {
+      headers: { Authorization: `Bearer ${secret}` },
     })
     const data = await r.json()
-    if (!data.IsSuccess) return json({ ok: false, error: 'status_failed', message: data.Message }, 400)
-    inv = data.Data
+    if (!data.status) return json({ ok: false, error: 'status_failed', message: data.message }, 400)
+    tx = data.data
   } catch (e) {
     return json({ ok: false, error: 'request_failed', message: String(e) }, 500)
   }
 
-  if (inv.InvoiceStatus !== 'Paid') return json({ ok: false, status: inv.InvoiceStatus })
+  if (!tx || tx.status !== 'success') return json({ ok: false, status: tx?.status || 'unknown' })
 
-  // 2) Activate the plan (CustomerReference = "clinicId:tier")
-  const [clinicId, tier] = String(inv.CustomerReference || '').split(':')
-  if (!clinicId || !['student', 'economy', 'pro'].includes(tier)) return json({ ok: false, error: 'bad_reference' }, 400)
+  // 2) Recover clinicId + tier — from metadata, falling back to the reference
+  //    (reference format = "clinicId--tier--timestamp").
+  let clinicId, tier
+  try {
+    const meta = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : tx.metadata
+    clinicId = meta?.clinicId; tier = meta?.tier
+  } catch { /* fall back to the reference below */ }
+  if (!clinicId || !tier) {
+    const parts = String(tx.reference || reference).split('--')
+    clinicId = parts[0]; tier = parts[1]
+  }
+  if (!clinicId || !['student', 'economy', 'pro'].includes(tier)) {
+    return json({ ok: false, error: 'bad_reference' }, 400)
+  }
 
+  // 3) Anti-tampering: the paid amount must match the tier's price.
+  //    Prices are defined in USD, so only enforce exact match for USD charges;
+  //    for other currencies just require a positive amount.
+  const paid = Number(tx.amount)
+  if ((tx.currency || 'USD') === 'USD' && paid !== PRICES[tier] * 100) {
+    return json({ ok: false, error: 'amount_mismatch', paid, expected: PRICES[tier] * 100 }, 400)
+  }
+  if (!(paid > 0)) return json({ ok: false, error: 'amount_mismatch', paid }, 400)
+
+  // 4) Activate the plan
   const supaUrl = env.SUPABASE_URL
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
   if (!supaUrl || !serviceKey) return json({ ok: false, error: 'supabase_not_configured' }, 503)

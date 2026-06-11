@@ -24,7 +24,7 @@ export function StoreProvider({ children }) {
   const [booting, setBooting] = useState(true)
   const [recovery, setRecovery] = useState(false)
   const [pendingOtp, setPendingOtp] = useState(null) // { email, pending } when email confirmation is on
-  const [paymentResult, setPaymentResult] = useState(null) // result after returning from MyFatoorah
+  const [paymentResult, setPaymentResult] = useState(null) // result after returning from Lahza
   const [state, setState] = useState(EMPTY)
   const stateRef = useRef(state)
   useEffect(() => { stateRef.current = state }, [state])
@@ -69,14 +69,13 @@ export function StoreProvider({ children }) {
     return () => data?.subscription?.unsubscribe?.()
   }, [])
 
-  // Handle the return from a MyFatoorah payment → verify & refresh the plan.
+  // Handle the return from a Lahza payment → verify & refresh the plan.
   useEffect(() => {
-    const pid = getPaymentReturn()
-    if (!pid) return
+    const ref = getPaymentReturn()
+    if (!ref) return
     clearPaymentReturn()
-    if (pid === 'error') { setPaymentResult({ ok: false, reason: 'gateway' }); return }
     ;(async () => {
-      const res = await verifyPayment(pid)
+      const res = await verifyPayment(ref)
       if (res.ok) { await loadSession(); setPaymentResult({ ok: true, tier: res.tier }) }
       else setPaymentResult({ ok: false, status: res.status, error: res.error, message: res.message })
     })()

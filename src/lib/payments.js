@@ -1,4 +1,4 @@
-// Client helpers for the MyFatoorah payment flow. Calls the serverless payment
+// Client helpers for the Lahza payment flow. Calls the serverless payment
 // functions at /api/* — works on Cloudflare Pages (native) and Netlify (redirect).
 import { isCloud } from './supabaseClient'
 
@@ -20,12 +20,12 @@ export async function startCheckout({ tier, clinicId, customerName, email, phone
   }
 }
 
-export async function verifyPayment(paymentId) {
+export async function verifyPayment(reference) {
   try {
     const r = await fetch('/api/verify-payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ paymentId }),
+      body: JSON.stringify({ reference }),
     })
     return await r.json()
   } catch (e) {
@@ -33,12 +33,11 @@ export async function verifyPayment(paymentId) {
   }
 }
 
-// MyFatoorah returns to  …/?payment=return&paymentId=XXX
+// Lahza returns to  …/?reference=XXX  (trxref is an alias). Returns the
+// reference to verify, or null if this is not a payment return.
 export function getPaymentReturn() {
   const p = new URLSearchParams(window.location.search)
-  if (p.get('payment') === 'return' && p.get('paymentId')) return p.get('paymentId')
-  if (p.get('payment') === 'error') return 'error'
-  return null
+  return p.get('reference') || p.get('trxref') || null
 }
 export function clearPaymentReturn() {
   const url = new URL(window.location.href)

@@ -1,7 +1,7 @@
-// Cloudflare Pages Function: starts a MyFatoorah payment for a subscription plan.
+// Cloudflare Pages Function: starts a Lahza payment for a subscription plan.
 // Route: POST /api/create-payment
 // Env vars (Cloudflare Pages → Settings → Environment variables):
-//   MYFATOORAH_TOKEN, MYFATOORAH_BASE, MYFATOORAH_CURRENCY, SITE_URL (optional)
+//   LAHZA_SECRET_KEY, LAHZA_BASE (optional), LAHZA_CURRENCY (optional), SITE_URL (optional)
 const PRICES = { student: 5, economy: 60, pro: 100 }
 
 const json = (body, status = 200) =>
@@ -20,12 +20,12 @@ export const onRequestOptions = () =>
   })
 
 export const onRequestPost = async ({ request, env }) => {
-  const token = env.MYFATOORAH_TOKEN
-  if (!token) return json({ error: 'not_configured' }, 503)
-  const base = env.MYFATOORAH_BASE || 'https://apitest.myfatoorah.com'
-  const currency = env.MYFATOORAH_CURRENCY || 'USD'
-  // Default to the live deployment origin (e.g. https://your-app.pages.dev) so the
-  // payment redirect always returns to this site even without setting SITE_URL.
+  const secret = env.LAHZA_SECRET_KEY
+  if (!secret) return json({ error: 'not_configured' }, 503)
+  const base = (env.LAHZA_BASE || 'https://api.lahza.io').replace(/\/$/, '')
+  const currency = env.LAHZA_CURRENCY || 'USD'
+  // Default to the live deployment origin so Lahza redirects back to this site
+  // even without setting SITE_URL.
   const siteUrl = (env.SITE_URL || new URL(request.url).origin).replace(/\/$/, '')
 
   let payload
@@ -34,29 +34,34 @@ export const onRequestPost = async ({ request, env }) => {
   const amount = PRICES[tier]
   if (!amount || !clinicId) return json({ error: 'bad_request' }, 400)
 
+  // Lahza requires an email; fall back to a per-clinic address if the caller omits it.
+  const customerEmail = email || `clinic-${clinicId}@dentalcloud.app`
+  // The reference carries clinicId + tier so verify-payment can activate the plan.
+  // "--" is a safe delimiter: clinic ids are UUIDs (single "-" only).
+  const reference = `${clinicId}--${tier}--${Date.now()}`
+
   const body = {
-    CustomerName: customerName || 'Clinic',
-    NotificationOption: 'LNK',
-    InvoiceValue: amount,
-    DisplayCurrencyIso: currency,
-    CustomerEmail: email || undefined,
-    MobileCountryCode: phone ? '+962' : undefined,
-    CustomerMobile: phone || undefined,
-    CallBackUrl: `${siteUrl}/?payment=return`,
-    ErrorUrl: `${siteUrl}/?payment=error`,
-    CustomerReference: `${clinicId}:${tier}`,
-    Language: 'AR',
+    email: customerEmail,
+    amount: String(amount * 100), // smallest unit: cents (USD) / aghora (ILS) / qirsh (JOD)
+    currency,
+    reference,
+    callback_url: `${siteUrl}/`,
+    first_name: customerName || 'Clinic',
+    mobile: phone || undefined,
+    metadata: JSON.stringify({ clinicId, tier }),
   }
 
   try {
-    const r = await fetch(`${base}/v2/SendPayment`, {
+    const r = await fetch(`${base}/transaction/initialize`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
     const data = await r.json()
-    if (!data.IsSuccess) return json({ error: 'mf_failed', message: data.Message, details: data.ValidationErrors }, 400)
-    return json({ url: data.Data.InvoiceURL, invoiceId: data.Data.InvoiceId })
+    if (!data.status || !data.data?.authorization_url) {
+      return json({ error: 'lahza_failed', message: data.message, details: data.errors }, 400)
+    }
+    return json({ url: data.data.authorization_url, reference: data.data.reference })
   } catch (e) {
     return json({ error: 'request_failed', message: String(e) }, 500)
   }
