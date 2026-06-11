@@ -58,8 +58,8 @@ export default function Layout() {
     <div className="flex h-full flex-col">
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white shadow-soft">
-          <Stethoscope size={22} />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden shadow-soft">
+          <img src="/logo.png" alt="logo" className="h-full w-full object-cover" />
         </div>
         <div className="leading-tight">
           <p className="text-lg font-extrabold text-ink-800">{t('app.name')}</p>

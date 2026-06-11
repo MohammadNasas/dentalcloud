@@ -35,7 +35,7 @@ export default function Paywall() {
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 flex items-center justify-between text-white">
           <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 backdrop-blur"><Stethoscope size={22} /></div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden bg-white/15 backdrop-blur"><img src="/logo.png" alt="logo" className="h-full w-full object-cover" /></div>
             <span className="text-xl font-extrabold">{t('app.name')}</span>
           </div>
           <div className="flex items-center gap-2">

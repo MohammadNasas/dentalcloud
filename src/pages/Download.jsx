@@ -12,8 +12,8 @@ export default function Download() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div className="text-center">
-        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-soft">
-          <Stethoscope size={28} />
+        <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl overflow-hidden shadow-soft">
+          <img src="/logo.png" alt="logo" className="h-full w-full object-cover" />
         </div>
         <h1 className="text-2xl font-extrabold text-ink-800">{lang === 'ar' ? 'حمّل تطبيق سطح المكتب' : 'Download the desktop app'}</h1>
         <p className="mt-1 text-ink-400">{lang === 'ar' ? 'ثبّته على جهازك مثل أي برنامج — بياناتك نفسها على الموقع والتطبيق.' : 'Install it like any program — same data as the website.'}</p>

@@ -93,8 +93,8 @@ export default function Login({ initialTab = 'signin', onBack }) {
         <div className="absolute -bottom-32 -start-20 h-96 w-96 rounded-full bg-teal-300/20 blur-3xl" />
 
         <div className="relative flex items-center gap-3 text-white">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
-            <Stethoscope size={26} />
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl overflow-hidden bg-white/15 backdrop-blur">
+            <img src="/logo.png" alt="logo" className="h-full w-full object-cover" />
           </div>
           <div>
             <p className="text-2xl font-extrabold">{t('app.name')}</p>
@@ -138,7 +138,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
               </button>
             ) : (
               <div className="flex items-center gap-2 lg:hidden">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-600 text-white"><Stethoscope size={20} /></div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden"><img src="/logo.png" alt="logo" className="h-full w-full object-cover" /></div>
                 <span className="text-xl font-extrabold text-ink-800">{t('app.name')}</span>
               </div>
             )}
