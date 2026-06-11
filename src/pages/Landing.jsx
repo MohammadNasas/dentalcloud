@@ -7,7 +7,7 @@ import {
 import { useI18n } from '../i18n/I18nContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES } from '../lib/packages'
-import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/PackagePreviews'
+import { ChartPreview, CalendarPreview, DashboardPreview, AppShowcase } from '../components/PackagePreviews'
 import { cx } from '../lib/utils'
 
 const TIER_ICON = { student: GraduationCap, economy: Building2, pro: Crown }
@@ -93,8 +93,8 @@ export default function Landing({ onEnter }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {features.map((f, i) => (
-            <motion.div key={i} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.04 }}
-              className="card p-5">
+            <motion.div key={i} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.05 }}
+              className="card card-hover p-5">
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600"><f.icon size={22} /></div>
               <h3 className="mt-3 font-bold text-ink-800">{L(f)}</h3>
               <p className="mt-1 text-sm text-ink-400">{L(f.d)}</p>
@@ -103,20 +103,78 @@ export default function Landing({ onEnter }) {
         </div>
       </section>
 
-      {/* Screenshots showcase */}
-      <section className="bg-white py-12">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6">
-          <div className="mb-8 text-center">
-            <p className="flex items-center justify-center gap-2 text-sm font-bold uppercase tracking-wider text-brand-600"><Sparkles size={16} /> {t('packages.screenshotsTitle')}</p>
+      {/* App Showcase */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-slate-900 via-[#0f1f3d] to-brand-900 py-20">
+        {/* Ambient blobs */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-32 -start-32 h-96 w-96 rounded-full bg-brand-600/20 blur-3xl" />
+          <div className="absolute -bottom-32 -end-32 h-96 w-96 rounded-full bg-teal-500/20 blur-3xl" />
+        </div>
+
+        {/* Floating decorative teeth */}
+        <motion.div
+          animate={{ y: [0, -14, 0], rotate: [0, 6, 0] }}
+          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+          className="pointer-events-none absolute start-[6%] top-16 opacity-[0.07]">
+          <svg viewBox="0 0 60 80" width="70" fill="white">
+            <ellipse cx="30" cy="28" rx="22" ry="26" />
+            <rect x="16" y="48" width="12" height="28" rx="6" />
+            <rect x="32" y="48" width="12" height="28" rx="6" />
+          </svg>
+        </motion.div>
+        <motion.div
+          animate={{ y: [0, 14, 0], rotate: [0, -8, 0] }}
+          transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+          className="pointer-events-none absolute end-[5%] bottom-16 opacity-[0.07]">
+          <svg viewBox="0 0 60 80" width="90" fill="white">
+            <ellipse cx="30" cy="28" rx="22" ry="26" />
+            <rect x="16" y="48" width="12" height="28" rx="6" />
+            <rect x="32" y="48" width="12" height="28" rx="6" />
+          </svg>
+        </motion.div>
+
+        <div className="relative mx-auto max-w-5xl px-4 sm:px-6">
+          {/* Heading */}
+          <div className="mb-10 text-center">
+            <motion.span
+              initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
+              className="chip mb-3 bg-white/10 text-white/70 backdrop-blur">
+              <Sparkles size={13} />
+              {lang === 'ar' ? 'نظرة من الداخل' : 'Inside the app'}
+            </motion.span>
+            <motion.h2
+              initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}
+              className="text-3xl font-extrabold text-white">
+              {lang === 'ar' ? 'كل أداة صُمِّمت بعناية' : 'Every tool, crafted with care'}
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.2 }}
+              className="mt-2 text-white/50">
+              {lang === 'ar' ? 'اضغط على التبويبات لتستكشف' : 'Click the tabs to explore'}
+            </motion.p>
           </div>
-          <div className="grid gap-5 md:grid-cols-3">
-            {[['Dashboard', 'لوحة المعلومات', <DashboardPreview key="d" />], ['Dental chart', 'مخطط الأسنان', <ChartPreview key="c" />], ['Calendar', 'التقويم', <CalendarPreview key="cal" />]].map(([en, ar, comp], i) => (
-              <div key={i} className="card overflow-hidden">
-                <div className="bg-gradient-to-br from-ink-50 to-white p-4">{comp}</div>
-                <div className="border-t border-ink-100 px-4 py-2.5 text-sm font-bold text-ink-600">{lang === 'ar' ? ar : en}</div>
+
+          {/* Tabbed window mockup */}
+          <AppShowcase />
+
+          {/* Stat badges */}
+          <motion.div
+            initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}
+            className="mt-10 flex flex-wrap justify-center gap-4">
+            {[
+              { emoji: '🦷', val: '1,200+', label: lang === 'ar' ? 'مريض في النظام' : 'Patients managed' },
+              { emoji: '📅', val: '450+',   label: lang === 'ar' ? 'موعد شهرياً'    : 'Monthly appointments' },
+              { emoji: '⚡', val: '< 1s',   label: lang === 'ar' ? 'زمن التحميل'    : 'Load time' },
+            ].map((s) => (
+              <div key={s.label} className="flex items-center gap-3 rounded-2xl bg-white/8 px-5 py-3.5 ring-1 ring-white/10 backdrop-blur">
+                <span className="text-2xl">{s.emoji}</span>
+                <div>
+                  <p className="text-base font-extrabold text-white">{s.val}</p>
+                  <p className="text-xs text-white/50">{s.label}</p>
+                </div>
               </div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 

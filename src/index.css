@@ -59,7 +59,10 @@
 
 @layer components {
   .card {
-    @apply rounded-2xl bg-white shadow-card border border-ink-100/80;
+    @apply rounded-2xl bg-white shadow-card border border-ink-100/80 transition-all duration-300;
+  }
+  .card-hover {
+    @apply hover:-translate-y-1 hover:shadow-lg;
   }
 
   .btn {
@@ -109,6 +112,22 @@
 .page-enter {
   animation: fade-in 0.35s ease-out;
 }
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50%       { transform: translateY(-14px) rotate(4deg); }
+}
+@keyframes float-rev {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50%       { transform: translateY(12px) rotate(-5deg); }
+}
+.animate-float     { animation: float     7s ease-in-out infinite; }
+.animate-float-rev { animation: float-rev 9s ease-in-out infinite; }
 
 /* Glassy top bar */
 .glass {
