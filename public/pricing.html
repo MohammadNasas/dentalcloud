@@ -1,118 +1,198 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Pricing — DentalCloud</title>
-<meta name="description" content="DentalCloud pricing plans for dental clinics: Student, Economy, and Pro." />
+<title>الأسعار · Pricing — DentalCloud</title>
+<meta name="description" content="باقات DentalCloud لإدارة عيادات الأسنان — DentalCloud pricing plans." />
+<link rel="icon" href="/tooth.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
 <style>
   :root{--teal:#0d9488;--teal2:#14b8a6;--ink:#1e293b;--muted:#64748b;--bg:#f4f7fa;--line:#e2e8f0}
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Arabic',Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.7}
-  .wrap{max-width:980px;margin:0 auto;padding:0 20px}
-  header{background:#fff;border-bottom:1px solid var(--line)}
-  .bar{display:flex;align-items:center;gap:12px;height:64px}
-  .logo{width:36px;height:36px;border-radius:9px;overflow:hidden;display:flex;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-  .logo img{width:100%;height:100%;object-fit:cover}
-  .brand{font-weight:800;font-size:18px}
-  nav{margin-left:auto;display:flex;gap:18px;flex-wrap:wrap}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.8;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Arial,sans-serif}
+  body.ar{font-family:'Cairo',system-ui,'Segoe UI',Tahoma,Arial,sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+  header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  .bar{display:flex;align-items:center;gap:12px;height:66px}
+  .logo{width:38px;height:38px;border-radius:10px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+  .logo img{width:100%;height:100%;object-fit:cover;display:block}
+  .brand{font-weight:800;font-size:19px}
+  nav{margin-inline-start:auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
   nav a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:600}
   nav a:hover{color:var(--teal)}
-  main{padding:48px 0 64px}
-  h1{font-size:32px;margin:0 0 6px;text-align:center}
-  .sub{color:var(--muted);margin:0 auto 40px;text-align:center;max-width:560px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
-  .plan{background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px;display:flex;flex-direction:column}
-  .plan.featured{border:2px solid var(--teal);box-shadow:0 12px 30px rgba(13,148,136,.12)}
-  .badge{align-self:flex-start;background:#ccfbf1;color:#0f766e;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;margin-bottom:12px}
-  .pname{font-size:14px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-  .price{font-size:40px;font-weight:800;margin:10px 0 2px}
+  .langbtn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;font-weight:700;font-size:13px;color:var(--ink);cursor:pointer}
+  .langbtn:hover{border-color:var(--teal);color:var(--teal)}
+  .hero{background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;padding:54px 0 60px;text-align:center}
+  .hero h1{font-size:34px;margin:0 0 10px}
+  .hero p{margin:0 auto;max-width:600px;opacity:.92;font-size:16px}
+  main{padding:0 0 64px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(265px,1fr));gap:20px;margin-top:-34px}
+  .plan{background:#fff;border:1px solid var(--line);border-radius:18px;padding:28px;display:flex;flex-direction:column;box-shadow:0 6px 24px rgba(15,23,42,.06)}
+  .plan.featured{border:2px solid var(--teal2);box-shadow:0 14px 36px rgba(13,148,136,.16)}
+  .badge{align-self:flex-start;background:#ccfbf1;color:#0f766e;font-size:12px;font-weight:800;padding:4px 11px;border-radius:999px;margin-bottom:12px}
+  .pname{font-size:13px;font-weight:800;color:var(--muted);letter-spacing:.04em}
+  .price{font-size:42px;font-weight:800;margin:10px 0 2px;color:var(--ink)}
   .price span{font-size:15px;font-weight:600;color:var(--muted)}
   .pdesc{color:var(--muted);font-size:14px;margin:0 0 18px}
   ul{list-style:none;padding:0;margin:0 0 22px}
-  li{padding:7px 0 7px 26px;position:relative;font-size:14.5px;color:#334155}
-  li:before{content:"✓";position:absolute;left:0;color:var(--teal);font-weight:800}
-  .cta{margin-top:auto;display:block;text-align:center;background:var(--teal);color:#fff;text-decoration:none;font-weight:700;padding:12px;border-radius:12px}
+  li{padding:7px 0;padding-inline-start:26px;position:relative;font-size:14.5px;color:#334155}
+  li:before{content:"✓";position:absolute;inset-inline-start:0;color:var(--teal);font-weight:800}
+  .cta{margin-top:auto;display:block;text-align:center;background:var(--teal);color:#fff;text-decoration:none;font-weight:800;padding:12px;border-radius:12px}
   .cta:hover{background:#0f766e}
-  .note{max-width:720px;margin:36px auto 0;color:var(--muted);font-size:13.5px;text-align:center}
+  .note{max-width:760px;margin:36px auto 0;color:var(--muted);font-size:13.5px;text-align:center}
+  .note a{color:var(--teal)}
   footer{border-top:1px solid var(--line);background:#fff;color:var(--muted);font-size:13px}
   .foot{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:22px 0}
   .foot a{color:var(--muted);text-decoration:none}
   .foot a:hover{color:var(--teal)}
-  .foot .sp{margin-left:auto}
+  .foot .sp{margin-inline-start:auto}
+  body.ar .en-doc{display:none}
+  body.en .ar-doc{display:none}
 </style>
 </head>
-<body>
+<body class="ar">
 <header><div class="wrap"><div class="bar">
   <span class="logo"><img src="/logo.png" alt="DentalCloud" /></span>
   <span class="brand">DentalCloud</span>
   <nav>
-    <a href="/">Home</a>
-    <a href="/pricing.html">Pricing</a>
-    <a href="/terms.html">Terms</a>
-    <a href="/privacy.html">Privacy</a>
-    <a href="/refund.html">Refund</a>
+    <a href="/"><span data-ar="الرئيسية" data-en="Home">الرئيسية</span></a>
+    <a href="/pricing.html"><span data-ar="الأسعار" data-en="Pricing">الأسعار</span></a>
+    <a href="/terms.html"><span data-ar="الشروط" data-en="Terms">الشروط</span></a>
+    <a href="/privacy.html"><span data-ar="الخصوصية" data-en="Privacy">الخصوصية</span></a>
+    <a href="/refund.html"><span data-ar="الاسترجاع" data-en="Refund">الاسترجاع</span></a>
+    <button class="langbtn" id="langBtn" onclick="toggleLang()">EN</button>
   </nav>
 </div></div></header>
 
+<div class="hero">
+  <div class="wrap">
+    <h1><span data-ar="أسعار بسيطة وواضحة" data-en="Simple, transparent pricing">أسعار بسيطة وواضحة</span></h1>
+    <p><span data-ar="كل ما تحتاجه عيادتك في مكان واحد — مرضى، مخططات، مواعيد، مدفوعات وتقارير. الأسعار بالدولار، والضرائب (إن وُجدت) تظهر عند الدفع." data-en="Everything your dental clinic needs in one place — patients, charting, appointments, payments, and reports. Prices in USD; taxes (if any) are shown at checkout.">كل ما تحتاجه عيادتك في مكان واحد — مرضى، مخططات، مواعيد، مدفوعات وتقارير. الأسعار بالدولار، والضرائب (إن وُجدت) تظهر عند الدفع.</span></p>
+  </div>
+</div>
+
 <main><div class="wrap">
-  <h1>Simple, transparent pricing</h1>
-  <p class="sub">Everything your dental clinic needs in one place — patients, charting, appointments, payments, and reports. Prices in USD. Taxes (if any) are shown at checkout.</p>
 
-  <div class="grid">
-    <div class="plan">
-      <span class="pname">Student · الطالب</span>
-      <div class="price">$5 <span>one-time</span></div>
-      <p class="pdesc">Lifetime access for dental students. Pay once, keep it forever.</p>
-      <ul>
-        <li>Unlimited patient records</li>
-        <li>Interactive dental chart (3 views)</li>
-        <li>Treatment tracking &amp; tooth history</li>
-        <li>Printable patient instructions</li>
-        <li>Arabic &amp; English interface</li>
-      </ul>
-      <a class="cta" href="/">Get started</a>
+  <!-- Arabic -->
+  <div class="ar-doc" dir="rtl">
+    <div class="grid">
+      <div class="plan">
+        <span class="pname">الطالب · Student</span>
+        <div class="price">$5 <span>مرة واحدة</span></div>
+        <p class="pdesc">وصول مدى الحياة لطلاب طب الأسنان. ادفع مرة، واستخدمه للأبد.</p>
+        <ul>
+          <li>سجلات مرضى غير محدودة</li>
+          <li>مخطط أسنان تفاعلي (٣ أوضاع)</li>
+          <li>متابعة العلاجات وسجل كل سن</li>
+          <li>تعليمات مرضى قابلة للطباعة</li>
+          <li>واجهة عربية وإنجليزية</li>
+        </ul>
+        <a class="cta" href="/">ابدأ الآن</a>
+      </div>
+      <div class="plan featured">
+        <span class="badge">الأكثر طلباً</span>
+        <span class="pname">الاحترافية · Pro</span>
+        <div class="price">$100 <span>/ سنة</span></div>
+        <p class="pdesc">الحزمة الكاملة للعيادات المزدحمة.</p>
+        <ul>
+          <li>كل ما في باقة العيادات الصغيرة</li>
+          <li>معرض الصور والأشعة</li>
+          <li>تقارير وتحليلات</li>
+          <li>إدارة طلبات المختبر</li>
+          <li>دفعات مقسّطة</li>
+        </ul>
+        <a class="cta" href="/">ابدأ الآن</a>
+      </div>
+      <div class="plan">
+        <span class="pname">العيادات الصغيرة · Economy</span>
+        <div class="price">$60 <span>/ سنة</span></div>
+        <p class="pdesc">للعيادات الصغيرة اللي بدها تنظيم.</p>
+        <ul>
+          <li>كل ما في باقة الطالب</li>
+          <li>المواعيد والتقويم</li>
+          <li>أكثر من طبيب</li>
+          <li>قائمة أسعار وطرق دفع</li>
+          <li>مخطط اللثة واللويحة وتذكيرات</li>
+        </ul>
+        <a class="cta" href="/">ابدأ الآن</a>
+      </div>
     </div>
-
-    <div class="plan featured">
-      <span class="badge">Most popular</span>
-      <span class="pname">Pro · الاحترافية</span>
-      <div class="price">$100 <span>/ year</span></div>
-      <p class="pdesc">The complete toolkit for busy clinics.</p>
-      <ul>
-        <li>Everything in Economy</li>
-        <li>Photos &amp; X-ray gallery</li>
-        <li>Reports &amp; analytics</li>
-        <li>Lab order management</li>
-        <li>Split payments</li>
-      </ul>
-      <a class="cta" href="/">Get started</a>
-    </div>
-
-    <div class="plan">
-      <span class="pname">Economy · العيادات الصغيرة</span>
-      <div class="price">$60 <span>/ year</span></div>
-      <p class="pdesc">For small clinics getting organized.</p>
-      <ul>
-        <li>Everything in Student</li>
-        <li>Appointments &amp; calendar</li>
-        <li>Multiple doctors</li>
-        <li>Price catalog &amp; payment methods</li>
-        <li>Perio &amp; plaque charting, reminders</li>
-      </ul>
-      <a class="cta" href="/">Get started</a>
-    </div>
+    <p class="note">الباقات السنوية (العيادات الصغيرة والاحترافية) تتجدّد كل ١٢ شهراً ويمكن إلغاؤها في أي وقت؛ باقة الطالب دفعة واحدة بوصول مدى الحياة. تتم معالجة المدفوعات بأمان عبر مزوّد الدفع المعتمد لدينا. راجع <a href="/refund.html">سياسة الاسترجاع</a> و<a href="/terms.html">شروط الخدمة</a>.</p>
   </div>
 
-  <p class="note">Annual plans (Economy and Pro) renew every 12 months and can be cancelled anytime; the Student plan is a single one-time payment with lifetime access. Payments are processed securely by our authorized payment provider. See our <a href="/refund.html">Refund Policy</a> and <a href="/terms.html">Terms of Service</a>.</p>
+  <!-- English -->
+  <div class="en-doc" dir="ltr">
+    <div class="grid">
+      <div class="plan">
+        <span class="pname">Student · الطالب</span>
+        <div class="price">$5 <span>one-time</span></div>
+        <p class="pdesc">Lifetime access for dental students. Pay once, keep it forever.</p>
+        <ul>
+          <li>Unlimited patient records</li>
+          <li>Interactive dental chart (3 views)</li>
+          <li>Treatment tracking &amp; tooth history</li>
+          <li>Printable patient instructions</li>
+          <li>Arabic &amp; English interface</li>
+        </ul>
+        <a class="cta" href="/">Get started</a>
+      </div>
+      <div class="plan featured">
+        <span class="badge">Most popular</span>
+        <span class="pname">Pro · الاحترافية</span>
+        <div class="price">$100 <span>/ year</span></div>
+        <p class="pdesc">The complete toolkit for busy clinics.</p>
+        <ul>
+          <li>Everything in Economy</li>
+          <li>Photos &amp; X-ray gallery</li>
+          <li>Reports &amp; analytics</li>
+          <li>Lab order management</li>
+          <li>Split payments</li>
+        </ul>
+        <a class="cta" href="/">Get started</a>
+      </div>
+      <div class="plan">
+        <span class="pname">Economy · العيادات الصغيرة</span>
+        <div class="price">$60 <span>/ year</span></div>
+        <p class="pdesc">For small clinics getting organized.</p>
+        <ul>
+          <li>Everything in Student</li>
+          <li>Appointments &amp; calendar</li>
+          <li>Multiple doctors</li>
+          <li>Price catalog &amp; payment methods</li>
+          <li>Perio &amp; plaque charting, reminders</li>
+        </ul>
+        <a class="cta" href="/">Get started</a>
+      </div>
+    </div>
+    <p class="note">Annual plans (Economy and Pro) renew every 12 months and can be cancelled anytime; the Student plan is a single one-time payment with lifetime access. Payments are processed securely by our authorized payment provider. See our <a href="/refund.html">Refund Policy</a> and <a href="/terms.html">Terms of Service</a>.</p>
+  </div>
+
 </div></main>
 
 <footer><div class="wrap"><div class="foot">
   <span>© 2026 DentalCloud</span>
-  <a href="/terms.html">Terms</a>
-  <a href="/privacy.html">Privacy</a>
-  <a href="/refund.html">Refund</a>
+  <a href="/terms.html"><span data-ar="الشروط" data-en="Terms">الشروط</span></a>
+  <a href="/privacy.html"><span data-ar="الخصوصية" data-en="Privacy">الخصوصية</span></a>
+  <a href="/refund.html"><span data-ar="الاسترجاع" data-en="Refund">الاسترجاع</span></a>
   <a class="sp" href="mailto:support@dentalcloud.app">support@dentalcloud.app</a>
 </div></div></footer>
+
+<script>
+  function applyLang(l){
+    document.documentElement.lang = l;
+    document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+    document.body.className = l;
+    document.getElementById('langBtn').textContent = l === 'ar' ? 'EN' : 'ع';
+    document.querySelectorAll('[data-ar]').forEach(function(e){
+      e.textContent = l === 'ar' ? e.getAttribute('data-ar') : e.getAttribute('data-en');
+    });
+    try { localStorage.setItem('dc_lang', l); } catch (e) {}
+  }
+  function toggleLang(){ applyLang(document.body.className === 'ar' ? 'en' : 'ar'); }
+  (function(){ var l; try { l = localStorage.getItem('dc_lang'); } catch (e) {} applyLang(l === 'en' ? 'en' : 'ar'); })();
+</script>
 </body>
 </html>

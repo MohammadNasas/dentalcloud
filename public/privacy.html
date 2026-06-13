@@ -1,108 +1,190 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Privacy Policy — DentalCloud</title>
+<title>سياسة الخصوصية · Privacy Policy — DentalCloud</title>
+<link rel="icon" href="/tooth.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet" />
 <style>
   :root{--teal:#0d9488;--ink:#1e293b;--muted:#64748b;--bg:#f4f7fa;--line:#e2e8f0}
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Arabic',Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.75}
-  .wrap{max-width:820px;margin:0 auto;padding:0 20px}
-  header{background:#fff;border-bottom:1px solid var(--line)}
-  .bar{display:flex;align-items:center;gap:12px;height:64px}
-  .logo{width:36px;height:36px;border-radius:9px;overflow:hidden;display:flex;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.1)}
-  .logo img{width:100%;height:100%;object-fit:cover}
-  .brand{font-weight:800;font-size:18px}
-  nav{margin-left:auto;display:flex;gap:18px;flex-wrap:wrap}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.85;font-family:'Inter',system-ui,-apple-system,'Segoe UI',Arial,sans-serif}
+  body.ar{font-family:'Cairo',system-ui,'Segoe UI',Tahoma,Arial,sans-serif}
+  .wrap{max-width:840px;margin:0 auto;padding:0 20px}
+  header{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  .bar{display:flex;align-items:center;gap:12px;height:66px}
+  .logo{width:38px;height:38px;border-radius:10px;overflow:hidden;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+  .logo img{width:100%;height:100%;object-fit:cover;display:block}
+  .brand{font-weight:800;font-size:19px}
+  nav{margin-inline-start:auto;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
   nav a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:600}
   nav a:hover{color:var(--teal)}
+  .langbtn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;font-weight:700;font-size:13px;color:var(--ink);cursor:pointer}
+  .langbtn:hover{border-color:var(--teal);color:var(--teal)}
   main{padding:44px 0 60px}
   h1{font-size:30px;margin:0 0 6px}
-  .updated{color:var(--muted);font-size:14px;margin:0 0 28px}
+  .updated{color:var(--muted);font-size:14px;margin:0 0 26px}
   h2{font-size:19px;margin:30px 0 8px}
   p,li{color:#334155;font-size:15.5px}
-  li{margin:4px 0}
+  li{margin:5px 0}
   a{color:var(--teal)}
-  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px 30px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:30px 32px}
+  ul{padding-inline-start:22px}
   footer{border-top:1px solid var(--line);background:#fff;color:var(--muted);font-size:13px}
   .foot{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:22px 0}
   .foot a{color:var(--muted);text-decoration:none}
   .foot a:hover{color:var(--teal)}
-  .foot .sp{margin-left:auto}
+  .foot .sp{margin-inline-start:auto}
+  body.ar .en-doc{display:none}
+  body.en .ar-doc{display:none}
 </style>
 </head>
-<body>
+<body class="ar">
 <header><div class="wrap"><div class="bar">
   <span class="logo"><img src="/logo.png" alt="DentalCloud" /></span>
   <span class="brand">DentalCloud</span>
   <nav>
-    <a href="/">Home</a>
-    <a href="/pricing.html">Pricing</a>
-    <a href="/terms.html">Terms</a>
-    <a href="/privacy.html">Privacy</a>
-    <a href="/refund.html">Refund</a>
+    <a href="/"><span data-ar="الرئيسية" data-en="Home">الرئيسية</span></a>
+    <a href="/pricing.html"><span data-ar="الأسعار" data-en="Pricing">الأسعار</span></a>
+    <a href="/terms.html"><span data-ar="الشروط" data-en="Terms">الشروط</span></a>
+    <a href="/privacy.html"><span data-ar="الخصوصية" data-en="Privacy">الخصوصية</span></a>
+    <a href="/refund.html"><span data-ar="الاسترجاع" data-en="Refund">الاسترجاع</span></a>
+    <button class="langbtn" id="langBtn" onclick="toggleLang()">EN</button>
   </nav>
 </div></div></header>
 
 <main><div class="wrap"><div class="card">
-  <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: June 13, 2026</p>
 
-  <p>This Privacy Policy explains how DentalCloud ("we", "us") collects, uses, and protects information when you use our dental-clinic management application on the web and desktop. By using the Service you agree to this policy.</p>
+  <!-- Arabic -->
+  <div class="ar-doc" dir="rtl">
+    <h1>سياسة الخصوصية</h1>
+    <p class="updated">آخر تحديث: ١٣ حزيران ٢٠٢٦</p>
+    <p>توضّح سياسة الخصوصية هذه كيف يجمع DentalCloud ("نحن") المعلومات ويستخدمها ويحميها عند استخدامك لتطبيق إدارة عيادات الأسنان على الويب وسطح المكتب. باستخدامك للخدمة فإنك توافق على هذه السياسة.</p>
 
-  <h2>1. Information we collect</h2>
-  <ul>
-    <li><b>Account information</b> — name, email, clinic name, and login credentials you provide when registering.</li>
-    <li><b>Clinic &amp; clinical data</b> — the records you choose to enter, such as patients, dental charts, treatments, appointments, payments, photos, and lab orders.</li>
-    <li><b>Payment information</b> — when you subscribe, payment is handled by our authorized payment provider. We do not store full card numbers; we receive only confirmation and limited billing details needed to activate your plan.</li>
-    <li><b>Usage &amp; technical data</b> — basic technical information needed to operate the Service securely (for example, session and error information).</li>
-  </ul>
+    <h2>١. المعلومات التي نجمعها</h2>
+    <ul>
+      <li><b>معلومات الحساب</b> — الاسم والبريد الإلكتروني واسم العيادة وبيانات الدخول التي تقدّمها عند التسجيل.</li>
+      <li><b>بيانات العيادة والبيانات السريرية</b> — السجلات التي تختار إدخالها مثل المرضى ومخططات الأسنان والعلاجات والمواعيد والمدفوعات والصور وطلبات المختبر.</li>
+      <li><b>معلومات الدفع</b> — عند الاشتراك تتم معالجة الدفع عبر مزوّد الدفع المعتمد لدينا. لا نخزّن أرقام البطاقات الكاملة؛ نستلم فقط تأكيداً وتفاصيل فوترة محدودة لتفعيل باقتك.</li>
+      <li><b>بيانات الاستخدام والبيانات التقنية</b> — معلومات تقنية أساسية لازمة لتشغيل الخدمة بأمان (مثل معلومات الجلسة والأخطاء).</li>
+    </ul>
 
-  <h2>2. How we use information</h2>
-  <ul>
-    <li>To provide, operate, and improve the Service.</li>
-    <li>To authenticate you and keep your account secure.</li>
-    <li>To process subscriptions and activate your plan.</li>
-    <li>To provide support and respond to your requests.</li>
-    <li>To comply with legal obligations.</li>
-  </ul>
-  <p>We do not sell your personal information, and we do not use patient records for advertising.</p>
+    <h2>٢. كيف نستخدم المعلومات</h2>
+    <ul>
+      <li>لتقديم الخدمة وتشغيلها وتحسينها.</li>
+      <li>للتحقق من هويتك والحفاظ على أمان حسابك.</li>
+      <li>لمعالجة الاشتراكات وتفعيل باقتك.</li>
+      <li>لتقديم الدعم والرد على طلباتك.</li>
+      <li>للامتثال للالتزامات القانونية.</li>
+    </ul>
+    <p>نحن لا نبيع معلوماتك الشخصية، ولا نستخدم سجلات المرضى لأغراض الإعلانات.</p>
 
-  <h2>3. Patient data &amp; your responsibility</h2>
-  <p>You (the clinic or practitioner) are the controller of any patient or clinical data you enter. We process and store this data on your behalf so you can manage your practice. You are responsible for obtaining any consent required by law and for using patient data lawfully and ethically.</p>
+    <h2>٣. بيانات المرضى ومسؤوليتك</h2>
+    <p>أنت (العيادة أو الطبيب) المتحكّم في أي بيانات للمرضى أو بيانات سريرية تُدخلها. نحن نعالج ونخزّن هذه البيانات نيابةً عنك لتتمكّن من إدارة عيادتك. أنت مسؤول عن الحصول على أي موافقات يفرضها القانون وعن استخدام بيانات المرضى بشكل قانوني وأخلاقي.</p>
 
-  <h2>4. Where your data is stored</h2>
-  <p>Your data is stored securely with reputable cloud infrastructure providers and is encrypted in transit. Access is restricted to your account. Some data may also be cached locally on your device to let the app work smoothly.</p>
+    <h2>٤. أين تُخزَّن بياناتك</h2>
+    <p>تُخزَّن بياناتك بأمان لدى مزوّدي بنية تحتية سحابية موثوقين، وتكون مشفّرة أثناء النقل. الوصول مقصور على حسابك. قد تُخزَّن بعض البيانات مؤقتاً على جهازك ليعمل التطبيق بسلاسة.</p>
 
-  <h2>5. Service providers</h2>
-  <p>We rely on trusted third parties to operate the Service, including cloud hosting and database providers and our payment provider. These providers process data only as needed to deliver their services and under their own security and privacy obligations.</p>
+    <h2>٥. مزوّدو الخدمة</h2>
+    <p>نعتمد على أطراف ثالثة موثوقة لتشغيل الخدمة، منها مزوّدو الاستضافة وقواعد البيانات ومزوّد الدفع. يعالج هؤلاء البيانات فقط بالقدر اللازم لتقديم خدماتهم ووفق التزاماتهم الأمنية.</p>
 
-  <h2>6. Security</h2>
-  <p>We use industry-standard measures to protect your data, including encryption in transit and access controls. No method of transmission or storage is completely secure, but we work to protect your information and recommend you keep your password confidential.</p>
+    <h2>٦. الأمان</h2>
+    <p>نستخدم معايير أمان متعارف عليها لحماية بياناتك، بما في ذلك التشفير أثناء النقل وضوابط الوصول. لا توجد وسيلة نقل أو تخزين آمنة تماماً، لكننا نعمل على حماية معلوماتك وننصحك بالحفاظ على سرية كلمة مرورك.</p>
 
-  <h2>7. Data retention</h2>
-  <p>We keep your data for as long as your account is active or as needed to provide the Service. You may request deletion of your account and associated data by contacting us, subject to any legal retention requirements.</p>
+    <h2>٧. الاحتفاظ بالبيانات</h2>
+    <p>نحتفظ ببياناتك طالما حسابك نشط أو حسب الحاجة لتقديم الخدمة. يمكنك طلب حذف حسابك والبيانات المرتبطة به بالتواصل معنا، مع مراعاة أي متطلبات احتفاظ قانونية.</p>
 
-  <h2>8. Your rights</h2>
-  <p>You may request access to, correction of, or deletion of your personal data, and you may export your clinic data. To exercise these rights, contact us at the address below.</p>
+    <h2>٨. حقوقك</h2>
+    <p>يمكنك طلب الوصول إلى بياناتك الشخصية أو تصحيحها أو حذفها، ويمكنك تصدير بيانات عيادتك. لممارسة هذه الحقوق، تواصل معنا على العنوان أدناه.</p>
 
-  <h2>9. Children</h2>
-  <p>The Service is intended for dental professionals and clinics, not for use by children. We do not knowingly collect personal data directly from children as end users.</p>
+    <h2>٩. الأطفال</h2>
+    <p>الخدمة موجّهة لأطباء وعيادات الأسنان، وليست للاستخدام من قبل الأطفال. نحن لا نجمع عمداً بيانات شخصية مباشرة من الأطفال كمستخدمين.</p>
 
-  <h2>10. Changes to this policy</h2>
-  <p>We may update this policy from time to time. Material changes will be reflected by updating the date above.</p>
+    <h2>١٠. تغييرات هذه السياسة</h2>
+    <p>قد نحدّث هذه السياسة من وقت لآخر. تُعكَس التغييرات الجوهرية بتحديث التاريخ أعلاه.</p>
 
-  <h2>11. Contact</h2>
-  <p>For privacy questions or requests, email <a href="mailto:support@dentalcloud.app">support@dentalcloud.app</a>.</p>
+    <h2>١١. التواصل</h2>
+    <p>لأسئلة أو طلبات الخصوصية، راسلنا على <a href="mailto:support@dentalcloud.app">support@dentalcloud.app</a>.</p>
+  </div>
+
+  <!-- English -->
+  <div class="en-doc" dir="ltr">
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: June 13, 2026</p>
+    <p>This Privacy Policy explains how DentalCloud ("we", "us") collects, uses, and protects information when you use our dental-clinic management application on the web and desktop. By using the Service you agree to this policy.</p>
+
+    <h2>1. Information we collect</h2>
+    <ul>
+      <li><b>Account information</b> — name, email, clinic name, and login credentials you provide when registering.</li>
+      <li><b>Clinic &amp; clinical data</b> — the records you choose to enter, such as patients, dental charts, treatments, appointments, payments, photos, and lab orders.</li>
+      <li><b>Payment information</b> — when you subscribe, payment is handled by our authorized payment provider. We do not store full card numbers; we receive only confirmation and limited billing details needed to activate your plan.</li>
+      <li><b>Usage &amp; technical data</b> — basic technical information needed to operate the Service securely (for example, session and error information).</li>
+    </ul>
+
+    <h2>2. How we use information</h2>
+    <ul>
+      <li>To provide, operate, and improve the Service.</li>
+      <li>To authenticate you and keep your account secure.</li>
+      <li>To process subscriptions and activate your plan.</li>
+      <li>To provide support and respond to your requests.</li>
+      <li>To comply with legal obligations.</li>
+    </ul>
+    <p>We do not sell your personal information, and we do not use patient records for advertising.</p>
+
+    <h2>3. Patient data &amp; your responsibility</h2>
+    <p>You (the clinic or practitioner) are the controller of any patient or clinical data you enter. We process and store this data on your behalf so you can manage your practice. You are responsible for obtaining any consent required by law and for using patient data lawfully and ethically.</p>
+
+    <h2>4. Where your data is stored</h2>
+    <p>Your data is stored securely with reputable cloud infrastructure providers and is encrypted in transit. Access is restricted to your account. Some data may also be cached locally on your device to let the app work smoothly.</p>
+
+    <h2>5. Service providers</h2>
+    <p>We rely on trusted third parties to operate the Service, including cloud hosting and database providers and our payment provider. These providers process data only as needed to deliver their services and under their own security and privacy obligations.</p>
+
+    <h2>6. Security</h2>
+    <p>We use industry-standard measures to protect your data, including encryption in transit and access controls. No method of transmission or storage is completely secure, but we work to protect your information and recommend you keep your password confidential.</p>
+
+    <h2>7. Data retention</h2>
+    <p>We keep your data for as long as your account is active or as needed to provide the Service. You may request deletion of your account and associated data by contacting us, subject to any legal retention requirements.</p>
+
+    <h2>8. Your rights</h2>
+    <p>You may request access to, correction of, or deletion of your personal data, and you may export your clinic data. To exercise these rights, contact us at the address below.</p>
+
+    <h2>9. Children</h2>
+    <p>The Service is intended for dental professionals and clinics, not for use by children. We do not knowingly collect personal data directly from children as end users.</p>
+
+    <h2>10. Changes to this policy</h2>
+    <p>We may update this policy from time to time. Material changes will be reflected by updating the date above.</p>
+
+    <h2>11. Contact</h2>
+    <p>For privacy questions or requests, email <a href="mailto:support@dentalcloud.app">support@dentalcloud.app</a>.</p>
+  </div>
+
 </div></div></main>
 
 <footer><div class="wrap"><div class="foot">
   <span>© 2026 DentalCloud</span>
-  <a href="/pricing.html">Pricing</a>
-  <a href="/terms.html">Terms</a>
-  <a href="/refund.html">Refund</a>
+  <a href="/pricing.html"><span data-ar="الأسعار" data-en="Pricing">الأسعار</span></a>
+  <a href="/terms.html"><span data-ar="الشروط" data-en="Terms">الشروط</span></a>
+  <a href="/refund.html"><span data-ar="الاسترجاع" data-en="Refund">الاسترجاع</span></a>
   <a class="sp" href="mailto:support@dentalcloud.app">support@dentalcloud.app</a>
 </div></div></footer>
+
+<script>
+  function applyLang(l){
+    document.documentElement.lang = l;
+    document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+    document.body.className = l;
+    document.getElementById('langBtn').textContent = l === 'ar' ? 'EN' : 'ع';
+    document.querySelectorAll('[data-ar]').forEach(function(e){
+      e.textContent = l === 'ar' ? e.getAttribute('data-ar') : e.getAttribute('data-en');
+    });
+    try { localStorage.setItem('dc_lang', l); } catch (e) {}
+  }
+  function toggleLang(){ applyLang(document.body.className === 'ar' ? 'en' : 'ar'); }
+  (function(){ var l; try { l = localStorage.getItem('dc_lang'); } catch (e) {} applyLang(l === 'en' ? 'en' : 'ar'); })();
+</script>
 </body>
 </html>
