@@ -1,4 +1,7 @@
+import { motion } from 'framer-motion'
 import { isAnterior } from '../../lib/teeth'
+
+const popOrigin = { transformOrigin: 'center', transformBox: 'fill-box' }
 
 // Renders one tooth as a 5-surface charting box (Buccal / Lingual / Mesial /
 // Distal / Occlusal) with colours driven by the records affecting it.
@@ -56,19 +59,27 @@ export default function Tooth({ tooth, display, selected, onClick, size = 38, la
             })}
             {/* whole-tooth tint overlay (crown, RCT, implant…) */}
             {whole && (
-              <rect x={0} y={0} width={S} height={S} rx={3} fill={whole}
+              <motion.rect
+                key={whole + (display.wholeStatus || '')}
+                x={0} y={0} width={S} height={S} rx={3} fill={whole}
                 fillOpacity={display.wholeStatus === 'done' ? 0.28 : 0.14}
-                stroke={whole} strokeWidth={1.6} />
+                stroke={whole} strokeWidth={1.6}
+                initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 18 }} style={popOrigin} />
             )}
           </>
         )}
 
         {/* overlay symbols */}
         {display?.symbols?.length > 0 && (
-          <text x={S / 2} y={S / 2 + 4} textAnchor="middle" fontSize={S * 0.42} fontWeight="800"
-            fill={display.symbols[0].color} style={{ paintOrder: 'stroke' }} stroke="#fff" strokeWidth={0.6}>
+          <motion.text
+            key={display.symbols[0].symbol + display.symbols[0].color}
+            x={S / 2} y={S / 2 + 4} textAnchor="middle" fontSize={S * 0.42} fontWeight="800"
+            fill={display.symbols[0].color} style={{ paintOrder: 'stroke', ...popOrigin }} stroke="#fff" strokeWidth={0.6}
+            initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 16 }}>
             {display.symbols[0].symbol}
-          </text>
+          </motion.text>
         )}
       </svg>
       <span className={`mt-1 text-[10px] font-bold ${selected ? 'text-brand-600' : 'text-ink-400 group-hover:text-ink-600'}`}>

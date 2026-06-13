@@ -11,6 +11,7 @@ import { TIERS } from '../lib/db'
 import { isElectron } from '../lib/downloads'
 import { cx } from '../lib/utils'
 import { Avatar } from './ui'
+import { PingDot } from './anim'
 
 const NAV_CONTAINER = {
   hidden: {},
@@ -57,11 +58,24 @@ export default function Layout() {
               to={item.to}
               end={item.end}
               onClick={onNavigate}
-              className={({ isActive }) => cx('nav-link group', isActive && 'nav-link-active')}
+              className={({ isActive }) => cx('nav-link group relative', isActive && '!text-brand-700')}
             >
-              <item.icon size={19} className="shrink-0" />
-              <span className="flex-1">{t(`nav.${item.key}`)}</span>
-              {locked && <Lock size={13} className="text-amber-400" />}
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <motion.span
+                      layoutId="nav-pill"
+                      className="absolute inset-0 rounded-xl bg-white shadow-soft"
+                      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative z-10 flex flex-1 items-center gap-3">
+                    <item.icon size={19} className="shrink-0" />
+                    <span className="flex-1">{t(`nav.${item.key}`)}</span>
+                    {locked && <Lock size={13} className="text-amber-400" />}
+                  </span>
+                </>
+              )}
             </NavLink>
           </motion.div>
         )
@@ -156,14 +170,21 @@ export default function Layout() {
           </button>
           <h1 className="text-lg font-extrabold text-ink-800">{pageTitle}</h1>
           <div className="ms-auto flex items-center gap-2">
-            <button
+            <span className="hidden items-center gap-1.5 text-xs font-semibold text-emerald-600 sm:flex">
+              <PingDot /> {lang === 'ar' ? 'متصل' : 'Online'}
+            </span>
+            <motion.button
               onClick={toggleLang}
+              whileTap={{ scale: 0.9, rotate: -12 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 18 }}
               className="btn-outline !py-2"
               title={lang === 'ar' ? 'English' : 'العربية'}
             >
               <Globe size={16} />
-              <span className="text-xs font-bold">{lang === 'ar' ? 'EN' : 'ع'}</span>
-            </button>
+              <motion.span key={lang} initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="text-xs font-bold">
+                {lang === 'ar' ? 'EN' : 'ع'}
+              </motion.span>
+            </motion.button>
           </div>
         </header>
 

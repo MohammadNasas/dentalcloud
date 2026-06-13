@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { X, Lock, Search } from 'lucide-react'
 import { cx, initials, colorFromString, colorFromStringDark } from '../lib/utils'
 import { useEffect } from 'react'
+import { CountUp } from './anim'
 
 export function Modal({ open, onClose, title, children, footer, size = 'md', icon }) {
   useEffect(() => {
@@ -152,7 +153,7 @@ export function Badge({ children, color = 'ink', className }) {
 export function EmptyState({ icon, title, hint, action }) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink-100 text-ink-400">{icon}</div>
+      <div className="animate-bob flex h-14 w-14 items-center justify-center rounded-2xl bg-ink-100 text-ink-400">{icon}</div>
       <div>
         <p className="font-semibold text-ink-700">{title}</p>
         {hint && <p className="mt-1 text-sm text-ink-400">{hint}</p>}
@@ -202,10 +203,12 @@ export function Stat({ icon, label, value, sub, color = 'brand' }) {
     green: 'bg-emerald-50 text-emerald-600',
   }
   return (
-    <div className="card flex items-center gap-4 p-4">
+    <div className="card card-hover flex items-center gap-4 p-4">
       <div className={cx('flex h-12 w-12 shrink-0 items-center justify-center rounded-xl', ring[color])}>{icon}</div>
       <div className="min-w-0">
-        <p className="truncate text-2xl font-extrabold text-ink-800">{value}</p>
+        <p className="truncate text-2xl font-extrabold text-ink-800">
+          {typeof value === 'number' ? <CountUp to={value} /> : value}
+        </p>
         <p className="truncate text-xs font-semibold text-ink-400">{label}</p>
         {sub && <p className="truncate text-xs text-ink-400">{sub}</p>}
       </div>

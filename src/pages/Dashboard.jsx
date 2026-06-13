@@ -8,6 +8,7 @@ import {
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { Stat, Avatar, EmptyState, Badge } from '../components/ui'
+import { stagger, staggerItem, Sparkline } from '../components/anim'
 import { fmtTime, fmtDate, isToday, isTomorrow, isSameDay, parseISO } from '../lib/dates'
 import { money } from '../lib/utils'
 import PatientFormModal from '../components/PatientFormModal'
@@ -58,6 +59,18 @@ export default function Dashboard() {
 
   const totalDue = balances.reduce((s, b) => s + b.debt, 0)
 
+  const revTrend = useMemo(() => {
+    const days = 14
+    const arr = Array.from({ length: days }, () => 0)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    payments.forEach((p) => {
+      const d = parseISO(p.date)
+      const diff = Math.floor((today - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000)
+      if (diff >= 0 && diff < days) arr[days - 1 - diff] += Number(p.amount) || 0
+    })
+    return arr
+  }, [payments])
+
   const name = (lang === 'ar' ? currentUser?.nameAr : currentUser?.name) || ''
 
   return (
@@ -77,18 +90,37 @@ export default function Dashboard() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat icon={<Users size={22} />} label={t('dashboard.totalPatients')} value={patients.length} color="brand" />
+      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <motion.div variants={staggerItem}>
+          <Stat icon={<Users size={22} />} label={t('dashboard.totalPatients')} value={patients.length} color="brand" />
+        </motion.div>
         {can('clinicBalances') && (
-          <Stat icon={<Wallet size={22} />} label={t('dashboard.totalDue')} value={money(totalDue, currency)} color="rose" />
+          <motion.div variants={staggerItem}>
+            <Stat icon={<Wallet size={22} />} label={t('dashboard.totalDue')} value={money(totalDue, currency)} color="rose" />
+          </motion.div>
         )}
         {can('reports') && (
-          <Stat icon={<TrendingUp size={22} />} label={t('dashboard.collectedThisMonth')} value={money(collectedThisMonth, currency)} color="green" />
+          <motion.div variants={staggerItem}>
+            <Stat icon={<TrendingUp size={22} />} label={t('dashboard.collectedThisMonth')} value={money(collectedThisMonth, currency)} color="green" />
+          </motion.div>
         )}
         {can('appointments') && (
-          <Stat icon={<CalendarDays size={22} />} label={t('dashboard.appointmentsThisWeek')} value={weekCount} color="blue" />
+          <motion.div variants={staggerItem}>
+            <Stat icon={<CalendarDays size={22} />} label={t('dashboard.appointmentsThisWeek')} value={weekCount} color="blue" />
+          </motion.div>
         )}
-      </div>
+      </motion.div>
+
+      {/* Revenue trend */}
+      {can('reports') && revTrend.some((v) => v > 0) && (
+        <div className="card card-hover flex items-center justify-between gap-4 p-4">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-ink-400">{lang === 'ar' ? 'إيراد آخر ١٤ يوم' : 'Last 14 days'}</p>
+            <p className="text-xl font-extrabold text-ink-800">{money(revTrend.reduce((a, b) => a + b, 0), currency)}</p>
+          </div>
+          <div style={{ direction: 'ltr' }}><Sparkline data={revTrend} width={150} height={42} /></div>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Today's appointments */}

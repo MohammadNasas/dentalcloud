@@ -8,6 +8,7 @@ import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, DEMO_LOGIN, tierPeriodLabel } from '../lib/db'
 import { Field, Spinner } from '../components/ui'
+import { FloatingField } from '../components/anim'
 import { cx } from '../lib/utils'
 
 export default function Login({ initialTab = 'signin', onBack }) {
@@ -218,14 +219,10 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 <h2 className="text-2xl font-extrabold text-ink-800">{t('auth.welcome')}</h2>
                 <p className="text-sm text-ink-400">{t('auth.subtitle')}</p>
               </div>
-              <Field label={t('auth.email')}>
-                <input className="input" type="text" value={signin.email} autoFocus dir="ltr"
-                  onChange={(e) => setSignin({ ...signin, email: e.target.value })} placeholder={isCloud ? 'name@clinic.com' : 'sara'} />
-              </Field>
-              <Field label={t('auth.password')}>
-                <input className="input" type="password" dir="ltr" value={signin.password}
-                  onChange={(e) => setSignin({ ...signin, password: e.target.value })} placeholder="••••" />
-              </Field>
+              <FloatingField label={t('auth.email')} type="text" dir="ltr" autoFocus value={signin.email}
+                onChange={(e) => setSignin({ ...signin, email: e.target.value })} />
+              <FloatingField label={t('auth.password')} type="password" dir="ltr" value={signin.password}
+                onChange={(e) => setSignin({ ...signin, password: e.target.value })} />
               <div className="flex items-center justify-between">
                 <label className="flex cursor-pointer items-center gap-2 select-none">
                   <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)}

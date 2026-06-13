@@ -9,6 +9,7 @@ import { useI18n } from '../i18n/I18nContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES } from '../lib/packages'
 import { ChartPreview, CalendarPreview, DashboardPreview, AppShowcase } from '../components/PackagePreviews'
+import { Accordion, StarRating } from '../components/anim'
 import { cx } from '../lib/utils'
 
 const TIER_ICON = { student: GraduationCap, economy: Building2, pro: Crown }
@@ -263,6 +264,41 @@ export default function Landing({ onEnter }) {
               </motion.div>
             )
           })}
+        </div>
+      </section>
+
+      {/* Testimonial / trust */}
+      <section className="py-12">
+        <div className="mx-auto max-w-2xl px-4 text-center">
+          <div className="flex justify-center"><StarRating value={5} size={22} /></div>
+          <p className="mt-4 text-xl font-bold leading-relaxed text-ink-700">
+            {lang === 'ar'
+              ? '«وفّر علينا ساعات كل يوم. مخطط الأسنان والتقارير وفّروا كل شي بمكان واحد.»'
+              : '“Saved us hours every day. The dental chart and reports keep everything in one place.”'}
+          </p>
+          <p className="mt-3 text-sm font-semibold text-ink-400">
+            {lang === 'ar' ? 'د. سارة — عيادة أسنان' : 'Dr. Sara — Dental Clinic'}
+          </p>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-12">
+        <div className="mx-auto max-w-2xl px-4">
+          <h2 className="mb-6 text-center text-2xl font-extrabold text-ink-800">
+            {lang === 'ar' ? 'أسئلة شائعة' : 'Frequently asked questions'}
+          </h2>
+          <Accordion items={lang === 'ar' ? [
+            { q: 'هل بياناتي محمية؟', a: 'نعم، كل البيانات مشفّرة ومخزّنة بأمان على السحابة، ولا أحد يقدر يوصلها غيرك.' },
+            { q: 'بشتغل على الموبايل وسطح المكتب؟', a: 'أكيد — حسابك واحد يشتغل على الموقع وعلى تطبيق سطح المكتب، وكل شي بتزامن تلقائياً.' },
+            { q: 'هل في عربي وإنجليزي؟', a: 'التطبيق ثنائي اللغة بالكامل، وبتقدر تبدّل بين العربي والإنجليزي بضغطة زر.' },
+            { q: 'كيف بقدر أبدأ؟', a: 'أنشئ حساب عيادتك خلال دقيقة، واختر الباقة المناسبة، وابدأ فوراً.' },
+          ] : [
+            { q: 'Is my data secure?', a: 'Yes. All data is encrypted and stored safely in the cloud — only you can access it.' },
+            { q: 'Does it work on mobile and desktop?', a: 'Absolutely — one account works on the web and the desktop app, syncing automatically.' },
+            { q: 'Is it available in Arabic and English?', a: 'The app is fully bilingual; switch between Arabic and English with one tap.' },
+            { q: 'How do I get started?', a: 'Create your clinic account in a minute, pick a plan, and start right away.' },
+          ]} />
         </div>
       </section>
 

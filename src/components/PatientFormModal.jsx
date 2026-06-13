@@ -4,6 +4,7 @@ import { UserPlus, Save } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { Modal, Field, Segmented } from './ui'
+import { toast } from './anim'
 import { calcAge } from '../lib/utils'
 
 const empty = {
@@ -28,10 +29,12 @@ export default function PatientFormModal({ open, onClose, patient, onSaved }) {
     const data = { ...form, age }
     if (patient) {
       updatePatient(patient.id, data)
+      toast(t('common.saved'))
       onSaved?.(patient.id)
       onClose()
     } else {
       const p = addPatient(data)
+      toast(t('common.saved'))
       onClose()
       if (onSaved) onSaved(p.id)
       else navigate(`/patients/${p.id}`)

@@ -1,9 +1,10 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { CheckCircle2, XCircle } from 'lucide-react'
+import { XCircle } from 'lucide-react'
 import { useStore } from './context/StoreContext'
 import { useI18n } from './i18n/I18nContext'
 import { Modal } from './components/ui'
+import { Confetti, SuccessCheck, ToastHost } from './components/anim'
 import Layout from './components/Layout'
 import PublicEntry from './pages/PublicEntry'
 import ResetPassword from './pages/ResetPassword'
@@ -54,9 +55,10 @@ function PaymentResultOverlay({ result, onClose }) {
     : ''
   return (
     <Modal open onClose={onClose} size="sm">
-      <div className="flex flex-col items-center gap-3 py-4 text-center">
+      {result.ok && <Confetti />}
+      <div className="relative flex flex-col items-center gap-3 py-4 text-center">
         {result.ok
-          ? <CheckCircle2 size={52} className="text-emerald-500" />
+          ? <SuccessCheck size={56} />
           : <XCircle size={52} className="text-rose-500" />}
         <p className="text-lg font-bold text-ink-800">{result.ok ? t('packages.paySuccess') : t('packages.payCancelled')}</p>
         {detail && <p className="rounded-lg bg-ink-50 px-3 py-1.5 text-xs text-ink-500" dir="ltr">{detail}</p>}
@@ -73,9 +75,9 @@ export default function App() {
 
   if (booting) return <Splash />
   if (recovery) return <ResetPassword />
-  if (!currentUser) return <>{<PublicEntry />}{overlay}</>
+  if (!currentUser) return <>{<PublicEntry />}{overlay}<ToastHost /></>
   // Cloud accounts must pay before entering the app.
-  if (mode === 'cloud' && clinic && !clinic.paid) return <>{<Paywall />}{overlay}</>
+  if (mode === 'cloud' && clinic && !clinic.paid) return <>{<Paywall />}{overlay}<ToastHost /></>
 
   return (
     <>
@@ -96,6 +98,7 @@ export default function App() {
         </Route>
       </Routes>
       {overlay}
+      <ToastHost />
     </>
   )
 }

@@ -129,6 +129,24 @@
 .animate-float     { animation: float     7s ease-in-out infinite; }
 .animate-float-rev { animation: float-rev 9s ease-in-out infinite; }
 
+/* Skeleton shimmer */
+.shimmer {
+  background: linear-gradient(90deg, theme('colors.ink.100') 25%, theme('colors.ink.200') 50%, theme('colors.ink.100') 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Gentle idle bob (empty states, illustrations) */
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-7px); }
+}
+.animate-bob { animation: bob 2.6s ease-in-out infinite; }
+
 /* Glassy top bar */
 .glass {
   background: rgba(255, 255, 255, 0.72);

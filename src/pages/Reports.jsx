@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
   CartesianGrid, AreaChart, Area,
@@ -168,10 +169,12 @@ function ReportsInner() {
                 <div key={i} className="flex items-center gap-3">
                   <span className="w-28 truncate text-sm font-semibold text-ink-600">{d.name}</span>
                   <div className="h-7 flex-1 overflow-hidden rounded-lg bg-ink-50">
-                    <div className="flex h-full items-center justify-end rounded-lg px-2 text-xs font-bold text-white transition-all"
-                      style={{ width: `${(d.value / max) * 100}%`, background: d.color, minWidth: 40 }}>
+                    <motion.div className="flex h-full items-center justify-end rounded-lg px-2 text-xs font-bold text-white"
+                      initial={{ width: 0 }} whileInView={{ width: `${(d.value / max) * 100}%` }} viewport={{ once: true }}
+                      transition={{ duration: 0.9, ease: 'easeOut', delay: i * 0.08 }}
+                      style={{ background: d.color, minWidth: 40 }}>
                       {money(d.value, currency)}
-                    </div>
+                    </motion.div>
                   </div>
                 </div>
               )
