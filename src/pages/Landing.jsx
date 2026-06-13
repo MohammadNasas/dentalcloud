@@ -315,6 +315,12 @@ export default function Landing({ onEnter }) {
       </section>
 
       <footer className="border-t border-ink-100 py-6 text-center text-sm text-ink-400">
+        <div className="mb-2 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 font-semibold">
+          <a href="/pricing.html" className="hover:text-brand-600">{lang === 'ar' ? 'الأسعار' : 'Pricing'}</a>
+          <a href="/terms.html" className="hover:text-brand-600">{lang === 'ar' ? 'الشروط' : 'Terms'}</a>
+          <a href="/privacy.html" className="hover:text-brand-600">{lang === 'ar' ? 'الخصوصية' : 'Privacy'}</a>
+          <a href="/refund.html" className="hover:text-brand-600">{lang === 'ar' ? 'الاسترجاع' : 'Refund'}</a>
+        </div>
         © {new Date().getFullYear()} {t('app.name')} — {t('app.tagline')}
       </footer>
     </div>
