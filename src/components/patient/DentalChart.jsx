@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Plus, Trash2, Printer, Stethoscope, Layers, Eye, Wrench } from 'lucide-react'
+import { Plus, Trash2, Printer, Stethoscope, Layers, Eye, ClipboardList, CheckCircle2, Pencil, Save } from 'lucide-react'
 import { useI18n } from '../../i18n/I18nContext'
 import { useStore } from '../../context/StoreContext'
 import { chartRows, getTooth, SURFACE_KEYS, SURFACES, toothLabel, bilingual, NUMBERING_SYSTEMS } from '../../lib/teeth'
@@ -13,9 +13,16 @@ import InstructionsModal from '../InstructionsModal'
 import { fmtDate } from '../../lib/dates'
 import { money, cx } from '../../lib/utils'
 
+// viewMode: 'condition' = initial teeth status · 'plan' = planned treatments ·
+// 'done' = completed treatments.
 function computeDisplay(records, viewMode) {
   const relevant = records
-    .filter((r) => r.kind === viewMode)
+    .filter((r) => {
+      if (viewMode === 'condition') return r.kind === 'condition'
+      if (viewMode === 'plan') return r.kind === 'treatment' && r.status !== 'done'
+      if (viewMode === 'done') return r.kind === 'treatment' && r.status === 'done'
+      return false
+    })
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
   const surfaceColors = {}
   let wholeColor = null, wholeStatus = null, missing = false
@@ -99,8 +106,9 @@ export default function DentalChart({ patient }) {
             value={viewMode}
             onChange={setViewMode}
             options={[
-              { value: 'condition', label: t('chart.currentState'), icon: <Eye size={14} /> },
-              { value: 'treatment', label: t('chart.completedTreatment'), icon: <Wrench size={14} /> },
+              { value: 'condition', label: lang === 'ar' ? 'الوضع الأول' : 'Initial', icon: <Eye size={14} /> },
+              { value: 'plan', label: lang === 'ar' ? 'خطة العلاج' : 'Plan', icon: <ClipboardList size={14} /> },
+              { value: 'done', label: lang === 'ar' ? 'المنجزة' : 'Done', icon: <CheckCircle2 size={14} /> },
             ]}
           />
         </div>
@@ -152,7 +160,7 @@ export default function DentalChart({ patient }) {
 
 function ToothModal({ patient, toothId, dentition, onClose }) {
   const { t, lang } = useI18n()
-  const { recordsForPatient, addToothRecord, deleteToothRecord, doctors, getDoctor, can, clinic, currentUser } = useStore()
+  const { recordsForPatient, addToothRecord, updateToothRecord, deleteToothRecord, doctors, getDoctor, can, clinic, currentUser } = useStore()
   const tooth = getTooth(toothId)
   const currency = clinic?.settings?.currency || 'JOD'
   const numbering = clinic?.settings?.numbering || 'fdi'
@@ -259,32 +267,13 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
           <div className="max-h-72 space-y-2 overflow-y-auto pe-1">
             {records.length === 0 ? (
               <p className="rounded-xl bg-ink-50 px-3 py-6 text-center text-sm text-ink-400">{t('chart.noEntries')}</p>
-            ) : records.map((r) => {
-              const doc = getDoctor(r.doctorId)
-              return (
-                <div key={r.id} className="rounded-xl border border-ink-100 p-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 shrink-0 rounded" style={{ background: recordColor(r) }} />
-                    <span className="flex-1 text-sm font-bold text-ink-800">{recordName(r, lang)}</span>
-                    <Badge color={r.status === 'done' ? 'green' : 'amber'}>{r.status === 'done' ? t('chart.done') : t('chart.planned')}</Badge>
-                    <button onClick={() => deleteToothRecord(r.id)} className="text-ink-300 hover:text-rose-500"><Trash2 size={14} /></button>
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-400">
-                    <span>{fmtDate(r.date, lang)}</span>
-                    {r.surfaces?.length > 0 && <span>{r.surfaces.map((s) => SURFACES[s].short).join('')}</span>}
-                    {r.cariesClass && <span>Class {r.cariesClass}</span>}
-                    {doc && <span className="flex items-center gap-1">• {(lang === 'ar' ? doc.nameAr : doc.name)}</span>}
-                    {r.price > 0 && <span className="font-semibold text-ink-500">{money(r.price, currency)}</span>}
-                  </div>
-                  {r.notes && <p className="mt-1 text-xs text-ink-500">{r.notes}</p>}
-                  {r.kind === 'treatment' && can('instructions') && (
-                    <button onClick={() => setInstrFor(r.itemKey)} className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:underline">
-                      <Printer size={12} /> {t('instructions.title')}
-                    </button>
-                  )}
-                </div>
-              )
-            })}
+            ) : records.map((r) => (
+              <EditableRecord
+                key={r.id} record={r} lang={lang} t={t} currency={currency}
+                doctors={doctors} getDoctor={getDoctor} can={can}
+                onUpdate={updateToothRecord} onDelete={deleteToothRecord} onInstructions={setInstrFor}
+              />
+            ))}
           </div>
         </div>
 
@@ -401,6 +390,100 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
         <InstructionsModal patient={patient} treatmentKey={instrFor} onClose={() => setInstrFor(null)} />
       )}
     </Modal>
+  )
+}
+
+// One tooth-history row that can be edited inline (status, doctor, price, date,
+// notes) so corrections don't require deleting and re-adding the treatment.
+function EditableRecord({ record: r, lang, t, currency, doctors, getDoctor, can, onUpdate, onDelete, onInstructions }) {
+  const [editing, setEditing] = useState(false)
+  const [status, setStatus] = useState(r.status)
+  const [doctorId, setDoctorId] = useState(r.doctorId)
+  const [price, setPrice] = useState(String(r.price || ''))
+  const [date, setDate] = useState((r.date || '').slice(0, 10))
+  const [notes, setNotes] = useState(r.notes || '')
+  const isTreatment = r.kind === 'treatment'
+
+  function start() {
+    setStatus(r.status); setDoctorId(r.doctorId); setPrice(String(r.price || ''))
+    setDate((r.date || '').slice(0, 10)); setNotes(r.notes || ''); setEditing(true)
+  }
+  function save() {
+    onUpdate(r.id, {
+      status,
+      doctorId,
+      price: isTreatment ? Number(price) || 0 : 0,
+      date: date ? new Date(date).toISOString() : r.date,
+      notes,
+    })
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="space-y-2 rounded-xl border border-brand-300 bg-brand-50/40 p-2.5">
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-3 shrink-0 rounded" style={{ background: recordColor(r) }} />
+          <span className="flex-1 text-sm font-bold text-ink-800">{recordName(r, lang)}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <Field label={t('common.status')}>
+            <Segmented size="sm" value={status} onChange={setStatus}
+              options={[{ value: 'done', label: t('chart.done') }, { value: 'planned', label: t('chart.planned') }]} />
+          </Field>
+          <Field label={t('common.date')}>
+            <input type="date" className="input !py-1.5" value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {can('multiDoctor') && (
+            <Field label={t('appt.doctor')}>
+              <select className="input !py-1.5" value={doctorId} onChange={(e) => setDoctorId(e.target.value)}>
+                {doctors.map((d) => <option key={d.id} value={d.id}>{lang === 'ar' ? d.nameAr : d.name}</option>)}
+              </select>
+            </Field>
+          )}
+          {isTreatment && (
+            <Field label={`${t('chart.price')} (${currency})`}>
+              <input type="number" className="input !py-1.5" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />
+            </Field>
+          )}
+        </div>
+        <Field label={t('common.notes')}>
+          <input className="input !py-1.5" value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </Field>
+        <div className="flex justify-end gap-2">
+          <button onClick={() => setEditing(false)} className="btn-ghost !px-3 !py-1.5 text-xs">{t('common.cancel')}</button>
+          <button onClick={save} className="btn-primary !px-3 !py-1.5 text-xs"><Save size={13} /> {t('common.save')}</button>
+        </div>
+      </div>
+    )
+  }
+
+  const doc = getDoctor(r.doctorId)
+  return (
+    <div className="rounded-xl border border-ink-100 p-2.5">
+      <div className="flex items-center gap-2">
+        <span className="h-3 w-3 shrink-0 rounded" style={{ background: recordColor(r) }} />
+        <span className="flex-1 text-sm font-bold text-ink-800">{recordName(r, lang)}</span>
+        <Badge color={r.status === 'done' ? 'green' : 'amber'}>{r.status === 'done' ? t('chart.done') : t('chart.planned')}</Badge>
+        <button onClick={start} title={t('common.edit')} className="text-ink-300 hover:text-brand-600"><Pencil size={13} /></button>
+        <button onClick={() => onDelete(r.id)} className="text-ink-300 hover:text-rose-500"><Trash2 size={14} /></button>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-400">
+        <span>{fmtDate(r.date, lang)}</span>
+        {r.surfaces?.length > 0 && <span>{r.surfaces.map((s) => SURFACES[s].short).join('')}</span>}
+        {r.cariesClass && <span>Class {r.cariesClass}</span>}
+        {doc && <span className="flex items-center gap-1">• {(lang === 'ar' ? doc.nameAr : doc.name)}</span>}
+        {r.price > 0 && <span className="font-semibold text-ink-500">{money(r.price, currency)}</span>}
+      </div>
+      {r.notes && <p className="mt-1 text-xs text-ink-500">{r.notes}</p>}
+      {r.kind === 'treatment' && can('instructions') && (
+        <button onClick={() => onInstructions(r.itemKey)} className="mt-1.5 inline-flex items-center gap-1 text-xs font-bold text-brand-600 hover:underline">
+          <Printer size={12} /> {t('instructions.title')}
+        </button>
+      )}
+    </div>
   )
 }
 

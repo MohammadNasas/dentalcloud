@@ -321,12 +321,13 @@ function LabOrderModal({ order, patients, currency, lang, appointments, onSave, 
           </Field>
         )}
 
-        {/* Shade */}
-        <Field label={lang === 'ar' ? 'اللون / الشيد' : 'Shade'}>
-          <select className="input" value={form.shade} onChange={(e) => f('shade', e.target.value)}>
-            <option value="">{lang === 'ar' ? '— بدون —' : '— None —'}</option>
-            {SHADES.map((s) => <option key={s} value={s}>{s}</option>)}
-          </select>
+        {/* Shade — pick from the list or type any custom shade */}
+        <Field label={lang === 'ar' ? 'اللون / الشيد' : 'Shade'} hint={lang === 'ar' ? 'اختر من القائمة أو اكتب لوناً مخصصاً' : 'Pick from the list or type a custom shade'}>
+          <input className="input" list="lab-shades" value={form.shade} onChange={(e) => f('shade', e.target.value)}
+            placeholder={lang === 'ar' ? 'مثل A2 أو لون مخصص…' : 'e.g. A2 or custom…'} />
+          <datalist id="lab-shades">
+            {SHADES.map((s) => <option key={s} value={s} />)}
+          </datalist>
         </Field>
 
         {/* Pieces */}
