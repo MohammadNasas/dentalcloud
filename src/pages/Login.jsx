@@ -19,6 +19,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [rememberMe, setRememberMe] = useState(() => localStorage.getItem('_rememberMe') !== 'false')
+  const [agreedTerms, setAgreedTerms] = useState(false)
   const [forgot, setForgot] = useState({ open: false, email: '', sent: false })
   const [otpCode, setOtpCode] = useState('')
   const [resent, setResent] = useState(false)
@@ -67,6 +68,9 @@ export default function Login({ initialTab = 'signin', onBack }) {
     setError('')
     if (!reg.clinicName || !reg.doctorName || !reg.email || !reg.password) {
       setError(t('auth.fillAll')); return
+    }
+    if (!agreedTerms) {
+      setError(lang === 'ar' ? 'يجب الموافقة على الشروط وسياسة الخصوصية' : 'You must agree to the Terms and Privacy Policy'); return
     }
     setBusy(true)
     const res = await register(reg)
@@ -295,8 +299,18 @@ export default function Login({ initialTab = 'signin', onBack }) {
                   ))}
                 </div>
               </Field>
+              <label className="flex items-start gap-2 text-xs text-ink-500">
+                <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-ink-300 accent-brand-600" />
+                <span>
+                  {lang === 'ar' ? 'أوافق على ' : 'I agree to the '}
+                  <a href="https://dentalcloud.pages.dev/terms.html" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-600 hover:underline">{lang === 'ar' ? 'شروط الخدمة' : 'Terms of Service'}</a>
+                  {lang === 'ar' ? ' و' : ' and '}
+                  <a href="https://dentalcloud.pages.dev/privacy.html" target="_blank" rel="noopener noreferrer" className="font-bold text-brand-600 hover:underline">{lang === 'ar' ? 'سياسة الخصوصية' : 'Privacy Policy'}</a>
+                </span>
+              </label>
               {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{error}</p>}
-              <button disabled={busy} className="btn-primary w-full !py-3">
+              <button disabled={busy || !agreedTerms} className="btn-primary w-full !py-3">
                 {busy ? <Spinner /> : <>{t('auth.createAccount')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
               </button>
             </form>
