@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { XCircle } from 'lucide-react'
@@ -24,24 +25,40 @@ import Lab from './pages/Lab'
 
 function Splash() {
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-5 bg-[var(--app-bg)]">
+    <div className="relative flex h-screen flex-col items-center justify-center gap-6 overflow-hidden bg-[var(--app-bg)]">
+      {/* soft brand glow behind the logo */}
       <motion.div
-        initial={{ scale: 0.6, opacity: 0 }}
+        initial={{ scale: 0.7, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-        className="overflow-hidden rounded-2xl shadow-lg"
-        style={{ width: 72, height: 72 }}
+        transition={{ duration: 0.9, ease: 'easeOut' }}
+        className="pointer-events-none absolute h-72 w-72 rounded-full bg-brand-200/40 blur-3xl"
+      />
+      <motion.div
+        initial={{ scale: 0.4, opacity: 0, rotate: -10 }}
+        animate={{ scale: 1, opacity: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 220, damping: 15 }}
+        className="relative overflow-hidden rounded-3xl shadow-xl"
+        style={{ width: 96, height: 96 }}
       >
         <img src={logo} alt="logo" className="h-full w-full object-cover" />
       </motion.div>
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
+        initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="flex flex-col items-center gap-2"
+        transition={{ delay: 0.35, duration: 0.4 }}
+        className="relative flex flex-col items-center gap-3"
       >
-        <span className="text-lg font-extrabold text-ink-700">DentalCloud</span>
-        <span className="h-5 w-5 animate-spin rounded-full border-2 border-brand-200 border-t-brand-600" />
+        <span className="text-2xl font-extrabold tracking-tight text-ink-800">DentalCloud</span>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              className="h-2 w-2 rounded-full bg-brand-500"
+              animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+              transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
+            />
+          ))}
+        </div>
       </motion.div>
     </div>
   )
@@ -72,9 +89,17 @@ function PaymentResultOverlay({ result, onClose }) {
 export default function App() {
   const { booting, currentUser, recovery, paymentResult, dismissPaymentResult, mode, clinic } = useStore()
 
+  // Keep the splash on screen long enough for the logo reveal to actually be
+  // seen, even when boot finishes instantly.
+  const [minSplash, setMinSplash] = useState(true)
+  useEffect(() => {
+    const id = setTimeout(() => setMinSplash(false), 1600)
+    return () => clearTimeout(id)
+  }, [])
+
   const overlay = paymentResult ? <PaymentResultOverlay result={paymentResult} onClose={dismissPaymentResult} /> : null
 
-  if (booting) return <Splash />
+  if (booting || minSplash) return <Splash />
   if (recovery) return <ResetPassword />
   if (!currentUser) return <>{<PublicEntry />}{overlay}<ToastHost /></>
   // Cloud accounts must pay before entering the app.

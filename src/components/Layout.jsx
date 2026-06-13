@@ -31,10 +31,11 @@ function NotificationsBell({ items, lang, navigate }) {
       <button onClick={() => setOpen((o) => !o)} className="rounded-lg p-2 text-ink-500 hover:bg-ink-100" title={lang === 'ar' ? 'الإشعارات' : 'Notifications'}>
         <AnimatedBell count={items.length}><Bell size={18} /></AnimatedBell>
       </button>
+      {/* Backdrop kept outside AnimatePresence so it unmounts instantly (no ghost overlay that could trap taps). */}
+      {open && <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />}
       <AnimatePresence>
         {open && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <motion.div
               initial={{ opacity: 0, y: -8, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8, scale: 0.96 }}
               transition={{ type: 'spring', stiffness: 380, damping: 28 }}
@@ -189,27 +190,25 @@ export default function Layout() {
         <SidebarInner />
       </aside>
 
-      {/* Mobile sidebar */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <>
-            <motion.div
-              className="fixed inset-0 z-40 bg-ink-900/30 lg:hidden"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setMobileOpen(false)}
-            />
-            <motion.aside
-              className="fixed inset-y-0 z-50 w-64 bg-white shadow-2xl lg:hidden start-0"
-              initial={{ x: lang === 'ar' ? 280 : -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: lang === 'ar' ? 280 : -280 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 32 }}
-            >
-              <SidebarInner onNavigate={() => setMobileOpen(false)} />
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      {/* Mobile sidebar — always mounted and animated via state (no AnimatePresence).
+          When closed it gets pointer-events:none so a half-finished animation can
+          never leave an invisible overlay that traps taps. */}
+      <motion.div
+        className={cx('fixed inset-0 z-40 bg-ink-900/30 lg:hidden', !mobileOpen && 'pointer-events-none')}
+        initial={false}
+        animate={{ opacity: mobileOpen ? 1 : 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={() => setMobileOpen(false)}
+      />
+      <motion.aside
+        className="fixed inset-y-0 z-50 w-64 bg-white shadow-2xl lg:hidden start-0"
+        style={{ pointerEvents: mobileOpen ? 'auto' : 'none' }}
+        initial={false}
+        animate={{ x: mobileOpen ? 0 : (lang === 'ar' ? 280 : -280) }}
+        transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+      >
+        <SidebarInner onNavigate={() => setMobileOpen(false)} />
+      </motion.aside>
 
       {/* Main */}
       <div className="flex min-w-0 flex-1 flex-col">
