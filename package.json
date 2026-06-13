@@ -5,6 +5,10 @@
   "type": "module",
   "description": "DentalCloud - Dental Clinic Management System",
   "author": "DentalCloud",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MohammadNasas/dentalcloud.git"
+  },
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
@@ -68,6 +72,8 @@
     "publish": [
       {
         "provider": "github",
+        "owner": "MohammadNasas",
+        "repo": "dentalcloud",
         "releaseType": "release"
       }
     ],

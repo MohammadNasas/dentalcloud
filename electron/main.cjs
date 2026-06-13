@@ -1,5 +1,5 @@
 // Electron main process — wraps the DentaCare web app as a desktop application.
-const { app, BrowserWindow, shell, Menu } = require('electron')
+const { app, BrowserWindow, shell, Menu, dialog } = require('electron')
 const path = require('path')
 const { autoUpdater } = require('electron-updater')
 
@@ -49,18 +49,44 @@ function createWindow() {
   })
 }
 
-// Auto-update: in the installed app, quietly check GitHub Releases for a newer
-// version, download it in the background, and install it on the next restart.
-// Errors (offline, or no release published yet) are swallowed so they never
-// block the app from starting.
+// Auto-update: in the installed app, check GitHub Releases for a newer version,
+// download it in the background, then prompt the user to restart and apply it
+// right away. Relying on "install on quit" alone is unreliable (force-quitting
+// from Task Manager skips it), so we surface an explicit "Restart now" dialog.
+let updatePromptShown = false
 function setupAutoUpdates() {
   if (!app.isPackaged) return // updates only apply to the installed desktop app
   autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.autoInstallOnAppQuit = true // fallback: still applies on normal quit
+
   autoUpdater.on('error', (err) => console.error('[updater]', err == null ? 'unknown' : err.message || err))
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {})
-  // Re-check every 6 hours for apps that stay open all day.
-  setInterval(() => { autoUpdater.checkForUpdatesAndNotify().catch(() => {}) }, 6 * 60 * 60 * 1000)
+  autoUpdater.on('checking-for-update', () => console.log('[updater] checking…'))
+  autoUpdater.on('update-available', (info) => console.log('[updater] update available:', info?.version))
+  autoUpdater.on('update-not-available', () => console.log('[updater] up to date'))
+  autoUpdater.on('download-progress', (p) => console.log(`[updater] downloading ${Math.round(p.percent)}%`))
+
+  autoUpdater.on('update-downloaded', (info) => {
+    if (updatePromptShown) return
+    updatePromptShown = true
+    const win = BrowserWindow.getAllWindows()[0]
+    dialog.showMessageBox(win, {
+      type: 'info',
+      buttons: ['أعد التشغيل الآن', 'لاحقاً'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+      title: 'تحديث جديد لـ DentalCloud',
+      message: `النسخة ${info?.version || 'الجديدة'} جاهزة`,
+      detail: 'تم تنزيل تحديث جديد. أعد تشغيل التطبيق الآن لتطبيقه — أو سيُطبَّق تلقائياً عند إغلاق التطبيق.',
+    }).then((res) => {
+      if (res.response === 0) { setImmediate(() => autoUpdater.quitAndInstall()) }
+      else { updatePromptShown = false } // allow re-prompt on next check
+    }).catch(() => { updatePromptShown = false })
+  })
+
+  autoUpdater.checkForUpdates().catch(() => {})
+  // Re-check every 2 hours for apps that stay open all day.
+  setInterval(() => { autoUpdater.checkForUpdates().catch(() => {}) }, 2 * 60 * 60 * 1000)
 }
 
 app.whenReady().then(() => {
