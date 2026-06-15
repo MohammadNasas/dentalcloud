@@ -77,6 +77,14 @@ const NAV = [
   { to: '/settings', key: 'settings', icon: Settings },
 ].filter((item) => !(item.webOnly && isElectron))
 
+// Primary destinations for the mobile bottom tab bar (the rest live behind "More").
+const BOTTOM_NAV = [
+  { to: '/', key: 'dashboard', icon: LayoutDashboard, end: true },
+  { to: '/patients', key: 'patients', icon: Users },
+  { to: '/appointments', key: 'appointments', icon: CalendarDays },
+  { to: '/payments', key: 'payments', icon: Wallet },
+]
+
 export default function Layout() {
   const { t, L, lang, toggleLang } = useI18n()
   const { currentUser, clinic, logout, can, appointments, getPatient, isOwner } = useStore()
@@ -252,12 +260,37 @@ export default function Layout() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-6"
+            className="mx-auto max-w-7xl px-4 pt-5 pb-28 sm:px-6 sm:pt-6 lg:pb-6"
           >
             <Outlet />
           </motion.div>
         </main>
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-ink-100 bg-white/95 backdrop-blur lg:hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {BOTTOM_NAV.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.end}
+            className={({ isActive }) => cx('flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-bold', isActive ? 'text-brand-600' : 'text-ink-400')}
+          >
+            <item.icon size={21} />
+            <span>{t(`nav.${item.key}`)}</span>
+          </NavLink>
+        ))}
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-bold text-ink-400"
+        >
+          <Menu size={21} />
+          <span>{t('common.more')}</span>
+        </button>
+      </nav>
     </div>
   )
 }
