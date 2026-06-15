@@ -1,14 +1,40 @@
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Download as DownloadIcon, Monitor, Apple, ShieldQuestion, ExternalLink, Stethoscope } from 'lucide-react'
+import { Download as DownloadIcon, Monitor, Apple, ShieldQuestion, ExternalLink, Stethoscope, Smartphone, Share, Plus, Check } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { DOWNLOADS, downloadUrl, detectOS, RELEASES_PAGE } from '../lib/downloads'
 import { cx } from '../lib/utils'
 import logo from '../lib/logo'
 
+const isIOSDevice = () => /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+const isStandaloneMode = () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
+
 export default function Download() {
   const { t, lang, L } = useI18n()
   const os = detectOS()
   const recommended = DOWNLOADS.find((d) => d.os === os) || DOWNLOADS[0]
+
+  const [installEvt, setInstallEvt] = useState(typeof window !== 'undefined' ? window.__pwaInstallPrompt : null)
+  const [installed, setInstalled] = useState(isStandaloneMode())
+  const isIOS = isIOSDevice()
+
+  useEffect(() => {
+    const onAvail = () => setInstallEvt(window.__pwaInstallPrompt || null)
+    const onInstalled = () => { setInstalled(true); setInstallEvt(null); window.__pwaInstallPrompt = null }
+    window.addEventListener('pwa-installable', onAvail)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => { window.removeEventListener('pwa-installable', onAvail); window.removeEventListener('appinstalled', onInstalled) }
+  }, [])
+
+  async function installApp() {
+    const e = window.__pwaInstallPrompt
+    if (!e) return
+    e.prompt()
+    try { await e.userChoice } catch { /* user dismissed */ }
+    window.__pwaInstallPrompt = null
+    setInstallEvt(null)
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -35,6 +61,47 @@ export default function Download() {
         </div>
         <span className="btn-primary"><DownloadIcon size={18} /> {lang === 'ar' ? 'تحميل' : 'Download'}</span>
       </motion.a>
+
+      {/* Install on phone (PWA) */}
+      <div className="card p-5">
+        <h3 className="mb-1 flex items-center gap-2 font-bold text-ink-800">
+          <Smartphone size={18} className="text-brand-500" /> {lang === 'ar' ? 'ثبّت التطبيق على جوالك' : 'Install on your phone'}
+        </h3>
+        <p className="mb-4 text-sm text-ink-400">
+          {lang === 'ar' ? 'بيفتح كتطبيق مستقل بأيقونته على الشاشة الرئيسية — أندرويد و iPhone.' : 'Opens as a standalone app with its own icon — Android & iPhone.'}
+        </p>
+
+        {installed ? (
+          <div className="flex items-center gap-2 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700">
+            <Check size={18} /> {lang === 'ar' ? 'التطبيق مثبّت على هذا الجهاز ✅' : 'The app is installed on this device ✅'}
+          </div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {/* Android */}
+            <div className="rounded-xl border border-ink-100 p-4">
+              <p className="mb-2 flex items-center gap-2 font-bold text-ink-700"><Smartphone size={16} className="text-emerald-500" /> Android</p>
+              {installEvt ? (
+                <button onClick={installApp} className="btn-primary w-full"><DownloadIcon size={16} /> {lang === 'ar' ? 'ثبّت الآن' : 'Install now'}</button>
+              ) : (
+                <p className="text-sm text-ink-500">
+                  {lang === 'ar'
+                    ? 'افتح هذه الصفحة في Chrome على جوالك، ثم من قائمة (⋮) اختر «تثبيت التطبيق».'
+                    : 'Open this page in Chrome on your phone, then choose “Install app” from the (⋮) menu.'}
+                </p>
+              )}
+            </div>
+            {/* iOS */}
+            <div className={cx('rounded-xl border p-4', isIOS ? 'border-brand-200 bg-brand-50/40' : 'border-ink-100')}>
+              <p className="mb-2 flex items-center gap-2 font-bold text-ink-700"><Apple size={16} /> iPhone / iPad</p>
+              <ol className="space-y-1.5 text-sm text-ink-500">
+                <li className="flex gap-1.5">{lang === 'ar' ? '١. افتح الموقع في متصفح Safari' : '1. Open the site in Safari'}</li>
+                <li className="flex items-center gap-1.5">{lang === 'ar' ? '٢. اضغط زر المشاركة' : '2. Tap Share'} <Share size={14} className="inline text-brand-500" /></li>
+                <li className="flex items-center gap-1.5">{lang === 'ar' ? '٣. اختر «إضافة إلى الشاشة الرئيسية»' : '3. Choose “Add to Home Screen”'} <Plus size={14} className="inline text-brand-500" /></li>
+              </ol>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* All platforms */}
       <div>

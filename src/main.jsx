@@ -27,3 +27,11 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator && location.protocol.st
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   })
 }
+
+// Capture the Android/Chrome install prompt as early as possible so the Download
+// page can offer a real "Install app" button (the event fires once, on load).
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault()
+  window.__pwaInstallPrompt = e
+  window.dispatchEvent(new Event('pwa-installable'))
+})
