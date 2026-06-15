@@ -10,8 +10,9 @@ import { useStore } from '../context/StoreContext'
 import { Stat, Avatar, EmptyState, Badge } from '../components/ui'
 import { stagger, staggerItem, Sparkline } from '../components/anim'
 import { fmtTime, fmtDate, isToday, isTomorrow, isSameDay, parseISO } from '../lib/dates'
-import { money } from '../lib/utils'
+import { money, waLink } from '../lib/utils'
 import PatientFormModal from '../components/PatientFormModal'
+import WhatsAppIcon from '../components/WhatsAppIcon'
 
 export default function Dashboard() {
   const { t, lang, isRTL } = useI18n()
@@ -72,6 +73,15 @@ export default function Dashboard() {
   }, [payments])
 
   const name = (lang === 'ar' ? currentUser?.nameAr : currentUser?.name) || ''
+
+  // Ready-to-send WhatsApp reminder: patient name + clinic + appointment day/time.
+  const reminderMsg = (p, a) => {
+    const who = (lang === 'ar' ? (p?.nameAr || p?.name) : p?.name) || ''
+    const where = (lang === 'ar' ? (clinic?.nameAr || clinic?.name) : clinic?.name) || ''
+    return lang === 'ar'
+      ? `مرحباً ${who}، تذكير بموعدك في ${where} يوم ${fmtDate(a.start, lang)} الساعة ${fmtTime(a.start, lang)}. نراك قريباً 🦷`
+      : `Hi ${who}, a reminder of your appointment at ${where} on ${fmtDate(a.start, lang)} at ${fmtTime(a.start, lang)}. See you soon 🦷`
+  }
 
   return (
     <div className="space-y-6">
@@ -185,9 +195,20 @@ export default function Dashboard() {
                           <p className="text-xs text-ink-400">{fmtTime(a.start, lang)} · {a.reason}</p>
                         </div>
                       </div>
-                      <a href={`tel:${p?.phone}`} className="mt-2 flex items-center justify-center gap-2 rounded-lg bg-amber-50 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100">
-                        <Phone size={13} /> {p?.phone} · {t('dashboard.callConfirm')}
-                      </a>
+                      {p?.phone ? (
+                        <div className="mt-2 flex gap-2">
+                          <a href={waLink(p.phone, reminderMsg(p, a))} target="_blank" rel="noopener noreferrer"
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-[#25D366] py-2 text-xs font-bold text-white hover:opacity-90">
+                            <WhatsAppIcon size={14} /> {t('dashboard.remindWhatsapp')}
+                          </a>
+                          <a href={`tel:${p.phone.replace(/\s/g, '')}`} title={t('patient.call')} aria-label={t('patient.call')}
+                            className="flex items-center justify-center rounded-lg bg-ink-100 px-3 py-2 text-ink-600 hover:bg-ink-200">
+                            <Phone size={14} />
+                          </a>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-center text-xs text-ink-400">{t('dashboard.noPhone')}</p>
+                      )}
                     </div>
                   )
                 })

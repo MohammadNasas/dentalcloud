@@ -83,6 +83,17 @@ export function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n))
 }
 
+// Digits-only number for a wa.me link (strips +, spaces, leading 00).
+export function waNumber(phone) {
+  let d = (phone || '').replace(/\D/g, '')
+  if (d.startsWith('00')) d = d.slice(2)
+  return d
+}
+// Build a WhatsApp deep link, optionally with a pre-filled message.
+export function waLink(phone, message) {
+  return `https://wa.me/${waNumber(phone)}${message ? `?text=${encodeURIComponent(message)}` : ''}`
+}
+
 export const PAYMENT_METHODS = {
   cash: { en: 'Cash', ar: 'نقدي', icon: '💵' },
   card: { en: 'Card / Visa', ar: 'بطاقة / فيزا', icon: '💳' },

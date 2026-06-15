@@ -18,17 +18,10 @@ import PaymentsPanel from '../components/patient/PaymentsPanel'
 import Gallery from '../components/patient/Gallery'
 import Timeline from '../components/patient/Timeline'
 import Overview from '../components/patient/Overview'
-import { money } from '../lib/utils'
+import { money, waLink } from '../lib/utils'
 import { dayLabel, parseISO } from '../lib/dates'
 import { exportPatient } from '../lib/wordExport'
 import WhatsAppIcon from '../components/WhatsAppIcon'
-
-// Digits-only number for a wa.me link (strips +, spaces, leading 00).
-function waNumber(phone) {
-  let d = (phone || '').replace(/\D/g, '')
-  if (d.startsWith('00')) d = d.slice(2)
-  return d
-}
 
 const TABS = [
   { id: 'overview', icon: ClipboardList, key: 'overview' },
@@ -105,7 +98,7 @@ export default function PatientProfile() {
               {patient.phone && (
                 <span className="flex items-center gap-2">
                   <Phone size={14} /> <span dir="ltr">{patient.phone}</span>
-                  <a href={`https://wa.me/${waNumber(patient.phone)}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer"
+                  <a href={waLink(patient.phone, waMsg)} target="_blank" rel="noopener noreferrer"
                     title="WhatsApp" aria-label="WhatsApp"
                     className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#25D366] text-white hover:opacity-90">
                     <WhatsAppIcon size={13} />
