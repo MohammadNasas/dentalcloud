@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Stethoscope, Check, ArrowRight, LogOut, GraduationCap, Building2, Crown, Lock } from 'lucide-react'
+import { Stethoscope, Check, ArrowRight, LogOut, GraduationCap, Building2, Crown, Lock, CreditCard, Landmark } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
@@ -8,6 +8,8 @@ import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { startCheckout } from '../lib/payments'
 import { Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
+import BankTransferPanel from '../components/BankTransferPanel'
+import PaymentHelp from '../components/PaymentHelp'
 import logo from '../lib/logo'
 
 const ICONS = { student: GraduationCap, economy: Building2, pro: Crown }
@@ -19,6 +21,7 @@ export default function Paywall() {
   const [selected, setSelected] = useState(clinic?.tier || 'economy')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [payMethod, setPayMethod] = useState('card')
 
   async function pay() {
     setError(''); setBusy(true)
@@ -80,13 +83,41 @@ export default function Paywall() {
 
         {error && <p className="mt-4 rounded-lg bg-rose-100 px-3 py-2 text-center text-sm font-semibold text-rose-700">{error}</p>}
 
-        <div className="mt-6 flex flex-col items-center gap-3">
-          <button onClick={pay} disabled={busy} className="btn bg-white !px-8 !py-3.5 text-base font-extrabold text-brand-700 hover:bg-white/90">
-            {busy ? <Spinner /> : <>{t('packages.pay')} — ${tier.price} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} /></>}
-          </button>
-          <p className="text-xs text-white/70">🔒 {t('packages.securePay')}</p>
+        <div className="mx-auto mt-6 max-w-md">
+          <p className="mb-2 text-center text-sm font-bold text-white/90">{t('packages.payHow')}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <PwMethodBtn active={payMethod === 'card'} onClick={() => setPayMethod('card')} icon={<CreditCard size={18} />} title={t('packages.payCard')} sub={t('packages.payCardSub')} />
+            <PwMethodBtn active={payMethod === 'bank'} onClick={() => setPayMethod('bank')} icon={<Landmark size={18} />} title={t('packages.payBank')} sub={t('packages.payBankSub')} />
+          </div>
+
+          {payMethod === 'bank' ? (
+            <BankTransferPanel amount={tier.price} planLabel={L(tier)} />
+          ) : (
+            <div className="mt-6 flex flex-col items-center gap-3">
+              <button onClick={pay} disabled={busy} className="btn bg-white !px-8 !py-3.5 text-base font-extrabold text-brand-700 hover:bg-white/90">
+                {busy ? <Spinner /> : <>{t('packages.pay')} — ${tier.price} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} /></>}
+              </button>
+              <p className="text-xs text-white/70">🔒 {t('packages.securePay')}</p>
+            </div>
+          )}
+
+          <PaymentHelp />
         </div>
       </div>
     </div>
+  )
+}
+
+function PwMethodBtn({ active, onClick, icon, title, sub }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={cx('flex items-start gap-2.5 rounded-xl border p-3 text-start backdrop-blur transition-all',
+        active ? 'border-white bg-white text-ink-800' : 'border-white/30 bg-white/10 text-white hover:bg-white/20')}>
+      <span className={cx('mt-0.5 shrink-0', active ? 'text-brand-600' : 'text-white')}>{icon}</span>
+      <span className="min-w-0">
+        <span className="block font-bold">{title}</span>
+        <span className={cx('block text-xs', active ? 'text-ink-400' : 'text-white/70')}>{sub}</span>
+      </span>
+    </button>
   )
 }

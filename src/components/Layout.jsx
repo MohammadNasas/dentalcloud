@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Users, CalendarDays, Wallet, BarChart3, Package,
-  Settings, LogOut, Menu, X, Lock, Globe, Stethoscope, FileText, Download, FlaskConical, Bell,
+  Settings, LogOut, Menu, X, Lock, Globe, Stethoscope, FileText, Download, FlaskConical, Bell, Inbox,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -79,7 +79,15 @@ const NAV = [
 
 export default function Layout() {
   const { t, L, lang, toggleLang } = useI18n()
-  const { currentUser, clinic, logout, can, appointments, getPatient } = useStore()
+  const { currentUser, clinic, logout, can, appointments, getPatient, isOwner } = useStore()
+  const navItems = (() => {
+    if (!isOwner) return NAV
+    const items = [...NAV]
+    const i = items.findIndex((n) => n.to === '/settings')
+    const inbox = { to: '/inbox', key: 'inbox', icon: Inbox }
+    if (i >= 0) items.splice(i, 0, inbox); else items.push(inbox)
+    return items
+  })()
   const [mobileOpen, setMobileOpen] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -101,7 +109,7 @@ export default function Layout() {
       initial="hidden"
       animate="show"
     >
-      {NAV.map((item) => {
+      {navItems.map((item) => {
         const locked = item.feature && !can(item.feature)
         return (
           <motion.div key={item.to} variants={NAV_ITEM}>
@@ -179,7 +187,7 @@ export default function Layout() {
   )
 
   const pageTitle = (() => {
-    const item = NAV.find((n) => (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to) && n.to !== '/'))
+    const item = navItems.find((n) => (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to) && n.to !== '/'))
     return item ? t(`nav.${item.key}`) : ''
   })()
 

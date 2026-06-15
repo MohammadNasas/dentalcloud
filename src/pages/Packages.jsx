@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Check, Sparkles, Crown, GraduationCap, Building2, X, ArrowRight, Star } from 'lucide-react'
+import { Check, Sparkles, Crown, GraduationCap, Building2, X, ArrowRight, Star, CreditCard, Landmark } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
@@ -9,6 +9,8 @@ import { Modal, Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
 import { paymentsEnabled, startCheckout } from '../lib/payments'
 import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/PackagePreviews'
+import BankTransferPanel from '../components/BankTransferPanel'
+import PaymentHelp from '../components/PaymentHelp'
 
 const ICONS = { student: GraduationCap, economy: Building2, pro: Crown }
 
@@ -20,6 +22,7 @@ export default function Packages() {
   const [expanded, setExpanded] = useState({})
   const [processing, setProcessing] = useState(false)
   const [payError, setPayError] = useState('')
+  const [payMethod, setPayMethod] = useState('card')
   const current = clinic?.tier
 
   async function confirmBuy() {
@@ -170,21 +173,56 @@ export default function Packages() {
                 ))}
               </div>
               {payError && <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{payError}</p>}
-              <div className="mt-5 flex items-center justify-between rounded-xl bg-ink-50 p-4">
-                <div>
-                  <p className="text-sm text-ink-400">{L(TIERS[buying])}</p>
-                  <p className="text-2xl font-extrabold text-ink-800">${TIERS[buying].price}<span className="text-sm font-normal text-ink-400"> {tierPeriodLabel(TIERS[buying], t)}</span></p>
-                </div>
-                <button onClick={confirmBuy} disabled={processing} className="btn-primary !py-3 !px-6" style={{ background: PACKAGE_FEATURES[buying].accent }}>
-                  {processing ? <Spinner /> : <>{paymentsEnabled ? t('packages.pay') : t('packages.buyNow')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
-                </button>
-              </div>
-              {paymentsEnabled && <p className="mt-2 text-center text-xs text-ink-400">🔒 {t('packages.securePay')}</p>}
+
+              {paymentsEnabled && (
+                <>
+                  <p className="mt-5 mb-2 text-sm font-bold text-ink-600">{t('packages.payHow')}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <MethodBtn active={payMethod === 'card'} onClick={() => setPayMethod('card')} accent={PACKAGE_FEATURES[buying].accent}
+                      icon={<CreditCard size={18} />} title={t('packages.payCard')} sub={t('packages.payCardSub')} />
+                    <MethodBtn active={payMethod === 'bank'} onClick={() => setPayMethod('bank')} accent={PACKAGE_FEATURES[buying].accent}
+                      icon={<Landmark size={18} />} title={t('packages.payBank')} sub={t('packages.payBankSub')} />
+                  </div>
+                </>
+              )}
+
+              {paymentsEnabled && payMethod === 'bank' ? (
+                <BankTransferPanel amount={TIERS[buying].price} planLabel={L(TIERS[buying])} />
+              ) : (
+                <>
+                  <div className="mt-5 flex items-center justify-between rounded-xl bg-ink-50 p-4">
+                    <div>
+                      <p className="text-sm text-ink-400">{L(TIERS[buying])}</p>
+                      <p className="text-2xl font-extrabold text-ink-800">${TIERS[buying].price}<span className="text-sm font-normal text-ink-400"> {tierPeriodLabel(TIERS[buying], t)}</span></p>
+                    </div>
+                    <button onClick={confirmBuy} disabled={processing} className="btn-primary !py-3 !px-6" style={{ background: PACKAGE_FEATURES[buying].accent }}>
+                      {processing ? <Spinner /> : <>{paymentsEnabled ? t('packages.pay') : t('packages.buyNow')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
+                    </button>
+                  </div>
+                  {paymentsEnabled && <p className="mt-2 text-center text-xs text-ink-400">🔒 {t('packages.securePay')}</p>}
+                </>
+              )}
+
+              {paymentsEnabled && <PaymentHelp />}
             </>
           )}
         </Modal>
       )}
     </div>
+  )
+}
+
+function MethodBtn({ active, onClick, icon, title, sub, accent }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={cx('flex items-start gap-2.5 rounded-xl border p-3 text-start transition-all', active ? 'bg-ink-50/60' : 'border-ink-100 hover:border-ink-200')}
+      style={active ? { borderColor: accent, boxShadow: `0 0 0 1px ${accent}` } : undefined}>
+      <span className="mt-0.5 shrink-0" style={{ color: active ? accent : '#94a3b8' }}>{icon}</span>
+      <span className="min-w-0">
+        <span className="block font-bold text-ink-800">{title}</span>
+        <span className="block text-xs text-ink-400">{sub}</span>
+      </span>
+    </button>
   )
 }
 

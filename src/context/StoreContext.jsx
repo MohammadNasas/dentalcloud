@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react'
-import { hashPassword, DOCTOR_COLORS, resetDB, seedDB, isComplimentary } from '../lib/db'
+import { hashPassword, DOCTOR_COLORS, resetDB, seedDB, isComplimentary, isAppOwner } from '../lib/db'
 import { backend } from '../lib/backend'
 import { getPaymentReturn, verifyPayment, clearPaymentReturn } from '../lib/payments'
 
@@ -25,6 +25,7 @@ export function StoreProvider({ children }) {
   const [recovery, setRecovery] = useState(false)
   const [pendingOtp, setPendingOtp] = useState(null) // { email, pending } when email confirmation is on
   const [paymentResult, setPaymentResult] = useState(null) // result after returning from Lahza
+  const [isOwner, setIsOwner] = useState(false) // app owner → sees the global suggestions inbox
   const [state, setState] = useState(EMPTY)
   const stateRef = useRef(state)
   useEffect(() => { stateRef.current = state }, [state])
@@ -97,6 +98,13 @@ export function StoreProvider({ children }) {
     if (!need) return true
     return TIER_ORDER[tier] >= TIER_ORDER[need]
   }, [tier])
+
+  // Resolve the app-owner flag whenever the logged-in user changes (async hash).
+  useEffect(() => {
+    let active = true
+    isAppOwner(currentUser?.email).then((v) => { if (active) setIsOwner(v) })
+    return () => { active = false }
+  }, [currentUser?.email])
 
   // ── Auth ────────────────────────────────────────────────────────────────
   const login = useCallback(async (identifier, password) => {
@@ -242,7 +250,11 @@ export function StoreProvider({ children }) {
   const deleteUser = useCallback((id) => drop('doctors', 'doctors', id), [drop])
 
   const addSuggestion = useCallback((text) => {
-    const s = { id: backend.genId(), clinicId: clinic.id, userId: currentUser?.id, text, date: new Date().toISOString() }
+    const s = {
+      id: backend.genId(), clinicId: clinic.id, clinicName: clinic.name, tier: clinic.tier,
+      userId: currentUser?.id, userName: currentUser?.name, userEmail: currentUser?.email,
+      text, date: new Date().toISOString(),
+    }
     upsert('suggestions', 'suggestions', s)
     return s
   }, [clinic, currentUser, upsert])
@@ -273,7 +285,7 @@ export function StoreProvider({ children }) {
     booting, recovery, mode: backend.mode,
     otpEmail: pendingOtp?.email || null, verifyOtp, resendOtp, cancelOtp,
     paymentResult, dismissPaymentResult,
-    clinic, currentUser, tier, can,
+    clinic, currentUser, tier, can, isOwner,
     login, logout, register, resetPassword, updatePassword,
     patients: state.patients, doctors: state.doctors, appointments: state.appointments,
     toothRecords: state.toothRecords, payments: state.payments, suggestions: state.suggestions,

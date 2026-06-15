@@ -218,3 +218,15 @@ export async function isComplimentary(email) {
     return false
   }
 }
+
+// The single app-owner account — sees the global suggestions inbox across all
+// clinics. Hashed so the email is never exposed in the public client bundle.
+const APP_OWNER_HASH = '0a63e0c92d3dc6a4f0a0daf8635d7355b6d16cca0eb51c0e5e679e5bd9788194'
+export async function isAppOwner(email) {
+  if (!email) return false
+  try {
+    return (await sha256hex(email.trim().toLowerCase())) === APP_OWNER_HASH
+  } catch {
+    return false
+  }
+}

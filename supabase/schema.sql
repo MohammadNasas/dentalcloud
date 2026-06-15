@@ -128,4 +128,12 @@ begin
   end loop;
 end $$;
 
+-- ── Owner inbox ──────────────────────────────────────────────────────────
+-- The app owner can read EVERY clinic's suggestions (for the in-app inbox).
+-- RLS select policies are OR-combined, so this only widens read access for the
+-- owner; every other clinic still sees its own rows only.
+drop policy if exists suggestions_owner_read on public.suggestions;
+create policy suggestions_owner_read on public.suggestions for select
+  using ( lower(auth.jwt() ->> 'email') = 'mohammadissogood556@gmail.com' );
+
 -- Done. ✅  Next: copy your Project URL + anon key into the app's .env (see SUPABASE_SETUP.md)

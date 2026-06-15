@@ -22,6 +22,7 @@ import Download from './pages/Download'
 import Packages from './pages/Packages'
 import Settings from './pages/Settings'
 import Lab from './pages/Lab'
+import Inbox from './pages/Inbox'
 
 function Splash() {
   return (
@@ -120,6 +121,7 @@ export default function App() {
           <Route path="/packages" element={<Packages />} />
           <Route path="/lab" element={<Lab />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/inbox" element={<Inbox />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
