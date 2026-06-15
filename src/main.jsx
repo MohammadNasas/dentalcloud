@@ -19,3 +19,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </I18nProvider>
   </React.StrictMode>
 )
+
+// Register the PWA service worker on the deployed web build only (skip dev so it
+// never interferes with HMR, and skip Electron's file:// where it isn't needed).
+if (import.meta.env.PROD && 'serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {})
+  })
+}

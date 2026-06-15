@@ -21,6 +21,14 @@ import Overview from '../components/patient/Overview'
 import { money } from '../lib/utils'
 import { dayLabel, parseISO } from '../lib/dates'
 import { exportPatient } from '../lib/wordExport'
+import WhatsAppIcon from '../components/WhatsAppIcon'
+
+// Digits-only number for a wa.me link (strips +, spaces, leading 00).
+function waNumber(phone) {
+  let d = (phone || '').replace(/\D/g, '')
+  if (d.startsWith('00')) d = d.slice(2)
+  return d
+}
 
 const TABS = [
   { id: 'overview', icon: ClipboardList, key: 'overview' },
@@ -55,6 +63,16 @@ export default function PatientProfile() {
 
   const visibleTabs = TABS.filter((tb) => !tb.feature || can(tb.feature) || true) // show all, lock inside
 
+  const pName = lang === 'ar' ? (patient.nameAr || patient.name) : patient.name
+  const clinicName = lang === 'ar' ? (clinic?.nameAr || clinic?.name) : clinic?.name
+  const waMsg = nextAppt
+    ? (lang === 'ar'
+        ? `مرحباً ${pName}، تذكير بموعدك في ${clinicName || ''} يوم ${dayLabel(nextAppt.start, lang, t)}.`
+        : `Hi ${pName}, a reminder of your appointment at ${clinicName || ''} on ${dayLabel(nextAppt.start, lang, t)}.`)
+    : (lang === 'ar'
+        ? `مرحباً ${pName}، من ${clinicName || ''}.`
+        : `Hi ${pName}, from ${clinicName || ''}.`)
+
   async function doExport() {
     setExporting(true)
     try { await exportPatient(patient, { clinic, lang, getDoctor: store.getDoctor, recordsForPatient, paymentsForPatient, balanceForPatient }) }
@@ -84,7 +102,21 @@ export default function PatientProfile() {
               {patient.age !== '' && <Badge color="ink">{patient.age} {lang === 'ar' ? 'سنة' : 'yrs'}</Badge>}
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-500">
-              {patient.phone && <span className="flex items-center gap-1.5"><Phone size={14} /> <span dir="ltr">{patient.phone}</span></span>}
+              {patient.phone && (
+                <span className="flex items-center gap-2">
+                  <Phone size={14} /> <span dir="ltr">{patient.phone}</span>
+                  <a href={`https://wa.me/${waNumber(patient.phone)}?text=${encodeURIComponent(waMsg)}`} target="_blank" rel="noopener noreferrer"
+                    title="WhatsApp" aria-label="WhatsApp"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#25D366] text-white hover:opacity-90">
+                    <WhatsAppIcon size={13} />
+                  </a>
+                  <a href={`tel:${patient.phone.replace(/\s/g, '')}`}
+                    title={t('patient.call')} aria-label={t('patient.call')}
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand-500 text-white hover:bg-brand-600">
+                    <Phone size={13} />
+                  </a>
+                </span>
+              )}
               {patient.occupation && <span className="flex items-center gap-1.5"><Briefcase size={14} /> {patient.occupation}</span>}
               {patient.address && <span className="flex items-center gap-1.5"><MapPin size={14} /> {patient.address}</span>}
             </div>

@@ -94,7 +94,7 @@ export const translations = {
     patient: {
       patients: 'Patients', addPatient: 'Add patient', newPatient: 'New patient',
       editPatient: 'Edit patient', fileNo: 'File No.', name: 'Patient name',
-      phone: 'Phone', gender: 'Gender', male: 'Male', female: 'Female',
+      phone: 'Phone', call: 'Call', gender: 'Gender', male: 'Male', female: 'Female',
       age: 'Age', dob: 'Date of birth', occupation: 'Occupation', address: 'Address',
       complaint: 'Chief complaint', searchPlaceholder: 'Search by name, file no. or phone…',
       noPatients: 'No patients yet', addFirst: 'Add your first patient',
@@ -303,7 +303,7 @@ export const translations = {
     patient: {
       patients: 'المرضى', addPatient: 'إضافة مريض', newPatient: 'مريض جديد',
       editPatient: 'تعديل المريض', fileNo: 'رقم الملف', name: 'اسم المريض',
-      phone: 'الهاتف', gender: 'الجنس', male: 'ذكر', female: 'أنثى',
+      phone: 'الهاتف', call: 'اتصال', gender: 'الجنس', male: 'ذكر', female: 'أنثى',
       age: 'العمر', dob: 'تاريخ الميلاد', occupation: 'الوظيفة', address: 'العنوان',
       complaint: 'الشكوى الرئيسية', searchPlaceholder: 'ابحث بالاسم أو رقم الملف أو الهاتف…',
       noPatients: 'لا يوجد مرضى بعد', addFirst: 'أضف أول مريض',
