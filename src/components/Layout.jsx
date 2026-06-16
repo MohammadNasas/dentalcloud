@@ -125,7 +125,7 @@ export default function Layout() {
               to={item.to}
               end={item.end}
               onClick={onNavigate}
-              className={({ isActive }) => cx('nav-link group relative', isActive && '!text-brand-700')}
+              className={({ isActive }) => cx('nav-link group relative', isActive ? '!text-brand-700' : '!text-ink-300 hover:!text-brand-700')}
             >
               {({ isActive }) => (
                 <>
@@ -158,14 +158,14 @@ export default function Layout() {
           <img src={logo} alt="logo" className="h-full w-full object-cover" />
         </div>
         <div className="leading-tight">
-          <p className="text-lg font-extrabold text-ink-800">{t('app.name')}</p>
+          <p className="text-lg font-extrabold text-white">{t('app.name')}</p>
           <p className="text-[11px] font-semibold text-ink-400">{t('app.tagline')}</p>
         </div>
       </div>
 
       {/* Clinic chip */}
-      <div className="mx-3 mb-3 rounded-xl bg-gradient-to-br from-brand-50 to-brand-100/40 p-3">
-        <p className="truncate text-sm font-bold text-ink-700">
+      <div className="mx-3 mb-3 rounded-xl border border-white/10 bg-white/5 p-3">
+        <p className="truncate text-sm font-bold text-white">
           {lang === 'ar' ? clinic?.nameAr || clinic?.name : clinic?.name}
         </p>
         <div className="mt-1 flex items-center gap-1.5">
@@ -177,16 +177,16 @@ export default function Layout() {
       <NavList onNavigate={onNavigate} />
 
       {/* User */}
-      <div className="mt-auto border-t border-ink-100 p-3">
+      <div className="mt-auto border-t border-white/10 p-3">
         <div className="flex items-center gap-3 rounded-xl px-2 py-2">
           <Avatar name={currentUser?.name} size={38} />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold text-ink-700">
+            <p className="truncate text-sm font-bold text-white">
               {lang === 'ar' ? currentUser?.nameAr || currentUser?.name : currentUser?.name}
             </p>
             <p className="truncate text-[11px] text-ink-400">{currentUser?.specialty}</p>
           </div>
-          <button onClick={logout} title={t('nav.logout')} className="rounded-lg p-2 text-ink-400 hover:bg-rose-50 hover:text-rose-500">
+          <button onClick={logout} title={t('nav.logout')} className="rounded-lg p-2 text-ink-400 hover:bg-white/10 hover:text-rose-400">
             <LogOut size={17} />
           </button>
         </div>
@@ -202,7 +202,7 @@ export default function Layout() {
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--app-bg)]">
       {/* Desktop sidebar */}
-      <aside className="hidden w-64 shrink-0 border-e border-ink-100 bg-white/60 lg:block">
+      <aside className="hidden w-64 shrink-0 border-e border-ink-800 bg-ink-900 lg:block">
         <SidebarInner />
       </aside>
 
@@ -217,7 +217,7 @@ export default function Layout() {
         onClick={() => setMobileOpen(false)}
       />
       <motion.aside
-        className="fixed inset-y-0 z-50 w-64 bg-white shadow-2xl lg:hidden start-0"
+        className="fixed inset-y-0 z-50 w-64 bg-ink-900 shadow-2xl lg:hidden start-0"
         style={{ pointerEvents: mobileOpen ? 'auto' : 'none' }}
         initial={false}
         animate={{ x: mobileOpen ? 0 : (lang === 'ar' ? 280 : -280) }}
