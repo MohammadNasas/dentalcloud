@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Building2, Users, DollarSign, FileText, Lightbulb, Crown, Database,
-  Plus, Trash2, Save, Globe, Check, UserCog, RotateCcw, Gauge, Zap,
+  Plus, Trash2, Save, Globe, Check, UserCog, RotateCcw, Gauge, Zap, Palette,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -17,9 +17,16 @@ const SECTIONS = [
   { id: 'clinic', icon: Building2, key: 'clinic' },
   { id: 'doctors', icon: Users, key: 'doctors' },
   { id: 'prices', icon: DollarSign, key: 'prices' },
+  { id: 'appearance', icon: Palette, key: 'appearance' },
   { id: 'performance', icon: Gauge, key: 'performance' },
   { id: 'suggestions', icon: Lightbulb, key: 'suggestions' },
   { id: 'plan', icon: Crown, key: 'yourPlan' },
+]
+
+// Available colour themes (extend by adding a [data-theme] block in index.css).
+const THEMES = [
+  { id: 'teal', key: 'themeTeal', swatch: ['#cefcf3', '#14b8a6', '#0d9488', '#0f766e'] },
+  { id: 'emerald', key: 'themeEmerald', swatch: ['#d1fae5', '#10b981', '#059669', '#047857'] },
 ]
 
 export default function Settings() {
@@ -42,6 +49,7 @@ export default function Settings() {
         {section === 'clinic' && <ClinicSection />}
         {section === 'doctors' && <DoctorsSection />}
         {section === 'prices' && <PricesSection />}
+        {section === 'appearance' && <AppearanceSection />}
         {section === 'performance' && <PerformanceSection />}
         {section === 'suggestions' && <SuggestionsSection />}
         {section === 'plan' && <PlanSection />}
@@ -81,6 +89,32 @@ function ClinicSection() {
         </Field>
       </div>
       <button onClick={save} className="btn-primary mt-5">{saved ? <><Check size={16} /> {t('common.saved')}</> : <><Save size={16} /> {t('common.save')}</>}</button>
+    </div>
+  )
+}
+
+function AppearanceSection() {
+  const { t } = useI18n()
+  const { clinic, updateClinic } = useStore()
+  const current = clinic?.settings?.theme || 'teal'
+  const choose = (id) => updateClinic({ settings: { ...clinic.settings, theme: id } })
+  return (
+    <div className="card max-w-2xl p-6">
+      <h3 className="mb-2 flex items-center gap-2 text-lg font-bold text-ink-800"><Palette size={20} className="text-brand-500" /> {t('settings.appearance')}</h3>
+      <p className="mb-5 text-sm text-ink-400">{t('settings.themeDesc')}</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {THEMES.map((th) => (
+          <button key={th.id} onClick={() => choose(th.id)}
+            className={cx('rounded-2xl border-2 p-3 text-start transition-all', current === th.id ? 'border-brand-500 bg-brand-50/40' : 'border-ink-100 hover:border-ink-200')}>
+            <div className="mb-2.5 flex gap-1">
+              {th.swatch.map((c) => <span key={c} className="h-6 flex-1 rounded-md" style={{ background: c }} />)}
+            </div>
+            <span className="flex items-center gap-1.5 text-sm font-bold text-ink-700">
+              {current === th.id && <Check size={14} className="text-brand-600" />}{t(`settings.${th.key}`)}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
