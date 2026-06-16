@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Wallet, TrendingUp, CircleDollarSign, CheckCircle2, HandCoins, Receipt } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { Avatar, EmptyState, Stat, Badge, SearchInput } from '../components/ui'
+import { Avatar, EmptyState, Badge, SearchInput } from '../components/ui'
 import PaymentModal from '../components/PaymentModal'
+import PageHero from '../components/PageHero'
 import { money, PAYMENT_METHODS } from '../lib/utils'
 import { fmtDate } from '../lib/dates'
 
@@ -40,11 +41,20 @@ export default function Payments() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Stat icon={<Receipt size={22} />} label={t('pay.totalBilled')} value={money(totalBilled, currency)} color="blue" />
-        <Stat icon={<TrendingUp size={22} />} label={t('pay.totalPaid')} value={money(totalPaid, currency)} color="green" />
-        <Stat icon={<CircleDollarSign size={22} />} label={t('pay.totalDue')} value={money(totalDue, currency)} color="rose" />
-      </div>
+      <PageHero icon={<Wallet size={22} />} title={t('nav.payments')} subtitle={lang === 'ar' ? 'نظرة مالية على العيادة' : 'Clinic financial overview'}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {[
+            { label: t('pay.totalBilled'), value: money(totalBilled, currency), icon: Receipt },
+            { label: t('pay.totalPaid'), value: money(totalPaid, currency), icon: TrendingUp },
+            { label: t('pay.totalDue'), value: money(totalDue, currency), icon: CircleDollarSign },
+          ].map((k) => (
+            <div key={k.label} className="rounded-2xl bg-white/10 p-3.5 backdrop-blur ring-1 ring-white/10">
+              <div className="flex items-center gap-1.5 text-white/70"><k.icon size={15} /><span className="text-xs font-semibold">{k.label}</span></div>
+              <p className="mt-1.5 text-2xl font-extrabold">{k.value}</p>
+            </div>
+          ))}
+        </div>
+      </PageHero>
 
       {can('paymentMethods') && Object.keys(methodTotals).length > 0 && (
         <div className="card p-4">
