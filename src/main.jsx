@@ -1,10 +1,26 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
+import { MotionConfig } from 'framer-motion'
 import App from './App.jsx'
 import { I18nProvider } from './i18n/I18nContext.jsx'
 import { StoreProvider } from './context/StoreContext.jsx'
+import { applyReduceMotionOnBoot, useReduceMotion } from './lib/motionPref'
 import './index.css'
+
+// Apply the saved performance-mode choice before the first paint.
+applyReduceMotionOnBoot()
+
+// Wraps the app so "performance mode" can disable Framer Motion animations
+// app-wide (CSS animations/transitions are handled by the .reduce-motion class).
+function Root() {
+  const [reduce] = useReduceMotion()
+  return (
+    <MotionConfig reducedMotion={reduce ? 'always' : 'never'}>
+      <App />
+    </MotionConfig>
+  )
+}
 
 // HashRouter so routing works identically as a website AND inside the packaged
 // desktop app (Electron loads from file://, where path-based routing breaks).
@@ -13,7 +29,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <I18nProvider>
       <StoreProvider>
         <HashRouter>
-          <App />
+          <Root />
         </HashRouter>
       </StoreProvider>
     </I18nProvider>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Building2, Users, DollarSign, FileText, Lightbulb, Crown, Database,
-  Plus, Trash2, Save, Globe, Check, UserCog, RotateCcw,
+  Plus, Trash2, Save, Globe, Check, UserCog, RotateCcw, Gauge, Zap,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -11,11 +11,13 @@ import { DEFAULT_PRICES, INSTRUCTIONS } from '../lib/treatments'
 import FeatureLock from '../components/FeatureLock'
 import { Modal, Field, Segmented, Avatar, Badge } from '../components/ui'
 import { cx, CURRENCIES } from '../lib/utils'
+import { useReduceMotion } from '../lib/motionPref'
 
 const SECTIONS = [
   { id: 'clinic', icon: Building2, key: 'clinic' },
   { id: 'doctors', icon: Users, key: 'doctors' },
   { id: 'prices', icon: DollarSign, key: 'prices' },
+  { id: 'performance', icon: Gauge, key: 'performance' },
   { id: 'suggestions', icon: Lightbulb, key: 'suggestions' },
   { id: 'plan', icon: Crown, key: 'yourPlan' },
 ]
@@ -40,6 +42,7 @@ export default function Settings() {
         {section === 'clinic' && <ClinicSection />}
         {section === 'doctors' && <DoctorsSection />}
         {section === 'prices' && <PricesSection />}
+        {section === 'performance' && <PerformanceSection />}
         {section === 'suggestions' && <SuggestionsSection />}
         {section === 'plan' && <PlanSection />}
       </div>
@@ -78,6 +81,34 @@ function ClinicSection() {
         </Field>
       </div>
       <button onClick={save} className="btn-primary mt-5">{saved ? <><Check size={16} /> {t('common.saved')}</> : <><Save size={16} /> {t('common.save')}</>}</button>
+    </div>
+  )
+}
+
+function PerformanceSection() {
+  const { t } = useI18n()
+  const [reduce, setReduce] = useReduceMotion()
+  return (
+    <div className="card max-w-2xl p-6">
+      <h3 className="mb-2 flex items-center gap-2 text-lg font-bold text-ink-800"><Gauge size={20} className="text-brand-500" /> {t('settings.performance')}</h3>
+      <p className="mb-5 text-sm text-ink-400">{t('settings.perfDesc')}</p>
+
+      <Field label={t('settings.perfMode')}>
+        <Segmented
+          value={reduce ? 'perf' : 'normal'}
+          onChange={(v) => setReduce(v === 'perf')}
+          options={[
+            { value: 'normal', label: t('settings.perfNormal') },
+            { value: 'perf', label: t('settings.perfFast') },
+          ]}
+        />
+      </Field>
+
+      <div className={cx('mt-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm font-semibold',
+        reduce ? 'bg-emerald-50 text-emerald-700' : 'bg-ink-50 text-ink-500')}>
+        <Zap size={16} className="mt-0.5 shrink-0" />
+        <span>{reduce ? t('settings.perfOnNote') : t('settings.perfOffNote')}</span>
+      </div>
     </div>
   )
 }
