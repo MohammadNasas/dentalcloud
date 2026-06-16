@@ -7,9 +7,9 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { Stat, Avatar, EmptyState, Badge } from '../components/ui'
+import { Avatar, EmptyState, Badge } from '../components/ui'
 import { stagger, staggerItem, Sparkline } from '../components/anim'
-import { fmtTime, fmtDate, isToday, isTomorrow, isSameDay, parseISO } from '../lib/dates'
+import { fmtTime, fmtDate, fmtDateLong, isToday, isTomorrow, isSameDay, parseISO } from '../lib/dates'
 import { money, waLink } from '../lib/utils'
 import PatientFormModal from '../components/PatientFormModal'
 import WhatsAppIcon from '../components/WhatsAppIcon'
@@ -83,42 +83,47 @@ export default function Dashboard() {
       : `Hi ${who}, a reminder of your appointment at ${where} on ${fmtDate(a.start, lang)} at ${fmtTime(a.start, lang)}. See you soon 🦷`
   }
 
+  const kpis = [
+    { label: t('dashboard.totalPatients'), value: patients.length, icon: Users },
+    can('appointments') && { label: t('dashboard.appointmentsThisWeek'), value: weekCount, icon: CalendarDays },
+    can('clinicBalances') && { label: t('dashboard.totalDue'), value: money(totalDue, currency), icon: Wallet },
+    can('reports') && { label: t('dashboard.collectedThisMonth'), value: money(collectedThisMonth, currency), icon: TrendingUp },
+  ].filter(Boolean)
+
   return (
     <div className="space-y-6">
-      {/* Greeting */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-ink-400">{greeting} 👋</p>
-          <h2 className="text-2xl font-extrabold text-ink-800">{name}</h2>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setAddOpen(true)} className="btn-primary"><UserPlus size={16} /> {t('dashboard.addPatient')}</button>
-          {can('appointments') && (
-            <button onClick={() => navigate('/appointments')} className="btn-outline"><CalendarPlus size={16} /> {t('dashboard.newAppointment')}</button>
-          )}
-        </div>
-      </div>
+      {/* Hero band — greeting, quick actions and KPIs in one bold panel */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-700 to-ink-900 p-6 text-white sm:p-7"
+      >
+        <div className="pointer-events-none absolute -top-12 h-44 w-44 rounded-full bg-white/10 blur-2xl end-[-30px]" />
+        <div className="pointer-events-none absolute h-48 w-48 rounded-full bg-brand-400/20 blur-3xl bottom-[-60px] start-12" />
 
-      {/* Stats */}
-      <motion.div variants={stagger} initial="hidden" animate="show" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <motion.div variants={staggerItem}>
-          <Stat icon={<Users size={22} />} label={t('dashboard.totalPatients')} value={patients.length} color="brand" />
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-white/70">{greeting} 👋</p>
+            <h2 className="mt-0.5 text-3xl font-extrabold">{name}</h2>
+            <p className="mt-1 truncate text-sm text-white/60">
+              {(lang === 'ar' ? clinic?.nameAr || clinic?.name : clinic?.name)} · {fmtDateLong(new Date().toISOString(), lang)}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button onClick={() => setAddOpen(true)} className="btn bg-white font-bold text-brand-700 hover:bg-white/90"><UserPlus size={16} /> {t('dashboard.addPatient')}</button>
+            {can('appointments') && (
+              <button onClick={() => navigate('/appointments')} className="btn bg-white/15 font-bold text-white backdrop-blur hover:bg-white/25"><CalendarPlus size={16} /> {t('dashboard.newAppointment')}</button>
+            )}
+          </div>
+        </div>
+
+        <motion.div variants={stagger} initial="hidden" animate="show" className="relative mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {kpis.map((k) => (
+            <motion.div key={k.label} variants={staggerItem} className="rounded-2xl bg-white/10 p-3.5 backdrop-blur ring-1 ring-white/10">
+              <div className="flex items-center gap-1.5 text-white/70"><k.icon size={15} /><span className="text-xs font-semibold">{k.label}</span></div>
+              <p className="mt-1.5 text-2xl font-extrabold">{k.value}</p>
+            </motion.div>
+          ))}
         </motion.div>
-        {can('clinicBalances') && (
-          <motion.div variants={staggerItem}>
-            <Stat icon={<Wallet size={22} />} label={t('dashboard.totalDue')} value={money(totalDue, currency)} color="rose" />
-          </motion.div>
-        )}
-        {can('reports') && (
-          <motion.div variants={staggerItem}>
-            <Stat icon={<TrendingUp size={22} />} label={t('dashboard.collectedThisMonth')} value={money(collectedThisMonth, currency)} color="green" />
-          </motion.div>
-        )}
-        {can('appointments') && (
-          <motion.div variants={staggerItem}>
-            <Stat icon={<CalendarDays size={22} />} label={t('dashboard.appointmentsThisWeek')} value={weekCount} color="blue" />
-          </motion.div>
-        )}
       </motion.div>
 
       {/* Revenue trend */}
