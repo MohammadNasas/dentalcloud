@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence, animate, useInView } from 'framer-motion'
 import { cx } from '../lib/utils'
+import { getReduceMotion } from '../lib/motionPref'
 
 /* ── Shared variants ─────────────────────────────────────────────────────── */
 export const stagger = {
@@ -31,18 +32,21 @@ export function Item({ children, className }) {
 
 /* ── #2/#23 Count-up number ──────────────────────────────────────────────── */
 export function CountUp({ to, suffix = '', prefix = '', duration = 1.4, decimals = 0 }) {
+  const reduce = getReduceMotion()
+  const finalNum = parseFloat(String(to).replace(/[^0-9.-]/g, '')) || 0
+  const finalStr = finalNum.toLocaleString(undefined, { maximumFractionDigits: decimals })
   const ref = useRef(null)
   const inView = useInView(ref, { once: true, amount: 0.4 })
-  const [val, setVal] = useState('0')
+  const [val, setVal] = useState(reduce ? finalStr : '0')
   useEffect(() => {
+    if (reduce) { setVal(finalStr); return }       // performance mode → show the final number, no counting
     if (!inView) return
-    const num = parseFloat(String(to).replace(/[^0-9.-]/g, '')) || 0
-    const controls = animate(0, num, {
+    const controls = animate(0, finalNum, {
       duration, ease: [0.16, 1, 0.3, 1],
       onUpdate: (v) => setVal(v.toLocaleString(undefined, { maximumFractionDigits: decimals })),
     })
     return () => controls.stop()
-  }, [inView, to, duration, decimals])
+  }, [inView, to, duration, decimals, reduce, finalNum, finalStr])
   return <span ref={ref}>{prefix}{val}{suffix}</span>
 }
 
@@ -79,6 +83,7 @@ export function Confetti({ count = 26 }) {
       s: 6 + Math.random() * 5,
     }))
   ).current
+  if (getReduceMotion()) return null // performance mode → skip the confetti burst entirely
   return (
     <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-hidden">
       {pieces.map((p, i) => (
@@ -98,18 +103,24 @@ export function Confetti({ count = 26 }) {
 export function ProgressRing({ value = 0, size = 56, stroke = 6, color = '#14b8a6', label }) {
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
+  const offset = c - (Math.min(100, Math.max(0, value)) / 100) * c
   return (
     <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={stroke} />
-        <motion.circle
-          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
-          strokeDasharray={c}
-          initial={{ strokeDashoffset: c }}
-          whileInView={{ strokeDashoffset: c - (Math.min(100, Math.max(0, value)) / 100) * c }}
-          viewport={{ once: true }}
-          transition={{ duration: 1.1, ease: 'easeOut' }}
-        />
+        {getReduceMotion() ? (
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+            strokeDasharray={c} strokeDashoffset={offset} />
+        ) : (
+          <motion.circle
+            cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+            strokeDasharray={c}
+            initial={{ strokeDashoffset: c }}
+            whileInView={{ strokeDashoffset: offset }}
+            viewport={{ once: true }}
+            transition={{ duration: 1.1, ease: 'easeOut' }}
+          />
+        )}
       </svg>
       {label != null && <span className="absolute text-sm font-bold text-ink-700">{label}</span>}
     </div>
@@ -126,6 +137,15 @@ export function Sparkline({ data = [], width = 120, height = 36, color = '#14b8a
   const pts = data.map((v, i) => [i * step, height - ((v - min) / span) * (height - 4) - 2])
   const line = pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ')
   const area = `${line} L${width} ${height} L0 ${height} Z`
+  if (getReduceMotion()) {
+    // performance mode → draw the line statically, no path-draw animation
+    return (
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
+        {fill && <path d={area} fill={color} opacity={0.12} />}
+        <path d={line} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    )
+  }
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
       {fill && (
