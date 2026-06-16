@@ -7,6 +7,7 @@ import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { Modal, Field, Segmented, Badge, EmptyState } from '../components/ui'
 import FeatureLock from '../components/FeatureLock'
+import PageHero from '../components/PageHero'
 import { fmtDate } from '../lib/dates'
 import { money, cx } from '../lib/utils'
 import { chartRows, toothLabel } from '../lib/teeth'
@@ -79,36 +80,30 @@ function LabContent() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-xl font-extrabold text-ink-800">
-            <FlaskConical size={22} className="text-violet-500" />
-            {lang === 'ar' ? 'إدارة المختبر' : 'Lab Management'}
-          </h1>
-          <p className="mt-0.5 text-sm text-ink-400">
-            {lang === 'ar' ? 'تتبّع طلبات المختبر والمدفوعات' : 'Track lab orders and payments'}
-          </p>
+      <PageHero
+        icon={<FlaskConical size={22} />}
+        title={lang === 'ar' ? 'إدارة المختبر' : 'Lab Management'}
+        subtitle={lang === 'ar' ? 'تتبّع طلبات المختبر والمدفوعات' : 'Track lab orders and payments'}
+        actions={
+          <button onClick={() => setAddOpen(true)} className="btn bg-white font-bold text-brand-700 hover:bg-white/90">
+            <Plus size={16} /> {lang === 'ar' ? 'طلب جديد' : 'New Order'}
+          </button>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            { label: lang === 'ar' ? 'إجمالي الطلبات' : 'Total Orders', value: labOrders.length },
+            { label: lang === 'ar' ? 'قيد الانتظار' : 'Pending', value: pending },
+            { label: lang === 'ar' ? 'إجمالي المدفوع' : 'Total Paid', value: money(totalPaid, currency) },
+            { label: lang === 'ar' ? 'المتبقي للمختبر' : 'Owed to Lab', value: money(totalOwed, currency) },
+          ].map((s, i) => (
+            <div key={i} className="rounded-2xl bg-white/10 p-3.5 backdrop-blur ring-1 ring-white/10">
+              <p className="text-[11px] font-semibold text-white/70">{s.label}</p>
+              <p className="mt-1 text-xl font-extrabold">{s.value}</p>
+            </div>
+          ))}
         </div>
-        <button onClick={() => setAddOpen(true)} className="btn-primary">
-          <Plus size={16} /> {lang === 'ar' ? 'طلب جديد' : 'New Order'}
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {[
-          { label: lang === 'ar' ? 'إجمالي الطلبات' : 'Total Orders', value: labOrders.length, color: 'text-ink-700' },
-          { label: lang === 'ar' ? 'قيد الانتظار' : 'Pending', value: pending, color: 'text-amber-600' },
-          { label: lang === 'ar' ? 'إجمالي المدفوع' : 'Total Paid', value: money(totalPaid, currency), color: 'text-emerald-600' },
-          { label: lang === 'ar' ? 'المتبقي للمختبر' : 'Owed to Lab', value: money(totalOwed, currency), color: 'text-rose-600' },
-        ].map((s, i) => (
-          <div key={i} className="card p-4">
-            <p className="text-xs font-bold text-ink-400">{s.label}</p>
-            <p className={cx('mt-1 text-xl font-extrabold', s.color)}>{s.value}</p>
-          </div>
-        ))}
-      </div>
+      </PageHero>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">

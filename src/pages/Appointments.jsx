@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ChevronLeft, ChevronRight, Plus, CalendarPlus, Phone, Clock, User, Dot,
+  ChevronLeft, ChevronRight, Plus, CalendarPlus, Phone, Clock, User, Dot, CalendarDays,
 } from 'lucide-react'
 import {
   startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval,
@@ -12,6 +12,7 @@ import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import FeatureLock from '../components/FeatureLock'
 import AppointmentModal from '../components/AppointmentModal'
+import PageHero from '../components/PageHero'
 import { Avatar, EmptyState } from '../components/ui'
 import { fmtTime, fmtDateLong, parseISO } from '../lib/dates'
 import { cx } from '../lib/utils'
@@ -64,9 +65,17 @@ function Calendar() {
   }, [locale])
 
   const dayAppts = (apptsByDay[format(selectedDay, 'yyyy-MM-dd')] || [])
+  const monthCount = filtered.filter((a) => isSameMonth(parseISO(a.start), cursor)).length
 
   return (
     <div className="space-y-4">
+      <PageHero
+        icon={<CalendarDays size={22} />}
+        title={t('nav.appointments')}
+        subtitle={lang === 'ar' ? `${monthCount} موعد هذا الشهر` : `${monthCount} appointments this month`}
+        actions={<button onClick={() => setModal({ date: selectedDay })} className="btn bg-white font-bold text-brand-700 hover:bg-white/90"><Plus size={16} /> {t('appt.new')}</button>}
+      />
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-1">
@@ -75,7 +84,6 @@ function Calendar() {
           <button onClick={() => setCursor(addMonths(cursor, 1))} className="rounded-lg p-2 text-ink-500 hover:bg-ink-100"><Next size={18} /></button>
         </div>
         <button onClick={() => { setCursor(new Date()); setSelectedDay(new Date()) }} className="btn-outline !py-2">{t('appt.today')}</button>
-        <button onClick={() => setModal({ date: selectedDay })} className="btn-primary ms-auto"><Plus size={16} /> {t('appt.new')}</button>
       </div>
 
       {/* Doctor legend / filter */}

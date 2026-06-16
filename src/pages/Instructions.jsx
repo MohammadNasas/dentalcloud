@@ -5,6 +5,7 @@ import { useStore } from '../context/StoreContext'
 import { INSTRUCTIONS } from '../lib/treatments'
 import { genId } from '../lib/db'
 import { Modal, Field, Badge } from '../components/ui'
+import PageHero from '../components/PageHero'
 import { printSheet, escapeHtml } from '../lib/print'
 
 export default function Instructions() {
@@ -28,10 +29,12 @@ export default function Instructions() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-400">{lang === 'ar' ? 'أوراق تعليمات جاهزة وقابلة للتعديل والطباعة، مع إمكانية إضافة أوراقك الخاصة.' : 'Ready, editable & printable instruction sheets — plus add your own.'}</p>
-        <button onClick={() => setEditing({ type: 'custom', id: null })} className="btn-primary"><Plus size={16} /> {lang === 'ar' ? 'إضافة ورقة تعليمات' : 'Add instruction sheet'}</button>
-      </div>
+      <PageHero
+        icon={<FileText size={22} />}
+        title={t('nav.instructions')}
+        subtitle={lang === 'ar' ? 'أوراق جاهزة قابلة للتعديل والطباعة، مع إضافة أوراقك الخاصة.' : 'Ready, editable & printable sheets — plus add your own.'}
+        actions={<button onClick={() => setEditing({ type: 'custom', id: null })} className="btn bg-white font-bold text-brand-700 hover:bg-white/90"><Plus size={16} /> {lang === 'ar' ? 'إضافة ورقة' : 'Add sheet'}</button>}
+      />
 
       {/* Custom sheets */}
       {customSheets.length > 0 && (

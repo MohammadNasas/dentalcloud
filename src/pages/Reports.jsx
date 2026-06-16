@@ -4,13 +4,13 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
   CartesianGrid, AreaChart, Area,
 } from 'recharts'
-import { ChevronLeft, ChevronRight, Users, UserPlus, CalendarDays, TrendingUp, Receipt, Percent, Stethoscope } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Users, UserPlus, CalendarDays, TrendingUp, Receipt, Percent, Stethoscope, BarChart3 } from 'lucide-react'
 import { startOfMonth, endOfMonth, addMonths, subMonths, format, getDaysInMonth, getDate } from 'date-fns'
 import { ar, enUS } from 'date-fns/locale'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import FeatureLock from '../components/FeatureLock'
-import { Stat } from '../components/ui'
+import PageHero from '../components/PageHero'
 import { recordName, recordColor } from '../lib/treatments'
 import { money, PAYMENT_METHODS } from '../lib/utils'
 import { parseISO } from '../lib/dates'
@@ -80,20 +80,34 @@ function ReportsInner() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-1">
-        <button onClick={() => setCursor(subMonths(cursor, 1))} className="rounded-lg p-2 text-ink-500 hover:bg-ink-100"><Prev size={18} /></button>
-        <h2 className="min-w-[160px] text-center text-lg font-extrabold text-ink-800">{format(cursor, 'MMMM yyyy', { locale })}</h2>
-        <button onClick={() => setCursor(addMonths(cursor, 1))} className="rounded-lg p-2 text-ink-500 hover:bg-ink-100"><Next size={18} /></button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
-        <Stat icon={<Users size={20} />} label={t('reports.patientsSeen')} value={patientsSeen} color="brand" />
-        <Stat icon={<UserPlus size={20} />} label={t('reports.newPatients')} value={newPatients.length} color="blue" />
-        <Stat icon={<CalendarDays size={20} />} label={t('reports.appointments')} value={monthAppts.length} color="amber" />
-        <Stat icon={<TrendingUp size={20} />} label={t('reports.revenue')} value={money(revenue, currency)} color="green" />
-        <Stat icon={<Receipt size={20} />} label={t('reports.billed')} value={money(billed, currency)} color="blue" />
-        <Stat icon={<Percent size={20} />} label={t('reports.collectionRate')} value={`${collectionRate}%`} color={collectionRate >= 70 ? 'green' : 'rose'} />
-      </div>
+      <PageHero
+        icon={<BarChart3 size={22} />}
+        title={t('nav.reports')}
+        subtitle={format(cursor, 'MMMM yyyy', { locale })}
+        actions={
+          <div className="flex items-center gap-1 rounded-xl bg-white/15 p-1 backdrop-blur">
+            <button onClick={() => setCursor(subMonths(cursor, 1))} className="rounded-lg p-1.5 text-white hover:bg-white/15"><Prev size={18} /></button>
+            <span className="min-w-[120px] text-center text-sm font-bold text-white">{format(cursor, 'MMMM yyyy', { locale })}</span>
+            <button onClick={() => setCursor(addMonths(cursor, 1))} className="rounded-lg p-1.5 text-white hover:bg-white/15"><Next size={18} /></button>
+          </div>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            { label: t('reports.patientsSeen'), value: patientsSeen, icon: Users },
+            { label: t('reports.newPatients'), value: newPatients.length, icon: UserPlus },
+            { label: t('reports.appointments'), value: monthAppts.length, icon: CalendarDays },
+            { label: t('reports.revenue'), value: money(revenue, currency), icon: TrendingUp },
+            { label: t('reports.billed'), value: money(billed, currency), icon: Receipt },
+            { label: t('reports.collectionRate'), value: `${collectionRate}%`, icon: Percent },
+          ].map((k) => (
+            <div key={k.label} className="rounded-2xl bg-white/10 p-3 backdrop-blur ring-1 ring-white/10">
+              <div className="flex items-center gap-1.5 text-white/70"><k.icon size={14} /><span className="text-[11px] font-semibold">{k.label}</span></div>
+              <p className="mt-1 text-lg font-extrabold">{k.value}</p>
+            </div>
+          ))}
+        </div>
+      </PageHero>
 
       <div className="card p-5">
         <h3 className="mb-4 font-bold text-ink-800">{t('reports.dailyRevenue')}</h3>

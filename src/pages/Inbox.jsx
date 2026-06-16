@@ -6,6 +6,7 @@ import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { supabase, isCloud } from '../lib/supabaseClient'
 import { Spinner, EmptyState, Badge } from '../components/ui'
+import PageHero from '../components/PageHero'
 import { fmtDateTime } from '../lib/dates'
 import { cx } from '../lib/utils'
 
@@ -40,17 +41,16 @@ export default function Inbox() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-extrabold text-ink-800">
-            <InboxIcon size={24} className="text-brand-500" /> {t('inbox.title')}
-          </h1>
-          <p className="mt-1 text-sm text-ink-400">{t('inbox.subtitle')}</p>
-        </div>
-        <button onClick={load} disabled={loading} className="btn-outline shrink-0">
-          {loading ? <Spinner /> : <RefreshCw size={16} />} {t('inbox.refresh')}
-        </button>
-      </div>
+      <PageHero
+        icon={<InboxIcon size={22} />}
+        title={t('inbox.title')}
+        subtitle={t('inbox.subtitle')}
+        actions={
+          <button onClick={load} disabled={loading} className="btn bg-white font-bold text-brand-700 hover:bg-white/90 shrink-0">
+            {loading ? <Spinner /> : <RefreshCw size={16} />} {t('inbox.refresh')}
+          </button>
+        }
+      />
 
       {error && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600" dir="ltr">{error}</p>}
 
