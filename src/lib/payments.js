@@ -20,6 +20,43 @@ export async function startCheckout({ tier, clinicId, customerName, email, phone
   }
 }
 
+// ── PayPal ──────────────────────────────────────────────────────────────
+export async function startPaypalCheckout({ tier, clinicId }) {
+  try {
+    const r = await fetch('/api/paypal-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier, clinicId }),
+    })
+    const data = await r.json().catch(() => ({}))
+    if (r.ok && data.url) return { ok: true, url: data.url }
+    return { ok: false, error: data.error || 'failed', message: data.message, status: r.status }
+  } catch (e) {
+    return { ok: false, error: 'network', message: String(e) }
+  }
+}
+
+export async function capturePaypal(orderId) {
+  try {
+    const r = await fetch('/api/paypal-capture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId }),
+    })
+    return await r.json()
+  } catch (e) {
+    return { ok: false, error: 'network', message: String(e) }
+  }
+}
+
+// PayPal returns to  …/?paypal=return&token=ORDERID&PayerID=…  Returns the
+// order id to capture, or null if this isn't a PayPal return.
+export function getPaypalReturn() {
+  const p = new URLSearchParams(window.location.search)
+  if (p.get('paypal') === 'return') return p.get('token')
+  return null
+}
+
 export async function verifyPayment(reference) {
   try {
     const r = await fetch('/api/verify-payment', {

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { hashPassword, DOCTOR_COLORS, resetDB, seedDB, isComplimentary, isAppOwner } from '../lib/db'
 import { backend } from '../lib/backend'
-import { getPaymentReturn, verifyPayment, clearPaymentReturn } from '../lib/payments'
+import { getPaymentReturn, verifyPayment, clearPaymentReturn, getPaypalReturn, capturePaypal } from '../lib/payments'
 
 const StoreContext = createContext(null)
 
@@ -70,8 +70,18 @@ export function StoreProvider({ children }) {
     return () => data?.subscription?.unsubscribe?.()
   }, [])
 
-  // Handle the return from a Lahza payment → verify & refresh the plan.
+  // Handle the return from a payment → verify/capture & refresh the plan.
   useEffect(() => {
+    const paypalOrder = getPaypalReturn()
+    if (paypalOrder) {
+      clearPaymentReturn()
+      ;(async () => {
+        const res = await capturePaypal(paypalOrder)
+        if (res.ok) { await loadSession(); setPaymentResult({ ok: true, tier: res.tier }) }
+        else setPaymentResult({ ok: false, status: res.status, error: res.error, message: res.message })
+      })()
+      return
+    }
     const ref = getPaymentReturn()
     if (!ref) return
     clearPaymentReturn()
