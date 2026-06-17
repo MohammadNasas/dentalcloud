@@ -106,13 +106,6 @@ export function StoreProvider({ children }) {
     return () => { active = false }
   }, [currentUser?.email])
 
-  // Apply the clinic's chosen colour theme (default = teal → no attribute).
-  useEffect(() => {
-    const th = clinic?.settings?.theme
-    if (th && th !== 'teal') document.documentElement.dataset.theme = th
-    else delete document.documentElement.dataset.theme
-  }, [clinic?.settings?.theme])
-
   // ── Auth ────────────────────────────────────────────────────────────────
   const login = useCallback(async (identifier, password) => {
     const res = await backend.signIn(identifier, password)

@@ -5,7 +5,7 @@
 @layer base {
   :root {
     --app-bg: #f4f7fa;
-    /* Brand palette (default = Teal). Switched at runtime via [data-theme]. */
+    /* Brand palette (Teal), exposed as CSS variables for the Tailwind theme. */
     --brand-50: 240 253 250;
     --brand-100: 206 252 243;
     --brand-200: 158 248 233;
@@ -17,20 +17,6 @@
     --brand-800: 17 94 89;
     --brand-900: 19 78 74;
     --brand-950: 4 47 44;
-  }
-
-  [data-theme='emerald'] {
-    --brand-50: 236 253 245;
-    --brand-100: 209 250 229;
-    --brand-200: 167 243 208;
-    --brand-300: 110 231 183;
-    --brand-400: 52 211 153;
-    --brand-500: 16 185 129;
-    --brand-600: 5 150 105;
-    --brand-700: 4 120 87;
-    --brand-800: 6 95 70;
-    --brand-900: 6 78 59;
-    --brand-950: 2 44 34;
   }
 
   * {
