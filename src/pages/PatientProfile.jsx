@@ -3,7 +3,7 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, Pencil, FileDown, Trash2, Phone, MapPin, Briefcase,
   CalendarClock, Wallet, ClipboardList, Stethoscope, Grid3x3, Activity,
-  Images, History, NotebookPen,
+  Images, History, NotebookPen, FileSignature,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -15,6 +15,7 @@ import DentalChart from '../components/patient/DentalChart'
 import PerioChart from '../components/patient/PerioChart'
 import TreatmentsPanel from '../components/patient/TreatmentsPanel'
 import PaymentsPanel from '../components/patient/PaymentsPanel'
+import ConsentForm from '../components/patient/ConsentForm'
 import Gallery from '../components/patient/Gallery'
 import Timeline from '../components/patient/Timeline'
 import Overview from '../components/patient/Overview'
@@ -29,6 +30,7 @@ const TABS = [
   { id: 'chart', icon: Grid3x3, key: 'chart' },
   { id: 'perio', icon: Activity, key: 'perio', feature: 'perio' },
   { id: 'treatments', icon: NotebookPen, key: 'treatments' },
+  { id: 'consent', icon: FileSignature, key: 'consent' },
   { id: 'payments', icon: Wallet, key: 'paymentsTab', feature: 'clinicBalances' },
   { id: 'gallery', icon: Images, key: 'gallery', feature: 'photos' },
   { id: 'timeline', icon: History, key: 'timeline' },
@@ -168,6 +170,7 @@ export default function PatientProfile() {
         {tab === 'chart' && <DentalChart patient={patient} />}
         {tab === 'perio' && <FeatureLock feature="perio"><PerioChart patient={patient} /></FeatureLock>}
         {tab === 'treatments' && <TreatmentsPanel patient={patient} />}
+        {tab === 'consent' && <ConsentForm patient={patient} />}
         {tab === 'payments' && <FeatureLock feature="clinicBalances"><PaymentsPanel patient={patient} /></FeatureLock>}
         {tab === 'gallery' && <FeatureLock feature="photos"><Gallery patient={patient} /></FeatureLock>}
         {tab === 'timeline' && <Timeline patient={patient} />}
