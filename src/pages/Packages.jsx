@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Check, Sparkles, Crown, GraduationCap, Building2, X, ArrowRight, Star, CreditCard, Landmark, Wallet } from 'lucide-react'
+import { Check, Sparkles, Crown, GraduationCap, Building2, X, ArrowRight, Star, Landmark, Wallet } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { Modal, Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
-import { paymentsEnabled, startCheckout, startPaypalCheckout } from '../lib/payments'
+import { paymentsEnabled, startPaypalCheckout } from '../lib/payments'
 import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/PackagePreviews'
 import BankTransferPanel from '../components/BankTransferPanel'
 import PaymentHelp from '../components/PaymentHelp'
@@ -22,15 +22,14 @@ export default function Packages() {
   const [expanded, setExpanded] = useState({})
   const [processing, setProcessing] = useState(false)
   const [payError, setPayError] = useState('')
-  const [payMethod, setPayMethod] = useState('card')
+  const [payMethod, setPayMethod] = useState('paypal')
   const current = clinic?.tier
 
   async function confirmBuy() {
     setPayError('')
     if (paymentsEnabled) {
       setProcessing(true)
-      const checkout = payMethod === 'paypal' ? startPaypalCheckout : startCheckout
-      const res = await checkout({ tier: buying, clinicId: clinic.id, customerName: clinic.name, email: currentUser?.email })
+      const res = await startPaypalCheckout({ tier: buying, clinicId: clinic.id, customerName: clinic.name, email: currentUser?.email })
       if (res.ok && res.url) { window.location.href = res.url; return }
       setProcessing(false)
       setPayError(res.error === 'not_configured' ? t('packages.paymentsSoon') : (res.message || t('packages.payFailed')))
@@ -178,9 +177,7 @@ export default function Packages() {
               {paymentsEnabled && (
                 <>
                   <p className="mt-5 mb-2 text-sm font-bold text-ink-600">{t('packages.payHow')}</p>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    <MethodBtn active={payMethod === 'card'} onClick={() => setPayMethod('card')} accent={PACKAGE_FEATURES[buying].accent}
-                      icon={<CreditCard size={18} />} title={t('packages.payCard')} sub={t('packages.payCardSub')} />
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <MethodBtn active={payMethod === 'paypal'} onClick={() => setPayMethod('paypal')} accent={PACKAGE_FEATURES[buying].accent}
                       icon={<Wallet size={18} />} title="PayPal" sub={t('packages.payPaypalSub')} />
                     <MethodBtn active={payMethod === 'bank'} onClick={() => setPayMethod('bank')} accent={PACKAGE_FEATURES[buying].accent}

@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Stethoscope, Check, ArrowRight, LogOut, GraduationCap, Building2, Crown, Lock, CreditCard, Landmark, Wallet } from 'lucide-react'
+import { Stethoscope, Check, ArrowRight, LogOut, GraduationCap, Building2, Crown, Lock, Landmark, Wallet } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
-import { startCheckout, startPaypalCheckout } from '../lib/payments'
+import { startPaypalCheckout } from '../lib/payments'
 import { Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
 import BankTransferPanel from '../components/BankTransferPanel'
@@ -21,12 +21,11 @@ export default function Paywall() {
   const [selected, setSelected] = useState(clinic?.tier || 'economy')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [payMethod, setPayMethod] = useState('card')
+  const [payMethod, setPayMethod] = useState('paypal')
 
   async function pay() {
     setError(''); setBusy(true)
-    const checkout = payMethod === 'paypal' ? startPaypalCheckout : startCheckout
-    const res = await checkout({ tier: selected, clinicId: clinic.id, customerName: clinic.name, email: currentUser?.email })
+    const res = await startPaypalCheckout({ tier: selected, clinicId: clinic.id, customerName: clinic.name, email: currentUser?.email })
     if (res.ok && res.url) { window.location.href = res.url; return }
     setBusy(false)
     setError(res.error === 'not_configured' ? t('packages.paymentsSoon') : (res.message || t('packages.payFailed')))
@@ -86,8 +85,7 @@ export default function Paywall() {
 
         <div className="mx-auto mt-6 max-w-md">
           <p className="mb-2 text-center text-sm font-bold text-white/90">{t('packages.payHow')}</p>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <PwMethodBtn active={payMethod === 'card'} onClick={() => setPayMethod('card')} icon={<CreditCard size={18} />} title={t('packages.payCard')} sub={t('packages.payCardSub')} />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <PwMethodBtn active={payMethod === 'paypal'} onClick={() => setPayMethod('paypal')} icon={<Wallet size={18} />} title="PayPal" sub={t('packages.payPaypalSub')} />
             <PwMethodBtn active={payMethod === 'bank'} onClick={() => setPayMethod('bank')} icon={<Landmark size={18} />} title={t('packages.payBank')} sub={t('packages.payBankSub')} />
           </div>

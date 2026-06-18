@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { hashPassword, DOCTOR_COLORS, resetDB, seedDB, isComplimentary, isAppOwner } from '../lib/db'
 import { backend } from '../lib/backend'
-import { getPaymentReturn, verifyPayment, clearPaymentReturn, getPaypalReturn, capturePaypal } from '../lib/payments'
+import { clearPaymentReturn, getPaypalReturn, capturePaypal } from '../lib/payments'
 
 const StoreContext = createContext(null)
 
@@ -24,7 +24,7 @@ export function StoreProvider({ children }) {
   const [booting, setBooting] = useState(true)
   const [recovery, setRecovery] = useState(false)
   const [pendingOtp, setPendingOtp] = useState(null) // { email, pending } when email confirmation is on
-  const [paymentResult, setPaymentResult] = useState(null) // result after returning from Lahza
+  const [paymentResult, setPaymentResult] = useState(null) // result after returning from PayPal
   const [isOwner, setIsOwner] = useState(false) // app owner → sees the global suggestions inbox
   const [state, setState] = useState(EMPTY)
   const stateRef = useRef(state)
@@ -70,23 +70,13 @@ export function StoreProvider({ children }) {
     return () => data?.subscription?.unsubscribe?.()
   }, [])
 
-  // Handle the return from a payment → verify/capture & refresh the plan.
+  // Handle the return from a PayPal payment → capture & refresh the plan.
   useEffect(() => {
     const paypalOrder = getPaypalReturn()
-    if (paypalOrder) {
-      clearPaymentReturn()
-      ;(async () => {
-        const res = await capturePaypal(paypalOrder)
-        if (res.ok) { await loadSession(); setPaymentResult({ ok: true, tier: res.tier }) }
-        else setPaymentResult({ ok: false, status: res.status, error: res.error, message: res.message })
-      })()
-      return
-    }
-    const ref = getPaymentReturn()
-    if (!ref) return
+    if (!paypalOrder) return
     clearPaymentReturn()
     ;(async () => {
-      const res = await verifyPayment(ref)
+      const res = await capturePaypal(paypalOrder)
       if (res.ok) { await loadSession(); setPaymentResult({ ok: true, tier: res.tier }) }
       else setPaymentResult({ ok: false, status: res.status, error: res.error, message: res.message })
     })()

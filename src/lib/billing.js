@@ -1,5 +1,5 @@
 // Bank details shown when a clinic chooses to pay its DentalCloud subscription
-// by manual bank transfer (instead of card via Lahza).
+// by manual bank transfer (instead of PayPal).
 //
 // ⚠️ FILL THESE WITH YOUR REAL ACCOUNT before going live. This is the account
 // that receives subscription payments — i.e. YOUR account, not the clinic's.
