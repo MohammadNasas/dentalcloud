@@ -12,6 +12,7 @@ import { cx } from '../../lib/utils'
 
 const CATEGORIES = {
   before: { en: 'Before', ar: 'قبل' },
+  during: { en: 'During', ar: 'خلال' },
   after: { en: 'After', ar: 'بعد' },
   xray: { en: 'X-ray', ar: 'أشعة' },
   other: { en: 'Other', ar: 'أخرى' },
@@ -88,7 +89,7 @@ export default function Gallery({ patient }) {
     updatePatient(patient.id, { photos: photos.filter((p) => p.id !== id) })
   }
 
-  const groups = ['before', 'after', 'xray', 'other'].map((c) => ({ c, items: photos.filter((p) => p.category === c) })).filter((g) => g.items.length)
+  const groups = ['before', 'during', 'after', 'xray', 'other'].map((c) => ({ c, items: photos.filter((p) => p.category === c) })).filter((g) => g.items.length)
 
   return (
     <div className="space-y-4">
