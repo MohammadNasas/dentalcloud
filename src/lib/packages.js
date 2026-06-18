@@ -27,6 +27,7 @@ export const PACKAGE_FEATURES = {
       { en: 'Per-visit work log & step reached', ar: 'سجل عمل لكل زيارة والخطوة المنجزة' },
       { en: 'Payment methods (cash / card / insurance / cheque)', ar: 'طرق دفع (نقد / بطاقة / تأمين / شيك)' },
       { en: 'Fees / paid / remaining tracking', ar: 'تتبّع الأجور / المدفوع / المتبقي' },
+      { en: 'Editable, printable treatment-consent form', ar: 'نموذج موافقة على العلاج قابل للتعديل والطباعة' },
     ],
   },
   pro: {

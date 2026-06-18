@@ -10,7 +10,7 @@ export const FEATURE_MIN_TIER = {
   appointments: 'economy', calendar: 'economy', multiDoctor: 'economy',
   priceCatalog: 'economy', perio: 'economy', plaque: 'economy',
   priorityTeeth: 'economy', reminders: 'economy', apptWorkLog: 'economy',
-  paymentMethods: 'economy', clinicBalances: 'economy',
+  paymentMethods: 'economy', clinicBalances: 'economy', consent: 'economy',
   photos: 'pro', reports: 'pro', splitPayments: 'pro', lab: 'pro',
   // instructions are available to every plan (their own main section)
 }
