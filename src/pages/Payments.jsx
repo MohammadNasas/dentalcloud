@@ -6,10 +6,15 @@ import { useStore } from '../context/StoreContext'
 import { Avatar, EmptyState, Badge, SearchInput } from '../components/ui'
 import PaymentModal from '../components/PaymentModal'
 import PageHero from '../components/PageHero'
+import FeatureLock from '../components/FeatureLock'
 import { money, PAYMENT_METHODS } from '../lib/utils'
 import { fmtDate } from '../lib/dates'
 
 export default function Payments() {
+  return <FeatureLock feature="clinicBalances"><PaymentsInner /></FeatureLock>
+}
+
+function PaymentsInner() {
   const { t, lang, L } = useI18n()
   const navigate = useNavigate()
   const { patients, payments, clinic, can, balanceForPatient, getPatient } = useStore()

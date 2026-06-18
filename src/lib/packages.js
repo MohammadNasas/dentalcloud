@@ -8,7 +8,6 @@ export const PACKAGE_FEATURES = {
       { en: 'Interactive chart — permanent (1–8) & primary (A–E)', ar: 'مخطط تفاعلي — الدائمة (1–8) واللبنية (A–E)' },
       { en: 'Conditions & treatments with colours, surfaces & G.V. Black classes', ar: 'حالات وعلاجات بالألوان والأسطح وأصناف G.V. Black' },
       { en: 'Gingival overview & per-tooth history', ar: 'نظرة على اللثة وسجل لكل سن' },
-      { en: 'Fees / paid / remaining tracking', ar: 'تتبّع الأجور / المدفوع / المتبقي' },
       { en: 'Export to Word (per patient & all patients)', ar: 'تصدير إلى Word (لكل مريض وللكل)' },
       { en: 'Treatment timeline', ar: 'الخط الزمني للعلاج' },
       { en: 'Current-state vs treatment view per tooth', ar: 'تبديل بين الحالة والعلاج لكل سن' },
@@ -27,6 +26,7 @@ export const PACKAGE_FEATURES = {
       { en: 'Treatment price list + on-the-fly discounts', ar: 'قائمة أسعار العلاجات + خصومات فورية' },
       { en: 'Per-visit work log & step reached', ar: 'سجل عمل لكل زيارة والخطوة المنجزة' },
       { en: 'Payment methods (cash / card / insurance / cheque)', ar: 'طرق دفع (نقد / بطاقة / تأمين / شيك)' },
+      { en: 'Fees / paid / remaining tracking', ar: 'تتبّع الأجور / المدفوع / المتبقي' },
     ],
   },
   pro: {

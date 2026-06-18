@@ -29,7 +29,7 @@ const TABS = [
   { id: 'chart', icon: Grid3x3, key: 'chart' },
   { id: 'perio', icon: Activity, key: 'perio', feature: 'perio' },
   { id: 'treatments', icon: NotebookPen, key: 'treatments' },
-  { id: 'payments', icon: Wallet, key: 'paymentsTab' },
+  { id: 'payments', icon: Wallet, key: 'paymentsTab', feature: 'clinicBalances' },
   { id: 'gallery', icon: Images, key: 'gallery', feature: 'photos' },
   { id: 'timeline', icon: History, key: 'timeline' },
 ]
@@ -168,7 +168,7 @@ export default function PatientProfile() {
         {tab === 'chart' && <DentalChart patient={patient} />}
         {tab === 'perio' && <FeatureLock feature="perio"><PerioChart patient={patient} /></FeatureLock>}
         {tab === 'treatments' && <TreatmentsPanel patient={patient} />}
-        {tab === 'payments' && <PaymentsPanel patient={patient} />}
+        {tab === 'payments' && <FeatureLock feature="clinicBalances"><PaymentsPanel patient={patient} /></FeatureLock>}
         {tab === 'gallery' && <FeatureLock feature="photos"><Gallery patient={patient} /></FeatureLock>}
         {tab === 'timeline' && <Timeline patient={patient} />}
       </div>

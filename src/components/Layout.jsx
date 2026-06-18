@@ -68,7 +68,7 @@ const NAV = [
   { to: '/', key: 'dashboard', icon: LayoutDashboard, end: true },
   { to: '/patients', key: 'patients', icon: Users },
   { to: '/appointments', key: 'appointments', icon: CalendarDays, feature: 'appointments' },
-  { to: '/payments', key: 'payments', icon: Wallet },
+  { to: '/payments', key: 'payments', icon: Wallet, feature: 'clinicBalances' },
   { to: '/instructions', key: 'instructions', icon: FileText },
   { to: '/lab', key: 'lab', icon: FlaskConical, feature: 'lab' },
   { to: '/reports', key: 'reports', icon: BarChart3, feature: 'reports' },
@@ -82,7 +82,7 @@ const BOTTOM_NAV = [
   { to: '/', key: 'dashboard', icon: LayoutDashboard, end: true },
   { to: '/patients', key: 'patients', icon: Users },
   { to: '/appointments', key: 'appointments', icon: CalendarDays },
-  { to: '/payments', key: 'payments', icon: Wallet },
+  { to: '/payments', key: 'payments', icon: Wallet, feature: 'clinicBalances' },
 ]
 
 export default function Layout() {
