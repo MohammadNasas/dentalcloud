@@ -1,7 +1,7 @@
 // Netlify Function: captures an approved PayPal order and activates the plan.
 // Env vars: PAYPAL_CLIENT_ID, PAYPAL_SECRET, PAYPAL_BASE (optional),
 //           SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-const PRICES = { student: 5, economy: 60, pro: 100 }
+const PRICES = { student: 5, economy: 70, pro: 100 }
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } })

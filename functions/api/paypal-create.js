@@ -3,7 +3,7 @@
 // Env vars: PAYPAL_CLIENT_ID, PAYPAL_SECRET, PAYPAL_BASE (optional), SITE_URL (optional)
 //   PAYPAL_BASE defaults to live (https://api-m.paypal.com); use
 //   https://api-m.sandbox.paypal.com for testing.
-const PRICES = { student: 5, economy: 60, pro: 100 }
+const PRICES = { student: 5, economy: 70, pro: 100 }
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {

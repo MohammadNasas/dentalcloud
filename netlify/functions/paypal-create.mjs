@@ -1,6 +1,6 @@
 // Netlify Function: starts a PayPal order for a subscription plan.
 // Env vars: PAYPAL_CLIENT_ID, PAYPAL_SECRET, PAYPAL_BASE (optional), SITE_URL (optional)
-const PRICES = { student: 5, economy: 60, pro: 100 }
+const PRICES = { student: 5, economy: 70, pro: 100 }
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } })

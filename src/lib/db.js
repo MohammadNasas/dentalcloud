@@ -12,7 +12,7 @@ const DB_KEY = 'dentacare.db.v1'
 
 export const TIERS = {
   student: { id: 'student', en: 'Student', ar: 'الطالب', price: 5, period: 'lifetime' },
-  economy: { id: 'economy', en: 'Economy', ar: 'العيادات الصغيرة', price: 60, period: 'year' },
+  economy: { id: 'economy', en: 'Economy', ar: 'العيادات الصغيرة', price: 70, period: 'year' },
   pro: { id: 'pro', en: 'Pro', ar: 'الاحترافية', price: 100, period: 'year' },
 }
 
