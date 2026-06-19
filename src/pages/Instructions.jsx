@@ -1,16 +1,22 @@
 import { useState } from 'react'
-import { FileText, Plus, Printer, Pencil, Trash2, Save } from 'lucide-react'
+import { FileText, Plus, Printer, Pencil, Trash2, Save, Lock } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { INSTRUCTIONS } from '../lib/treatments'
 import { genId } from '../lib/db'
 import { Modal, Field, Badge } from '../components/ui'
 import PageHero from '../components/PageHero'
+import FeatureLock from '../components/FeatureLock'
+import { cx } from '../lib/utils'
 import { printSheet, escapeHtml } from '../lib/print'
+
+// On the free Student plan only these 3 sheets are open; the rest are locked.
+const FREE_SHEETS = ['extraction', 'rct', 'scaling']
 
 export default function Instructions() {
   const { t, lang } = useI18n()
-  const { clinic, updateClinic } = useStore()
+  const { clinic, updateClinic, can } = useStore()
+  const fullInstr = can('instructionsFull')
   const [editing, setEditing] = useState(null)
   const customSheets = clinic?.customSheets || []
   const defaultKeys = Object.keys(INSTRUCTIONS)
@@ -33,7 +39,7 @@ export default function Instructions() {
         icon={<FileText size={22} />}
         title={t('nav.instructions')}
         subtitle={lang === 'ar' ? 'أوراق جاهزة قابلة للتعديل والطباعة، مع إضافة أوراقك الخاصة.' : 'Ready, editable & printable sheets — plus add your own.'}
-        actions={<button onClick={() => setEditing({ type: 'custom', id: null })} className="btn bg-white font-bold text-brand-700 hover:bg-white/90"><Plus size={16} /> {lang === 'ar' ? 'إضافة ورقة' : 'Add sheet'}</button>}
+        actions={fullInstr ? <button onClick={() => setEditing({ type: 'custom', id: null })} className="btn bg-white font-bold text-brand-700 hover:bg-white/90"><Plus size={16} /> {lang === 'ar' ? 'إضافة ورقة' : 'Add sheet'}</button> : undefined}
       />
 
       {/* Custom sheets */}
@@ -66,17 +72,24 @@ export default function Instructions() {
           {defaultKeys.map((key) => {
             const sheet = defaultSheet(key)
             const edited = clinic?.customInstructions?.[key]?.[lang]
+            const locked = !fullInstr && !FREE_SHEETS.includes(key)
             return (
-              <div key={key} className="card p-4">
+              <div key={key} className={cx('card p-4', locked && 'opacity-70')}>
                 <div className="flex items-start gap-2">
                   <FileText size={18} className="mt-0.5 shrink-0 text-brand-500" />
                   <p className="flex-1 font-bold text-ink-800">{sheet.title}</p>
-                  {edited && <Badge color="brand">{lang === 'ar' ? 'مُعدّل' : 'edited'}</Badge>}
+                  {locked ? <Lock size={14} className="mt-0.5 shrink-0 text-amber-400" /> : edited && <Badge color="brand">{lang === 'ar' ? 'مُعدّل' : 'edited'}</Badge>}
                 </div>
                 <p className="mt-1 text-xs text-ink-400">{sheet.points.length} {lang === 'ar' ? 'بنود' : 'points'}</p>
                 <div className="mt-3 flex gap-1.5">
-                  <button onClick={() => doPrint(sheet.title, sheet.points)} className="btn-soft !py-1.5 flex-1 text-xs"><Printer size={13} /> {t('common.print')}</button>
-                  <button onClick={() => setEditing({ type: 'default', key })} className="btn-outline !py-1.5 !px-2.5"><Pencil size={13} /></button>
+                  {locked ? (
+                    <FeatureLock feature="instructionsFull" soft />
+                  ) : (
+                    <>
+                      <button onClick={() => doPrint(sheet.title, sheet.points)} className="btn-soft !py-1.5 flex-1 text-xs"><Printer size={13} /> {t('common.print')}</button>
+                      <button onClick={() => setEditing({ type: 'default', key })} className="btn-outline !py-1.5 !px-2.5"><Pencil size={13} /></button>
+                    </>
+                  )}
                 </div>
               </div>
             )

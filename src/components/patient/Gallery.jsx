@@ -20,10 +20,11 @@ const CATEGORIES = {
 
 export default function Gallery({ patient }) {
   const { t, lang, L } = useI18n()
-  const { updatePatient } = useStore()
+  const { updatePatient, can } = useStore()
+  const fullGallery = can('photos') // Pro: before/during/after/x-ray. Else: a single X-ray box.
   const photos = patient.photos || []
   const [urls, setUrls] = useState({})
-  const [category, setCategory] = useState('before')
+  const [category, setCategory] = useState(fullGallery ? 'before' : 'xray')
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [lightbox, setLightbox] = useState(null)
@@ -89,14 +90,18 @@ export default function Gallery({ patient }) {
     updatePatient(patient.id, { photos: photos.filter((p) => p.id !== id) })
   }
 
-  const groups = ['before', 'during', 'after', 'xray', 'other'].map((c) => ({ c, items: photos.filter((p) => p.category === c) })).filter((g) => g.items.length)
+  const groups = (fullGallery ? ['before', 'during', 'after', 'xray', 'other'] : ['xray']).map((c) => ({ c, items: photos.filter((p) => p.category === c) })).filter((g) => g.items.length)
 
   return (
     <div className="space-y-4">
       <div className="card p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          <Segmented value={category} onChange={setCategory} size="sm"
-            options={Object.entries(CATEGORIES).map(([k, v]) => ({ value: k, label: L(v) }))} />
+          {fullGallery ? (
+            <Segmented value={category} onChange={setCategory} size="sm"
+              options={Object.entries(CATEGORIES).map(([k, v]) => ({ value: k, label: L(v) }))} />
+          ) : (
+            <span className="chip bg-brand-50 text-brand-700"><Scan size={13} /> {lang === 'ar' ? 'أشعة' : 'X-ray'}</span>
+          )}
           <input ref={fileRef} type="file" accept="image/*" multiple hidden
             onChange={(e) => { if (e.target.files?.length) { onFiles([...e.target.files]); e.target.value = '' } }} />
           <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-primary ms-auto">

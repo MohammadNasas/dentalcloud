@@ -177,7 +177,7 @@ export const translations = {
     packages: {
       title: 'Packages & pricing', subtitle: 'Choose the plan that fits your clinic',
       current: 'Current plan', choose: 'Choose plan', upgrade: 'Upgrade', month: '/ month',
-      perYear: '/ year', lifetime: 'one-time · forever', everythingIn: 'Everything in',
+      perYear: '/ year', lifetime: 'one-time · forever', free: 'Free', everythingIn: 'Everything in',
       mostPopular: 'Most popular', features: 'Features', preview: 'Preview',
       buyNow: 'Get this plan', activated: 'Plan activated', screenshotsTitle: 'A look inside',
       compare: 'Compare features', whatYouGet: 'What you get',
@@ -395,7 +395,7 @@ export const translations = {
     packages: {
       title: 'الباقات والأسعار', subtitle: 'اختر الباقة المناسبة لعيادتك',
       current: 'الباقة الحالية', choose: 'اختيار الباقة', upgrade: 'ترقية', month: '/ شهرياً',
-      perYear: '/ سنوياً', lifetime: 'مرة واحدة · للأبد', everythingIn: 'كل مزايا',
+      perYear: '/ سنوياً', lifetime: 'مرة واحدة · للأبد', free: 'مجاني', everythingIn: 'كل مزايا',
       mostPopular: 'الأكثر شيوعاً', features: 'المزايا', preview: 'معاينة',
       buyNow: 'احصل على الباقة', activated: 'تم تفعيل الباقة', screenshotsTitle: 'نظرة من الداخل',
       compare: 'مقارنة المزايا', whatYouGet: 'ما تحصل عليه',

@@ -10,11 +10,13 @@ const StoreContext = createContext(null)
 const TIER_ORDER = { student: 0, economy: 1, pro: 2 }
 export const FEATURE_MIN_TIER = {
   appointments: 'economy', calendar: 'economy', multiDoctor: 'economy',
-  priceCatalog: 'economy', perio: 'economy', plaque: 'economy',
+  priceCatalog: 'economy',
   priorityTeeth: 'economy', reminders: 'economy', apptWorkLog: 'economy',
   paymentMethods: 'economy', clinicBalances: 'economy', consent: 'economy',
+  instructionsFull: 'economy',
   photos: 'pro', reports: 'pro', splitPayments: 'pro', lab: 'pro',
-  // instructions are available to every plan (their own main section)
+  // Free for the Student plan: dental chart, perio/gum chart (perio, plaque),
+  // a single X-ray gallery (see Gallery), and 3 ready instruction sheets.
 }
 
 const EMPTY = {

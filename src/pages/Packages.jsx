@@ -27,6 +27,13 @@ export default function Packages() {
 
   async function confirmBuy() {
     setPayError('')
+    // The Student plan is free — activate it instantly, no payment.
+    if (TIERS[buying].price === 0) {
+      setTier(buying)
+      setActivated(true)
+      setTimeout(() => { setBuying(null); setActivated(false) }, 1600)
+      return
+    }
     if (paymentsEnabled) {
       setProcessing(true)
       const res = await startPaypalCheckout({ tier: buying, clinicId: clinic.id, customerName: clinic.name, email: currentUser?.email })
@@ -94,8 +101,14 @@ export default function Packages() {
               </div>
 
               <div className="mt-4 flex items-end gap-1">
-                <span className="text-4xl font-extrabold text-ink-800">${tier.price}</span>
-                <span className="mb-1 text-sm text-ink-400"> {tierPeriodLabel(tier, t)}</span>
+                {tier.price === 0 ? (
+                  <span className="text-4xl font-extrabold text-ink-800">{t('packages.free')}</span>
+                ) : (
+                  <>
+                    <span className="text-4xl font-extrabold text-ink-800">${tier.price}</span>
+                    <span className="mb-1 text-sm text-ink-400"> {tierPeriodLabel(tier, t)}</span>
+                  </>
+                )}
               </div>
               <p className="mt-2 text-sm text-ink-500">{t(`packages.${tier.id}Desc`)}</p>
 
@@ -174,7 +187,7 @@ export default function Packages() {
               </div>
               {payError && <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{payError}</p>}
 
-              {paymentsEnabled && (
+              {paymentsEnabled && TIERS[buying].price > 0 && (
                 <>
                   <p className="mt-5 mb-2 text-sm font-bold text-ink-600">{t('packages.payHow')}</p>
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -186,24 +199,26 @@ export default function Packages() {
                 </>
               )}
 
-              {paymentsEnabled && payMethod === 'bank' ? (
+              {paymentsEnabled && TIERS[buying].price > 0 && payMethod === 'bank' ? (
                 <BankTransferPanel amount={TIERS[buying].price} planLabel={L(TIERS[buying])} />
               ) : (
                 <>
                   <div className="mt-5 flex items-center justify-between rounded-xl bg-ink-50 p-4">
                     <div>
                       <p className="text-sm text-ink-400">{L(TIERS[buying])}</p>
-                      <p className="text-2xl font-extrabold text-ink-800">${TIERS[buying].price}<span className="text-sm font-normal text-ink-400"> {tierPeriodLabel(TIERS[buying], t)}</span></p>
+                      <p className="text-2xl font-extrabold text-ink-800">
+                        {TIERS[buying].price === 0 ? t('packages.free') : <>${TIERS[buying].price}<span className="text-sm font-normal text-ink-400"> {tierPeriodLabel(TIERS[buying], t)}</span></>}
+                      </p>
                     </div>
                     <button onClick={confirmBuy} disabled={processing} className="btn-primary !py-3 !px-6" style={{ background: PACKAGE_FEATURES[buying].accent }}>
-                      {processing ? <Spinner /> : <>{!paymentsEnabled ? t('packages.buyNow') : payMethod === 'paypal' ? 'PayPal' : t('packages.pay')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
+                      {processing ? <Spinner /> : <>{TIERS[buying].price === 0 ? t('packages.buyNow') : !paymentsEnabled ? t('packages.buyNow') : payMethod === 'paypal' ? 'PayPal' : t('packages.pay')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
                     </button>
                   </div>
-                  {paymentsEnabled && <p className="mt-2 text-center text-xs text-ink-400">🔒 {t('packages.securePay')}</p>}
+                  {paymentsEnabled && TIERS[buying].price > 0 && <p className="mt-2 text-center text-xs text-ink-400">🔒 {t('packages.securePay')}</p>}
                 </>
               )}
 
-              {paymentsEnabled && <PaymentHelp />}
+              {paymentsEnabled && TIERS[buying].price > 0 && <PaymentHelp />}
             </>
           )}
         </Modal>

@@ -40,7 +40,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
 
   const [signin, setSignin] = useState({ email: '', password: '' })
   const [reg, setReg] = useState({
-    clinicName: '', doctorName: '', email: '', password: '', specialty: '', tier: 'economy',
+    clinicName: '', doctorName: '', email: '', password: '', specialty: '', tier: 'student',
   })
   const isCloud = mode === 'cloud'
 
@@ -294,7 +294,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
                       className={cx('rounded-xl border-2 p-2.5 text-center transition-all', reg.tier === tier.id ? 'border-brand-500 bg-brand-50' : 'border-ink-200 hover:border-ink-300')}>
                       {reg.tier === tier.id && <CheckCircle2 size={14} className="mx-auto mb-1 text-brand-500" />}
                       <p className="text-xs font-bold text-ink-700">{L(tier)}</p>
-                      <p className="text-sm font-extrabold text-brand-600">${tier.price}</p>
+                      <p className="text-sm font-extrabold text-brand-600">{tier.price === 0 ? t('packages.free') : `$${tier.price}`}</p>
                     </button>
                   ))}
                 </div>

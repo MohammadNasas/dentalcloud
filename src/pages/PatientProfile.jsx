@@ -32,7 +32,7 @@ const TABS = [
   { id: 'treatments', icon: NotebookPen, key: 'treatments' },
   { id: 'consent', icon: FileSignature, key: 'consent', feature: 'consent' },
   { id: 'payments', icon: Wallet, key: 'paymentsTab', feature: 'clinicBalances' },
-  { id: 'gallery', icon: Images, key: 'gallery', feature: 'photos' },
+  { id: 'gallery', icon: Images, key: 'gallery' },
   { id: 'timeline', icon: History, key: 'timeline' },
 ]
 
@@ -172,7 +172,7 @@ export default function PatientProfile() {
         {tab === 'treatments' && <TreatmentsPanel patient={patient} />}
         {tab === 'consent' && <FeatureLock feature="consent"><ConsentForm patient={patient} /></FeatureLock>}
         {tab === 'payments' && <FeatureLock feature="clinicBalances"><PaymentsPanel patient={patient} /></FeatureLock>}
-        {tab === 'gallery' && <FeatureLock feature="photos"><Gallery patient={patient} /></FeatureLock>}
+        {tab === 'gallery' && <Gallery patient={patient} />}
         {tab === 'timeline' && <Timeline patient={patient} />}
       </div>
 

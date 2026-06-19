@@ -103,8 +103,9 @@ export default function App() {
   if (booting || minSplash) return <Splash />
   if (recovery) return <ResetPassword />
   if (!currentUser) return <>{<PublicEntry />}{overlay}<ToastHost /></>
-  // Cloud accounts must pay before entering the app.
-  if (mode === 'cloud' && clinic && !clinic.paid) return <>{<Paywall />}{overlay}<ToastHost /></>
+  // Paid tiers must pay before entering; the Student plan is free, so it enters
+  // straight away.
+  if (mode === 'cloud' && clinic && !clinic.paid && clinic.tier !== 'student') return <>{<Paywall />}{overlay}<ToastHost /></>
 
   return (
     <>
