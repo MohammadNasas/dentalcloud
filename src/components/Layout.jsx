@@ -87,7 +87,7 @@ const BOTTOM_NAV = [
 
 export default function Layout() {
   const { t, L, lang, toggleLang } = useI18n()
-  const { currentUser, clinic, logout, can, appointments, getPatient, isOwner } = useStore()
+  const { currentUser, clinic, logout, can, appointments, getPatient, isOwner, readOnly } = useStore()
   const navItems = (() => {
     if (!isOwner) return NAV
     const items = [...NAV]
@@ -235,9 +235,15 @@ export default function Layout() {
           </button>
           <h1 className="text-lg font-extrabold text-ink-800">{pageTitle}</h1>
           <div className="ms-auto flex items-center gap-2">
-            <span className="hidden items-center gap-1.5 text-xs font-semibold text-emerald-600 sm:flex">
-              <PingDot /> {lang === 'ar' ? 'متصل' : 'Online'}
-            </span>
+            {readOnly ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
+                <Lock size={12} /> {lang === 'ar' ? 'عرض فقط · حساب تجريبي' : 'View only · Demo'}
+              </span>
+            ) : (
+              <span className="hidden items-center gap-1.5 text-xs font-semibold text-emerald-600 sm:flex">
+                <PingDot /> {lang === 'ar' ? 'متصل' : 'Online'}
+              </span>
+            )}
             {can('appointments') && <NotificationsBell items={todayItems} lang={lang} navigate={navigate} />}
             <motion.button
               onClick={toggleLang}

@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, useCallback, u
 import { hashPassword, DOCTOR_COLORS, resetDB, seedDB, isComplimentary, isAppOwner } from '../lib/db'
 import { backend } from '../lib/backend'
 import { clearPaymentReturn, getPaypalReturn, capturePaypal } from '../lib/payments'
+import { buildDemoState } from '../lib/demo'
+import { toast } from '../components/anim'
 
 const StoreContext = createContext(null)
 
@@ -30,6 +32,12 @@ export function StoreProvider({ children }) {
   const stateRef = useRef(state)
   useEffect(() => { stateRef.current = state }, [state])
 
+  // Read-only showcase mode: reached via ?demo=1 → loads in-memory example data
+  // and blocks every write so visitors can browse but never change anything.
+  const isDemo = useMemo(() => {
+    try { return new URLSearchParams(window.location.search).get('demo') === '1' } catch { return false }
+  }, [])
+
   // ── Boot: restore existing session ─────────────────────────────────────
   const loadSession = useCallback(async () => {
     const me = await backend.restore()
@@ -56,11 +64,14 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     let active = true
     ;(async () => {
-      try { await loadSession() } catch (e) { console.error('restore failed', e) }
+      try {
+        if (isDemo) { setState(buildDemoState()); return }
+        await loadSession()
+      } catch (e) { console.error('restore failed', e) }
       finally { if (active) setBooting(false) }
     })()
     return () => { active = false }
-  }, [loadSession])
+  }, [loadSession, isDemo])
 
   // Detect the password-recovery link (user clicked the reset email).
   useEffect(() => {
@@ -136,17 +147,19 @@ export function StoreProvider({ children }) {
 
   // ── Optimistic write helpers ─────────────────────────────────────────────
   const upsert = useCallback((key, table, obj) => {
+    if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return }
     setState((s) => {
       const exists = s[key].some((x) => x.id === obj.id)
       return { ...s, [key]: exists ? s[key].map((x) => (x.id === obj.id ? obj : x)) : [...s[key], obj] }
     })
     backend.save(table, obj).catch((e) => console.error('save', table, e))
-  }, [])
+  }, [isDemo])
 
   const drop = useCallback((key, table, id, extra) => {
+    if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return }
     setState((s) => ({ ...s, [key]: s[key].filter((x) => x.id !== id), ...(extra ? extra(s) : {}) }))
     backend.remove(table, id).catch((e) => console.error('remove', table, e))
-  }, [])
+  }, [isDemo])
 
   // ── Selectors ─────────────────────────────────────────────────────────────
   const getPatient = useCallback((id) => state.patients.find((p) => p.id === id) || null, [state.patients])
@@ -224,10 +237,11 @@ export function StoreProvider({ children }) {
   const deletePayment = useCallback((id) => drop('payments', 'payments', id), [drop])
 
   const updateClinic = useCallback((patch) => {
+    if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return }
     const next = { ...stateRef.current.clinic, ...patch }
     setState((s) => ({ ...s, clinic: next }))
     backend.saveClinic(next).catch((e) => console.error(e))
-  }, [])
+  }, [isDemo])
   const setTier = useCallback((newTier) => updateClinic({ tier: newTier }), [updateClinic])
 
   const addUser = useCallback((data) => {
@@ -285,7 +299,7 @@ export function StoreProvider({ children }) {
     booting, recovery, mode: backend.mode,
     otpEmail: pendingOtp?.email || null, verifyOtp, resendOtp, cancelOtp,
     paymentResult, dismissPaymentResult,
-    clinic, currentUser, tier, can, isOwner,
+    clinic, currentUser, tier, can, isOwner, readOnly: isDemo,
     login, logout, register, resetPassword, updatePassword,
     patients: state.patients, doctors: state.doctors, appointments: state.appointments,
     toothRecords: state.toothRecords, payments: state.payments, suggestions: state.suggestions,
