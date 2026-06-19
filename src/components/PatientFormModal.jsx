@@ -8,7 +8,7 @@ import { toast } from './anim'
 import { calcAge } from '../lib/utils'
 
 const empty = {
-  name: '', nameAr: '', fileNo: '', phone: '', gender: '', dob: '',
+  name: '', fileNo: '', phone: '', gender: '', dob: '',
   occupation: '', address: '', complaint: '',
 }
 
@@ -19,14 +19,21 @@ export default function PatientFormModal({ open, onClose, patient, onSaved }) {
   const [form, setForm] = useState(empty)
 
   useEffect(() => {
-    if (open) setForm(patient ? { ...empty, ...patient } : empty)
-  }, [open, patient])
+    if (!open) return
+    if (patient) {
+      // Seed the field with the name actually shown in the current language, so
+      // editing it changes what the user sees.
+      const shown = lang === 'ar' ? (patient.nameAr || patient.name) : (patient.name || patient.nameAr)
+      setForm({ ...empty, ...patient, name: shown || '' })
+    } else setForm(empty)
+  }, [open, patient, lang])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const age = form.dob ? calcAge(form.dob) : form.age || ''
 
   function submit() {
-    const data = { ...form, age }
+    // One name, mirrored to nameAr, so the edited name shows in every language.
+    const data = { ...form, nameAr: form.name, age }
     if (patient) {
       updatePatient(patient.id, data)
       toast(t('common.saved'))
@@ -59,11 +66,6 @@ export default function PatientFormModal({ open, onClose, patient, onSaved }) {
         <Field label={t('patient.name')} required className="sm:col-span-2">
           <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
         </Field>
-        {lang === 'ar' && (
-          <Field label={`${t('patient.name')} (EN)`} className="sm:col-span-2">
-            <input className="input" dir="ltr" value={form.nameAr === form.name ? '' : form.nameAr} placeholder="optional" onChange={(e) => set('nameAr', e.target.value)} />
-          </Field>
-        )}
         <Field label={t('patient.fileNo')}>
           <input className="input" value={form.fileNo} onChange={(e) => set('fileNo', e.target.value)} placeholder="auto" />
         </Field>

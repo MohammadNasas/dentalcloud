@@ -35,7 +35,10 @@ export function StoreProvider({ children }) {
   // Read-only showcase mode: reached via ?demo=1 → loads in-memory example data
   // and blocks every write so visitors can browse but never change anything.
   const isDemo = useMemo(() => {
-    try { return new URLSearchParams(window.location.search).get('demo') === '1' } catch { return false }
+    try {
+      const sp = new URLSearchParams(window.location.search)
+      return sp.has('demo') || /demo/i.test(window.location.hash)
+    } catch { return false }
   }, [])
 
   // ── Boot: restore existing session ─────────────────────────────────────
