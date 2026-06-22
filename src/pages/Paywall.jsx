@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Stethoscope, Check, ArrowRight, LogOut, GraduationCap, Building2, Crown, Lock, Landmark, Wallet } from 'lucide-react'
+import { Stethoscope, Check, ArrowRight, LogOut, GraduationCap, Building2, Crown, Lock, Landmark, Wallet, Tag, X } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
-import { startPaypalCheckout } from '../lib/payments'
+import { startPaypalCheckout, paymentsEnabled, notifyCouponUse } from '../lib/payments'
+import { lookupCoupon, applyDiscount } from '../lib/coupons'
 import { Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
 import BankTransferPanel from '../components/BankTransferPanel'
@@ -13,6 +14,12 @@ import PaymentHelp from '../components/PaymentHelp'
 import logo from '../lib/logo'
 
 const ICONS = { student: GraduationCap, economy: Building2, pro: Crown }
+
+// Pre-fill the code when the owner shares a private link with ?coupon=CODE.
+function initialCoupon() {
+  try { return new URLSearchParams(window.location.search).get('coupon') || '' }
+  catch { return '' }
+}
 
 // Shown to a cloud account that hasn't paid yet — they must pay to enter the app.
 export default function Paywall() {
@@ -22,10 +29,21 @@ export default function Paywall() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [payMethod, setPayMethod] = useState('paypal')
+  const [couponInput, setCouponInput] = useState(initialCoupon)
+  const coupon = lookupCoupon(couponInput) // { code, percent } | null
+
+  // Price for a tier after applying the active coupon.
+  const priceFor = (ti) => (coupon && ti.price > 0 ? applyDiscount(ti.price, coupon.percent) : ti.price)
+
+  // The moment a valid gift code is entered, privately notify the app owner
+  // (by email) that this customer applied it — before they pay.
+  useEffect(() => {
+    if (paymentsEnabled && coupon) notifyCouponUse({ email: currentUser?.email, tier: selected, coupon: coupon.code })
+  }, [coupon?.code]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function pay() {
     setError(''); setBusy(true)
-    const res = await startPaypalCheckout({ tier: selected, clinicId: clinic.id, customerName: clinic.name, email: currentUser?.email })
+    const res = await startPaypalCheckout({ tier: selected, clinicId: clinic.id, coupon: coupon?.code, customerName: clinic.name, email: currentUser?.email })
     if (res.ok && res.url) { window.location.href = res.url; return }
     setBusy(false)
     setError(res.error === 'not_configured' ? t('packages.paymentsSoon') : (res.message || t('packages.payFailed')))
@@ -66,7 +84,10 @@ export default function Paywall() {
                 {active && <span className="absolute top-3 flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-white end-3"><Check size={14} /></span>}
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white" style={{ background: accent }}><Icon size={22} /></div>
                 <h3 className="mt-3 font-extrabold text-ink-800">{L(ti)}</h3>
-                <p className="mt-1 text-2xl font-extrabold text-ink-800">${ti.price}<span className="text-xs font-normal text-ink-400"> {tierPeriodLabel(ti, t)}</span></p>
+                <p className="mt-1 text-2xl font-extrabold text-ink-800" dir="ltr">
+                  {coupon && ti.price > 0 && <span className="me-1.5 text-base font-bold text-ink-300 line-through">${ti.price}</span>}
+                  ${priceFor(ti)}<span className="text-xs font-normal text-ink-400"> {tierPeriodLabel(ti, t)}</span>
+                </p>
               </button>
             )
           })}
@@ -84,6 +105,35 @@ export default function Paywall() {
         {error && <p className="mt-4 rounded-lg bg-rose-100 px-3 py-2 text-center text-sm font-semibold text-rose-700">{error}</p>}
 
         <div className="mx-auto mt-6 max-w-md">
+          {/* Discount / gift code */}
+          <div className="mb-5">
+            <label className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-white/90">
+              <Tag size={15} /> {t('packages.couponLabel')}
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                value={couponInput}
+                onChange={(e) => setCouponInput(e.target.value)}
+                placeholder={t('packages.couponPlaceholder')}
+                dir="ltr"
+                className={cx('flex-1 rounded-xl border bg-white/95 px-4 py-2.5 font-bold uppercase tracking-wide text-ink-800 outline-none transition-colors placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-300',
+                  coupon ? 'border-emerald-300 ring-2 ring-emerald-300' : couponInput.trim() ? 'border-rose-300 ring-1 ring-rose-200' : 'border-transparent')}
+              />
+              {couponInput.trim() && (
+                <button type="button" onClick={() => setCouponInput('')} className="rounded-xl bg-white/15 px-3 py-2.5 text-white hover:bg-white/25" aria-label={t('common.clear')}>
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+            {coupon ? (
+              <p className="mt-1.5 flex items-center gap-1 text-sm font-bold text-emerald-200">
+                <Check size={15} /> {t('packages.couponApplied').replace('{percent}', coupon.percent)}
+              </p>
+            ) : couponInput.trim() ? (
+              <p className="mt-1.5 text-sm font-bold text-rose-200">{t('packages.couponInvalid')}</p>
+            ) : null}
+          </div>
+
           <p className="mb-2 text-center text-sm font-bold text-white/90">{t('packages.payHow')}</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <PwMethodBtn active={payMethod === 'paypal'} onClick={() => setPayMethod('paypal')} icon={<Wallet size={18} />} title="PayPal" sub={t('packages.payPaypalSub')} />
@@ -91,11 +141,11 @@ export default function Paywall() {
           </div>
 
           {payMethod === 'bank' ? (
-            <BankTransferPanel amount={tier.price} planLabel={L(tier)} />
+            <BankTransferPanel amount={priceFor(tier)} originalAmount={tier.price} coupon={coupon?.code} planLabel={L(tier)} />
           ) : (
             <div className="mt-6 flex flex-col items-center gap-3">
               <button onClick={pay} disabled={busy} className="btn bg-white !px-8 !py-3.5 text-base font-extrabold text-brand-700 hover:bg-white/90">
-                {busy ? <Spinner /> : <>{payMethod === 'paypal' ? 'PayPal' : t('packages.pay')} — ${tier.price} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} /></>}
+                {busy ? <Spinner /> : <>{payMethod === 'paypal' ? 'PayPal' : t('packages.pay')} — ${priceFor(tier)} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} /></>}
               </button>
               <p className="text-xs text-white/70">🔒 {t('packages.securePay')}</p>
             </div>

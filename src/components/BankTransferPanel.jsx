@@ -29,8 +29,10 @@ function Row({ label, value, mono }) {
 }
 
 // Shown when a clinic chooses to pay its subscription by manual bank transfer.
-// `amount` is the plan price in USD; `planLabel` is the localized plan name.
-export default function BankTransferPanel({ amount, planLabel }) {
+// `amount` is the (discounted) price to transfer in USD; `originalAmount` is the
+// pre-discount price and `coupon` the applied code (both optional); `planLabel`
+// is the localized plan name.
+export default function BankTransferPanel({ amount, originalAmount, coupon, planLabel }) {
   const { t } = useI18n()
   const bank = DENTALCLOUD_BANK
 
@@ -38,8 +40,9 @@ export default function BankTransferPanel({ amount, planLabel }) {
     return <p className="mt-5 rounded-xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">{t('packages.bankNotSet')}</p>
   }
 
+  const discounted = coupon && originalAmount && originalAmount !== amount
   const subject = `DentalCloud — ${planLabel} ($${amount})`
-  const body = `Plan: ${planLabel}\nAmount: $${amount}\nClinic name: \nTransfer date: \n\n(Please attach the transfer receipt.)`
+  const body = `Plan: ${planLabel}\nAmount: $${amount}${discounted ? `\nCoupon: ${coupon} (was $${originalAmount})` : ''}\nClinic name: \nTransfer date: \n\n(Please attach the transfer receipt.)`
   const mailto = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 
   return (
@@ -51,8 +54,14 @@ export default function BankTransferPanel({ amount, planLabel }) {
 
       <div className="mb-3 flex items-center justify-between rounded-xl bg-ink-50 px-4 py-3">
         <span className="text-sm text-ink-400">{t('packages.bankAmount')}</span>
-        <span className="text-xl font-extrabold text-ink-800" dir="ltr">${amount}</span>
+        <span className="flex items-center gap-2">
+          {discounted && <span className="text-sm font-bold text-ink-300 line-through" dir="ltr">${originalAmount}</span>}
+          <span className="text-xl font-extrabold text-ink-800" dir="ltr">${amount}</span>
+        </span>
       </div>
+      {discounted && (
+        <p className="mb-3 -mt-1 text-xs font-bold text-emerald-600">{t('packages.couponLabel')}: {coupon}</p>
+      )}
 
       <div className="rounded-xl border border-ink-100 px-4">
         <Row label={t('packages.bankIban')} value={bank.iban} mono />

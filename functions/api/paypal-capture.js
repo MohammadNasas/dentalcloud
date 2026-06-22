@@ -4,6 +4,12 @@
 // Env vars: PAYPAL_CLIENT_ID, PAYPAL_SECRET, PAYPAL_BASE (optional),
 //           SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 const PRICES = { student: 5, economy: 70, pro: 100 }
+// Promo codes — keep in sync with src/lib/coupons.js and paypal-create.js.
+const COUPONS = { DENTAL40: 40 }
+const expectedPrice = (tier, code) => {
+  const pct = COUPONS[String(code || '').trim().toUpperCase()] || 0
+  return Math.round(PRICES[tier] * (1 - pct / 100) * 100) / 100
+}
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -47,16 +53,18 @@ export const onRequestPost = async ({ request, env }) => {
     const cap = await capRes.json()
     if (cap.status !== 'COMPLETED') return json({ ok: false, status: cap.status || 'unknown', message: cap.message })
 
-    // 2) Recover clinicId + tier from custom_id ("clinicId--tier--timestamp")
+    // 2) Recover clinicId + tier + coupon from custom_id
+    //    ("clinicId--tier--coupon--timestamp")
     const pu = (cap.purchase_units || [])[0] || {}
     const capture = pu.payments?.captures?.[0] || {}
     const reference = capture.custom_id || pu.custom_id || ''
     const paid = Number(capture.amount?.value || 0)
-    const [clinicId, tier] = String(reference).split('--')
+    const [clinicId, tier, coupon] = String(reference).split('--')
     if (!clinicId || !['student', 'economy', 'pro'].includes(tier)) return json({ ok: false, error: 'bad_reference' }, 400)
 
-    // 3) Anti-tampering: captured USD amount must match the tier price
-    if (paid !== PRICES[tier]) return json({ ok: false, error: 'amount_mismatch', paid, expected: PRICES[tier] }, 400)
+    // 3) Anti-tampering: captured USD amount must match the tier price after coupon
+    const expected = expectedPrice(tier, coupon)
+    if (Math.abs(paid - expected) > 0.01) return json({ ok: false, error: 'amount_mismatch', paid, expected }, 400)
 
     // 4) Activate the plan
     const supaUrl = env.SUPABASE_URL, serviceKey = env.SUPABASE_SERVICE_ROLE_KEY

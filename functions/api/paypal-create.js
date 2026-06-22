@@ -4,6 +4,12 @@
 //   PAYPAL_BASE defaults to live (https://api-m.paypal.com); use
 //   https://api-m.sandbox.paypal.com for testing.
 const PRICES = { student: 5, economy: 70, pro: 100 }
+// Promo codes — keep in sync with src/lib/coupons.js and paypal-capture.js.
+const COUPONS = { DENTAL40: 40 }
+const discountedPrice = (tier, code) => {
+  const pct = COUPONS[String(code || '').trim().toUpperCase()] || 0
+  return Math.round(PRICES[tier] * (1 - pct / 100) * 100) / 100
+}
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -37,12 +43,15 @@ export const onRequestPost = async ({ request, env }) => {
 
   let payload
   try { payload = await request.json() } catch { return json({ error: 'bad_json' }, 400) }
-  const { tier, clinicId } = payload || {}
-  const amount = PRICES[tier]
-  if (!amount || !clinicId) return json({ error: 'bad_request' }, 400)
+  const { tier, clinicId, coupon } = payload || {}
+  if (!PRICES[tier] || !clinicId) return json({ error: 'bad_request' }, 400)
+  // The discount is computed server-side from our own coupon table, so the
+  // client can never dictate the charged amount.
+  const code = COUPONS[String(coupon || '').trim().toUpperCase()] ? String(coupon).trim().toUpperCase() : ''
+  const amount = discountedPrice(tier, code)
 
-  // custom_id carries clinicId + tier so the capture step can activate the plan.
-  const reference = `${clinicId}--${tier}--${Date.now()}`
+  // custom_id carries clinicId + tier + coupon so capture can re-verify the amount.
+  const reference = `${clinicId}--${tier}--${code}--${Date.now()}`
 
   try {
     const tok = await token(base, id, secret)

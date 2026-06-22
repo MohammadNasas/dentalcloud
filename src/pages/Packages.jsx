@@ -1,18 +1,29 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Check, Sparkles, Crown, GraduationCap, Building2, X, ArrowRight, Star, Landmark, Wallet } from 'lucide-react'
+import { Check, Sparkles, Crown, GraduationCap, Building2, X, ArrowRight, Star, Landmark, Wallet, Tag } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { Modal, Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
-import { paymentsEnabled, startPaypalCheckout } from '../lib/payments'
+import { paymentsEnabled, startPaypalCheckout, notifyCouponUse } from '../lib/payments'
+import { lookupCoupon, applyDiscount } from '../lib/coupons'
 import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/PackagePreviews'
 import BankTransferPanel from '../components/BankTransferPanel'
 import PaymentHelp from '../components/PaymentHelp'
 
 const ICONS = { student: GraduationCap, economy: Building2, pro: Crown }
+
+// Tier ranking (student < economy < pro) so we can block downgrades.
+const TIER_ORDER = Object.keys(TIERS)
+const tierRank = (id) => TIER_ORDER.indexOf(id)
+
+// Pre-fill the promo code when the marketing site deep-links with ?coupon=CODE.
+function initialCoupon() {
+  try { return new URLSearchParams(window.location.search).get('coupon') || '' }
+  catch { return '' }
+}
 
 export default function Packages() {
   const { t, lang, L, isRTL } = useI18n()
@@ -23,10 +34,22 @@ export default function Packages() {
   const [processing, setProcessing] = useState(false)
   const [payError, setPayError] = useState('')
   const [payMethod, setPayMethod] = useState('paypal')
+  const [couponInput, setCouponInput] = useState(initialCoupon)
   const current = clinic?.tier
+  const coupon = lookupCoupon(couponInput) // { code, percent } | null
+
+  // Price for a tier after applying the active coupon (paid tiers only).
+  const priceFor = (tier) => (coupon && tier.price > 0 ? applyDiscount(tier.price, coupon.percent) : tier.price)
+
+  // Privately notify the app owner the moment a valid gift code is applied.
+  useEffect(() => {
+    if (paymentsEnabled && coupon) notifyCouponUse({ email: currentUser?.email, tier: buying || current, coupon: coupon.code })
+  }, [coupon?.code]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function confirmBuy() {
     setPayError('')
+    // Never let a paid clinic downgrade to a lower (e.g. free Student) plan.
+    if (current && tierRank(buying) < tierRank(current)) { setBuying(null); return }
     // The Student plan is free — activate it instantly, no payment.
     if (TIERS[buying].price === 0) {
       setTier(buying)
@@ -36,7 +59,7 @@ export default function Packages() {
     }
     if (paymentsEnabled) {
       setProcessing(true)
-      const res = await startPaypalCheckout({ tier: buying, clinicId: clinic.id, customerName: clinic.name, email: currentUser?.email })
+      const res = await startPaypalCheckout({ tier: buying, clinicId: clinic.id, coupon: coupon?.code, customerName: clinic.name, email: currentUser?.email })
       if (res.ok && res.url) { window.location.href = res.url; return }
       setProcessing(false)
       setPayError(res.error === 'not_configured' ? t('packages.paymentsSoon') : (res.message || t('packages.payFailed')))
@@ -68,12 +91,42 @@ export default function Packages() {
         </div>
       </div>
 
+      {/* Promo / discount code */}
+      <div className="mx-auto max-w-md">
+        <label className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-ink-600">
+          <Tag size={15} className="text-brand-500" /> {t('packages.couponLabel')}
+        </label>
+        <div className="flex items-center gap-2">
+          <input
+            value={couponInput}
+            onChange={(e) => setCouponInput(e.target.value)}
+            placeholder={t('packages.couponPlaceholder')}
+            dir="ltr"
+            className={cx('flex-1 rounded-xl border bg-white px-4 py-2.5 font-bold tracking-wide text-ink-800 uppercase outline-none transition-colors placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-300',
+              coupon ? 'border-emerald-400 ring-1 ring-emerald-300' : couponInput.trim() ? 'border-rose-300' : 'border-ink-200 focus:border-brand-400')}
+          />
+          {couponInput.trim() && (
+            <button type="button" onClick={() => setCouponInput('')} className="rounded-xl border border-ink-200 px-3 py-2.5 text-ink-400 hover:text-ink-600" aria-label={t('common.clear')}>
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        {coupon ? (
+          <p className="mt-1.5 flex items-center gap-1 text-sm font-semibold text-emerald-600">
+            <Check size={15} /> {t('packages.couponApplied').replace('{percent}', coupon.percent)}
+          </p>
+        ) : couponInput.trim() ? (
+          <p className="mt-1.5 text-sm font-semibold text-rose-500">{t('packages.couponInvalid')}</p>
+        ) : null}
+      </div>
+
       {/* Pricing cards */}
       <div className="grid gap-5 lg:grid-cols-3">
         {Object.values(TIERS).map((tier, idx) => {
           const Icon = ICONS[tier.id]
           const accent = PACKAGE_FEATURES[tier.id].accent
           const isCurrent = current === tier.id
+          const isDowngrade = current && tierRank(tier.id) < tierRank(current)
           const popular = tier.id === 'economy'
           const features = fullFeatures(tier.id)
           const own = PACKAGE_FEATURES[tier.id].features
@@ -103,6 +156,12 @@ export default function Packages() {
               <div className="mt-4 flex items-end gap-1">
                 {tier.price === 0 ? (
                   <span className="text-4xl font-extrabold text-ink-800">{t('packages.free')}</span>
+                ) : coupon ? (
+                  <>
+                    <span className="text-lg font-bold text-ink-300 line-through" dir="ltr">${tier.price}</span>
+                    <span className="text-4xl font-extrabold text-ink-800" dir="ltr">${priceFor(tier)}</span>
+                    <span className="mb-1 text-sm text-ink-400"> {tierPeriodLabel(tier, t)}</span>
+                  </>
                 ) : (
                   <>
                     <span className="text-4xl font-extrabold text-ink-800">${tier.price}</span>
@@ -110,6 +169,11 @@ export default function Packages() {
                   </>
                 )}
               </div>
+              {coupon && tier.price > 0 && (
+                <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
+                  <Tag size={11} /> {coupon.code} · {t('packages.couponOff').replace('{percent}', coupon.percent)}
+                </p>
+              )}
               <p className="mt-2 text-sm text-ink-500">{t(`packages.${tier.id}Desc`)}</p>
 
               <div className="my-5 h-px bg-ink-100" />
@@ -146,6 +210,10 @@ export default function Packages() {
               {isCurrent ? (
                 <button disabled className="btn w-full bg-ink-100 text-ink-500">
                   <Check size={16} /> {t('packages.current')}
+                </button>
+              ) : isDowngrade ? (
+                <button disabled className="btn w-full cursor-not-allowed bg-ink-100 text-ink-400">
+                  <Check size={16} /> {t('packages.includedInPlan')}
                 </button>
               ) : (
                 <button onClick={() => setBuying(tier.id)} className="btn w-full text-white" style={{ background: accent }}>
@@ -200,15 +268,24 @@ export default function Packages() {
               )}
 
               {paymentsEnabled && TIERS[buying].price > 0 && payMethod === 'bank' ? (
-                <BankTransferPanel amount={TIERS[buying].price} planLabel={L(TIERS[buying])} />
+                <BankTransferPanel amount={priceFor(TIERS[buying])} originalAmount={TIERS[buying].price} coupon={coupon?.code} planLabel={L(TIERS[buying])} />
               ) : (
                 <>
                   <div className="mt-5 flex items-center justify-between rounded-xl bg-ink-50 p-4">
                     <div>
                       <p className="text-sm text-ink-400">{L(TIERS[buying])}</p>
                       <p className="text-2xl font-extrabold text-ink-800">
-                        {TIERS[buying].price === 0 ? t('packages.free') : <>${TIERS[buying].price}<span className="text-sm font-normal text-ink-400"> {tierPeriodLabel(TIERS[buying], t)}</span></>}
+                        {TIERS[buying].price === 0 ? t('packages.free') : (
+                          <>
+                            {coupon && <span className="me-2 text-base font-bold text-ink-300 line-through" dir="ltr">${TIERS[buying].price}</span>}
+                            <span dir="ltr">${priceFor(TIERS[buying])}</span>
+                            <span className="text-sm font-normal text-ink-400"> {tierPeriodLabel(TIERS[buying], t)}</span>
+                          </>
+                        )}
                       </p>
+                      {coupon && TIERS[buying].price > 0 && (
+                        <p className="mt-0.5 text-xs font-bold text-emerald-600">{coupon.code} · {t('packages.couponOff').replace('{percent}', coupon.percent)}</p>
+                      )}
                     </div>
                     <button onClick={confirmBuy} disabled={processing} className="btn-primary !py-3 !px-6" style={{ background: PACKAGE_FEATURES[buying].accent }}>
                       {processing ? <Spinner /> : <>{TIERS[buying].price === 0 ? t('packages.buyNow') : !paymentsEnabled ? t('packages.buyNow') : payMethod === 'paypal' ? 'PayPal' : t('packages.pay')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}

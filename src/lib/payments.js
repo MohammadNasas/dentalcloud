@@ -6,12 +6,12 @@ import { isCloud } from './supabaseClient'
 export const paymentsEnabled = isCloud
 
 // ── PayPal ──────────────────────────────────────────────────────────────
-export async function startPaypalCheckout({ tier, clinicId }) {
+export async function startPaypalCheckout({ tier, clinicId, coupon }) {
   try {
     const r = await fetch('/api/paypal-create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tier, clinicId }),
+      body: JSON.stringify({ tier, clinicId, coupon }),
     })
     const data = await r.json().catch(() => ({}))
     if (r.ok && data.url) return { ok: true, url: data.url }
@@ -19,6 +19,24 @@ export async function startPaypalCheckout({ tier, clinicId }) {
   } catch (e) {
     return { ok: false, error: 'network', message: String(e) }
   }
+}
+
+// Privately notify the app owner (by email, server-side) that a customer
+// applied a gift/discount code — before they pay. Best-effort & fire-once per
+// code/email/tier so it never blocks or spams checkout.
+const _notifiedCoupons = new Set()
+export async function notifyCouponUse({ email, tier, coupon }) {
+  if (!coupon) return
+  const key = `${coupon}|${email || ''}|${tier || ''}`
+  if (_notifiedCoupons.has(key)) return
+  _notifiedCoupons.add(key)
+  try {
+    await fetch('/api/coupon-notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, tier, coupon }),
+    })
+  } catch { /* notification is best-effort — never interrupt the purchase */ }
 }
 
 export async function capturePaypal(orderId) {
