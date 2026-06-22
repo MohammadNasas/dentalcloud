@@ -221,11 +221,11 @@ export function FloatingField({ label, type = 'text', value, onChange, icon, dir
       <input
         type={type} value={value} name={name} dir={dir} autoComplete={autoComplete} required={required} autoFocus={autoFocus}
         onChange={onChange} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
-        className={cx('peer w-full rounded-xl border bg-white px-3.5 pb-2 pt-5 text-sm text-ink-800 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-brand-400/10',
+        className={cx('peer w-full rounded-xl border bg-white px-3.5 pb-1.5 pt-6 text-sm text-ink-800 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-brand-400/10',
           focused ? 'border-brand-400' : 'border-ink-200', icon && 'ps-10')}
       />
       <motion.label
-        animate={float ? { y: -10, scale: 0.82 } : { y: 0, scale: 1 }}
+        animate={float ? { y: -14, scale: 0.8 } : { y: 0, scale: 1 }}
         transition={{ duration: 0.18, ease: 'easeOut' }}
         className={cx('pointer-events-none absolute top-1/2 -translate-y-1/2 origin-[0_50%] font-semibold',
           icon ? 'start-10' : 'start-3.5', float ? 'text-brand-600' : 'text-ink-400')}
