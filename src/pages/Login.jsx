@@ -75,7 +75,8 @@ export default function Login({ initialTab = 'signin', onBack }) {
     setBusy(true)
     const res = await register(reg)
     setBusy(false)
-    if (!res.ok) setError(t(`auth.${res.error}`) + (res.message ? ` (${res.message})` : ''))
+    // needsOtp isn't an error — it's the normal transition to the code screen.
+    if (!res.ok && !res.needsOtp) setError(t(`auth.${res.error || 'signupFailed'}`) + (res.message ? ` (${res.message})` : ''))
   }
 
   const highlights = [
