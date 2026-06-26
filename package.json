@@ -16,10 +16,10 @@
     "preview": "vite preview --host",
     "electron": "electron .",
     "icon": "node scripts/make-icon.cjs",
-    "pack": "vite build && electron-builder --dir",
-    "dist": "vite build && electron-builder",
-    "dist:ci": "vite build && electron-builder --publish never",
-    "release": "vite build && electron-builder --publish always"
+    "pack": "vite build --mode electron && electron-builder --dir",
+    "dist": "vite build --mode electron && electron-builder",
+    "dist:ci": "vite build --mode electron && electron-builder --publish never",
+    "release": "vite build --mode electron && electron-builder --publish always"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
