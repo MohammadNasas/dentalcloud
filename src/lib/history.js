@@ -80,6 +80,8 @@ export const SYSTEMS_HISTORY = {
       opt('copd', 'COPD', 'انسداد رئوي مزمن'),
       opt('tb', 'Tuberculosis', 'سل'),
       opt('sleepApnea', 'Sleep apnea', 'انقطاع نفس نومي'),
+      opt('nasalObstructionFull', 'Complete nasal obstruction', 'انسداد كلي بالأنف'),
+      opt('nasalObstructionPartial', 'Partial nasal obstruction', 'انسداد جزئي بالأنف'),
     ]},
     { id: 'gi', en: 'Stomach & liver', ar: 'المعدة والكبد', options: [
       opt('ulcer', 'Peptic ulcer', 'قرحة معدية'),
@@ -186,6 +188,7 @@ export const CLINICAL_EXAM = {
       opt('ulceration', 'Ulceration', 'تقرّح'),
       opt('lineaAlba', 'Linea alba', 'الخط الأبيض'),
     ]},
+    { id: 'tongue', en: 'Tongue position notes', ar: 'ملاحظات على وضع اللسان', type: 'text' },
     { id: 'softTissue', en: 'Soft tissue / floor of mouth notes', ar: 'ملاحظات الأنسجة الرخوة / أرضية الفم', type: 'text' },
   ],
 }
