@@ -7,6 +7,7 @@ import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { startPaypalCheckout, paymentsEnabled, notifyCouponUse } from '../lib/payments'
 import { lookupCoupon, applyDiscount } from '../lib/coupons'
+import { isInAppBrowser, openInBrowserNotice } from '../lib/inAppBrowser'
 import { Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
 import BankTransferPanel from '../components/BankTransferPanel'
@@ -42,7 +43,11 @@ export default function Paywall() {
   }, [coupon?.code]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function pay() {
-    setError(''); setBusy(true)
+    setError('')
+    // PayPal won't open inside Instagram/Facebook in-app browsers — guide the
+    // user to a real browser instead of redirecting into a dead end.
+    if (isInAppBrowser()) { openInBrowserNotice(true); return }
+    setBusy(true)
     const res = await startPaypalCheckout({ tier: selected, clinicId: clinic.id, coupon: coupon?.code, customerName: clinic.name, email: currentUser?.email })
     if (res.ok && res.url) { window.location.href = res.url; return }
     setBusy(false)

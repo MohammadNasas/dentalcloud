@@ -8,6 +8,7 @@ import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { Modal, Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
 import { paymentsEnabled, startPaypalCheckout, notifyCouponUse } from '../lib/payments'
+import { isInAppBrowser, openInBrowserNotice } from '../lib/inAppBrowser'
 import { lookupCoupon, applyDiscount } from '../lib/coupons'
 import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/PackagePreviews'
 import BankTransferPanel from '../components/BankTransferPanel'
@@ -58,6 +59,8 @@ export default function Packages() {
       return
     }
     if (paymentsEnabled) {
+      // PayPal won't open inside in-app browsers — send them to a real browser.
+      if (isInAppBrowser()) { openInBrowserNotice(true); return }
       setProcessing(true)
       const res = await startPaypalCheckout({ tier: buying, clinicId: clinic.id, coupon: coupon?.code, customerName: clinic.name, email: currentUser?.email })
       if (res.ok && res.url) { window.location.href = res.url; return }

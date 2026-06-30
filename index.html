@@ -28,41 +28,53 @@
          bundle loads) and tell the user to open the link in a real browser. -->
     <script>
       (function () {
+        // Builds the full-screen "open in your browser" notice. Exposed globally so
+        // the React app can also call it at payment time (window.__openInBrowserNotice).
+        // Pass true to tailor the wording to a blocked PayPal checkout.
+        window.__openInBrowserNotice = function (payment) {
+          try {
+            if (document.getElementById('__iaNotice')) return;
+            var ar = (localStorage.getItem('dentacare.lang') || 'ar') !== 'en';
+            var T = ar
+              ? { dir: 'rtl', title: 'افتح الموقع بمتصفّحك 🌐',
+                  body: payment
+                    ? 'لإتمام الدفع لازم تفتح الموقع بمتصفّحك العادي — PayPal لا يفتح داخل متصفّح إنستغرام/فيسبوك.'
+                    : 'أنت تستخدم المتصفّح الداخلي للتطبيق (إنستغرام/فيسبوك)، وهو يمنع تسجيل الدخول والدفع من العمل بشكل صحيح.',
+                  steps: 'اضغط على زر ⋮ في أعلى الشاشة، ثم اختر «فتح في المتصفّح».',
+                  copy: 'نسخ رابط الموقع', copied: 'تم النسخ ✓', cont: 'المتابعة هنا على أي حال' }
+              : { dir: 'ltr', title: 'Open in your browser 🌐',
+                  body: payment
+                    ? 'To complete payment, open the site in your real browser — PayPal will not open inside the Instagram/Facebook in-app browser.'
+                    : 'You are using an in-app browser (Instagram/Facebook). It blocks sign-in and payments from working correctly.',
+                  steps: 'Tap the ⋮ button at the top, then choose “Open in browser”.',
+                  copy: 'Copy site link', copied: 'Copied ✓', cont: 'Continue here anyway' };
+            var o = document.createElement('div');
+            o.id = '__iaNotice';
+            o.setAttribute('dir', T.dir);
+            o.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Cairo,Inter,system-ui,sans-serif';
+            o.innerHTML =
+              '<div style="max-width:420px;text-align:center">' +
+                '<div style="font-size:46px;margin-bottom:8px">🦷</div>' +
+                '<h1 style="font-size:22px;font-weight:800;margin:0 0 10px">' + T.title + '</h1>' +
+                '<p style="opacity:.92;line-height:1.7;margin:0 0 14px">' + T.body + '</p>' +
+                '<p style="background:rgba(255,255,255,.15);border-radius:12px;padding:12px 14px;line-height:1.7;margin:0 0 18px">' + T.steps + '</p>' +
+                '<button id="__iaCopy" style="width:100%;border:0;border-radius:12px;background:#fff;color:#0f766e;font-weight:800;font-size:15px;padding:13px;cursor:pointer">' + T.copy + '</button>' +
+                '<button id="__iaCont" style="margin-top:12px;background:transparent;border:0;color:rgba(255,255,255,.8);font-size:13px;text-decoration:underline;cursor:pointer">' + T.cont + '</button>' +
+              '</div>';
+            document.body.appendChild(o);
+            var cp = document.getElementById('__iaCopy');
+            cp.onclick = function () {
+              var url = window.location.href, done = function () { cp.textContent = T.copied; };
+              if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(done);
+              else { var i = document.createElement('input'); i.value = url; document.body.appendChild(i); i.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(i); done(); }
+            };
+            document.getElementById('__iaCont').onclick = function () { o.remove(); };
+          } catch (e) { /* never block the app on a detection error */ }
+        };
         try {
           var ua = navigator.userAgent || '';
-          var inApp = /(Instagram|FBAN|FBAV|FB_IAB|FBIOS|Messenger|TikTok|musical_ly|BytedanceWebview|Snapchat|Line\/|Twitter|Pinterest)/i.test(ua);
-          if (!inApp) return;
-          var ar = (localStorage.getItem('dentacare.lang') || 'ar') !== 'en';
-          var T = ar
-            ? { dir: 'rtl', title: 'افتح الموقع بمتصفّحك 🌐',
-                body: 'أنت تستخدم المتصفّح الداخلي للتطبيق (إنستغرام/فيسبوك)، وهو يمنع تسجيل الدخول والدفع من العمل بشكل صحيح.',
-                steps: 'اضغط على زر ⋮ في أعلى الشاشة، ثم اختر «فتح في المتصفّح».',
-                copy: 'نسخ رابط الموقع', copied: 'تم النسخ ✓', cont: 'المتابعة هنا على أي حال' }
-            : { dir: 'ltr', title: 'Open in your browser 🌐',
-                body: 'You are using an in-app browser (Instagram/Facebook). It blocks sign-in and payments from working correctly.',
-                steps: 'Tap the ⋮ button at the top, then choose “Open in browser”.',
-                copy: 'Copy site link', copied: 'Copied ✓', cont: 'Continue here anyway' };
-          var o = document.createElement('div');
-          o.setAttribute('dir', T.dir);
-          o.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:linear-gradient(135deg,#0f766e,#0d9488);color:#fff;display:flex;align-items:center;justify-content:center;padding:24px;font-family:Cairo,Inter,system-ui,sans-serif';
-          o.innerHTML =
-            '<div style="max-width:420px;text-align:center">' +
-              '<div style="font-size:46px;margin-bottom:8px">🦷</div>' +
-              '<h1 style="font-size:22px;font-weight:800;margin:0 0 10px">' + T.title + '</h1>' +
-              '<p style="opacity:.92;line-height:1.7;margin:0 0 14px">' + T.body + '</p>' +
-              '<p style="background:rgba(255,255,255,.15);border-radius:12px;padding:12px 14px;line-height:1.7;margin:0 0 18px">' + T.steps + '</p>' +
-              '<button id="__iaCopy" style="width:100%;border:0;border-radius:12px;background:#fff;color:#0f766e;font-weight:800;font-size:15px;padding:13px;cursor:pointer">' + T.copy + '</button>' +
-              '<button id="__iaCont" style="margin-top:12px;background:transparent;border:0;color:rgba(255,255,255,.8);font-size:13px;text-decoration:underline;cursor:pointer">' + T.cont + '</button>' +
-            '</div>';
-          document.body.appendChild(o);
-          var cp = document.getElementById('__iaCopy');
-          cp.onclick = function () {
-            var url = window.location.href, done = function () { cp.textContent = T.copied; };
-            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(done);
-            else { var i = document.createElement('input'); i.value = url; document.body.appendChild(i); i.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(i); done(); }
-          };
-          document.getElementById('__iaCont').onclick = function () { o.remove(); };
-        } catch (e) { /* never block the app on a detection error */ }
+          if (/(Instagram|FBAN|FBAV|FB_IAB|FBIOS|Messenger|TikTok|musical_ly|BytedanceWebview|Snapchat|Line\/|Twitter|Pinterest)/i.test(ua)) window.__openInBrowserNotice(false);
+        } catch (e) { /* ignore */ }
       })();
     </script>
     <script type="module" src="/src/main.jsx"></script>
