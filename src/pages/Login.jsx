@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Stethoscope, Globe, CheckCircle2, ArrowRight, Sparkles, ShieldCheck, Smartphone,
-  Cloud, WifiOff, Phone, Mail,
+  Cloud, WifiOff, Mail,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -12,6 +12,7 @@ import { FloatingField } from '../components/anim'
 import { cx } from '../lib/utils'
 import logo from '../lib/logo'
 import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from '../lib/billing'
+import WhatsAppIcon from '../components/WhatsAppIcon'
 
 export default function Login({ initialTab = 'signin', onBack }) {
   const { t, L, lang, toggleLang, isRTL } = useI18n()
@@ -271,21 +272,6 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 <h2 className="text-2xl font-extrabold text-ink-800">{t('auth.register')}</h2>
                 <p className="text-sm text-ink-400">{t('auth.anyDevice')}</p>
               </div>
-              <div className="rounded-xl border border-brand-100 bg-brand-50/70 p-3 text-sm">
-                <p className="mb-2 font-bold text-ink-700">
-                  {lang === 'ar' ? 'تحتاج مساعدة بالتسجيل؟' : 'Need help signing up?'}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <a href={supportWaLink} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 font-bold text-brand-700 shadow-soft" dir="ltr">
-                    <Phone size={14} /> {SUPPORT_WHATSAPP}
-                  </a>
-                  <a href={`mailto:${SUPPORT_EMAIL}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 font-bold text-brand-700 shadow-soft" dir="ltr">
-                    <Mail size={14} /> {SUPPORT_EMAIL}
-                  </a>
-                </div>
-              </div>
               <Field label={t('auth.clinicName')} required>
                 <input className="input" value={reg.clinicName} onChange={(e) => setReg({ ...reg, clinicName: e.target.value })} />
               </Field>
@@ -331,6 +317,37 @@ export default function Login({ initialTab = 'signin', onBack }) {
               <button disabled={busy || !agreedTerms} className="btn-primary w-full !py-3">
                 {busy ? <Spinner /> : <>{t('auth.createAccount')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
               </button>
+              <div className="rounded-2xl border border-ink-200 bg-white p-3 shadow-soft">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-extrabold text-ink-800">
+                      {lang === 'ar' ? 'تحتاج مساعدة بالتسجيل؟' : 'Need help signing up?'}
+                    </p>
+                    <p className="text-xs font-semibold text-ink-400">
+                      {lang === 'ar' ? 'الدعم جاهز لمساعدتك مباشرة' : 'Support is ready to help you directly'}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-700">
+                    {lang === 'ar' ? 'دعم' : 'Support'}
+                  </span>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <a href={supportWaLink} target="_blank" rel="noopener noreferrer"
+                    className="group flex items-center gap-2 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 font-bold text-emerald-700 transition-colors hover:border-emerald-200 hover:bg-emerald-100" dir="ltr">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-600 shadow-soft">
+                      <WhatsAppIcon size={17} />
+                    </span>
+                    <span className="min-w-0 truncate">{SUPPORT_WHATSAPP}</span>
+                  </a>
+                  <a href={`mailto:${SUPPORT_EMAIL}`}
+                    className="group flex items-center gap-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2.5 font-bold text-sky-700 transition-colors hover:border-sky-200 hover:bg-sky-100" dir="ltr">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-sky-600 shadow-soft">
+                      <Mail size={17} />
+                    </span>
+                    <span className="min-w-0 truncate">{SUPPORT_EMAIL}</span>
+                  </a>
+                </div>
+              </div>
             </form>
           )}
           </>
