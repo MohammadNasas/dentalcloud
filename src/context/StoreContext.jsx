@@ -3,6 +3,7 @@ import { hashPassword, DOCTOR_COLORS, resetDB, seedDB, isComplimentary, isAppOwn
 import { backend } from '../lib/backend'
 import { clearPaymentReturn, getPaypalReturn, capturePaypal } from '../lib/payments'
 import { buildDemoState } from '../lib/demo'
+import { trackDailyActive } from '../lib/analytics'
 import { toast } from '../components/anim'
 
 const StoreContext = createContext(null)
@@ -114,6 +115,30 @@ export function StoreProvider({ children }) {
     if (!need) return true
     return TIER_ORDER[tier] >= TIER_ORDER[need]
   }, [tier])
+
+  // Cloud usage analytics: one lightweight heartbeat on open, then every few
+  // minutes while the app is visible. It records only account/app metadata.
+  useEffect(() => {
+    if (backend.mode !== 'cloud' || isDemo || !clinic?.id || !currentUser?.id) return
+    let stopped = false
+    const send = (force = false) => {
+      if (stopped) return
+      const latest = stateRef.current
+      trackDailyActive({ clinic: latest.clinic, user: latest.currentUser }, { force })
+    }
+    send(true)
+    const timer = setInterval(() => send(false), 5 * 60 * 1000)
+    const onFocus = () => send(false)
+    const onVisibility = () => { if (document.visibilityState === 'visible') send(false) }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      stopped = true
+      clearInterval(timer)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [clinic?.id, currentUser?.id, isDemo])
 
   // Resolve the app-owner flag whenever the logged-in user changes (async hash).
   useEffect(() => {

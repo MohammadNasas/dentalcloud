@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Stethoscope, Globe, CheckCircle2, ArrowRight, Sparkles, ShieldCheck, Smartphone,
-  Cloud, WifiOff,
+  Cloud, WifiOff, Phone, Mail,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -11,6 +11,7 @@ import { Field, Spinner } from '../components/ui'
 import { FloatingField } from '../components/anim'
 import { cx } from '../lib/utils'
 import logo from '../lib/logo'
+import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from '../lib/billing'
 
 export default function Login({ initialTab = 'signin', onBack }) {
   const { t, L, lang, toggleLang, isRTL } = useI18n()
@@ -43,6 +44,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
     clinicName: '', doctorName: '', email: '', password: '', specialty: '', tier: 'student',
   })
   const isCloud = mode === 'cloud'
+  const supportWaLink = `https://wa.me/${SUPPORT_WHATSAPP.replace(/\D/g, '')}`
 
   async function doForgot(e) {
     e.preventDefault()
@@ -300,6 +302,21 @@ export default function Login({ initialTab = 'signin', onBack }) {
                   ))}
                 </div>
               </Field>
+              <div className="rounded-xl border border-brand-100 bg-brand-50/70 p-3 text-sm">
+                <p className="mb-2 font-bold text-ink-700">
+                  {lang === 'ar' ? 'تحتاج مساعدة بالتسجيل؟' : 'Need help signing up?'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <a href={supportWaLink} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 font-bold text-brand-700 shadow-soft" dir="ltr">
+                    <Phone size={14} /> {SUPPORT_WHATSAPP}
+                  </a>
+                  <a href={`mailto:${SUPPORT_EMAIL}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 font-bold text-brand-700 shadow-soft" dir="ltr">
+                    <Mail size={14} /> {SUPPORT_EMAIL}
+                  </a>
+                </div>
+              </div>
               <label className="flex items-start gap-2 text-xs text-ink-500">
                 <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)}
                   className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-ink-300 accent-brand-600" />
