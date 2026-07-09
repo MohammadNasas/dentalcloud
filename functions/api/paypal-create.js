@@ -69,6 +69,8 @@ export const onRequestPost = async ({ request, env }) => {
         }],
         application_context: {
           brand_name: 'DentalCloud',
+          landing_page: 'BILLING',
+          shipping_preference: 'NO_SHIPPING',
           user_action: 'PAY_NOW',
           return_url: `${siteUrl}/?paypal=return`,
           cancel_url: `${siteUrl}/?paypal=cancel`,
