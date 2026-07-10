@@ -64,7 +64,8 @@ export default function BankTransferPanel({ amount, originalAmount, coupon, plan
       )}
 
       <div className="rounded-xl border border-ink-100 px-4">
-        <Row label={t('packages.bankIban')} value={bank.iban} mono />
+        <Row label={bank.ibanIls ? t('packages.bankIbanUsd') : t('packages.bankIban')} value={bank.iban} mono />
+        {bank.ibanIls && <Row label={t('packages.bankIbanIls')} value={bank.ibanIls} mono />}
         {bank.bankName && <Row label={t('packages.bankBank')} value={bank.bankName} />}
         {bank.accountHolder && <Row label={t('packages.bankHolder')} value={bank.accountHolder} />}
         {bank.swift && <Row label={t('packages.bankSwift')} value={bank.swift} mono />}

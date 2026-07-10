@@ -4,7 +4,8 @@
 // âš ï¸ FILL THESE WITH YOUR REAL ACCOUNT before going live. This is the account
 // that receives subscription payments â€” i.e. YOUR account, not the clinic's.
 export const DENTALCLOUD_BANK = {
-  iban: 'PS94AISB070221010107194614001',         // verified (mod-97 valid)
+  iban: 'PS94AISB070221010107194614001',         // USD account, verified (mod-97 valid)
+  ibanIls: 'PS65AISB070321010107194614000',      // ILS / shekel account
   bankName: 'Arab Islamic Bank Â· Ø§Ù„Ø¨Ù†Ùƒ Ø§Ù„Ø¥Ø³Ù„Ø§Ù…ÙŠ Ø§Ù„Ø¹Ø±Ø¨ÙŠ',
   accountHolder: 'MOHAMMAD QAREEB',              // exact name on the account
   swift: '',                                     // â† optional, likely AISBPS22 (confirm with your bank)
