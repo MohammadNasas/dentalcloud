@@ -274,6 +274,11 @@ export default function Packages() {
                 <BankTransferPanel amount={priceFor(TIERS[buying])} originalAmount={TIERS[buying].price} coupon={coupon?.code} planLabel={L(TIERS[buying])} />
               ) : (
                 <>
+                  {paymentsEnabled && TIERS[buying].price > 0 && payMethod === 'paypal' && (
+                    <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-amber-900">
+                      {t('packages.paypalNoAccountNote')}
+                    </p>
+                  )}
                   <div className="mt-5 flex items-center justify-between rounded-xl bg-ink-50 p-4">
                     <div>
                       <p className="text-sm text-ink-400">{L(TIERS[buying])}</p>

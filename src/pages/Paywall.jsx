@@ -149,6 +149,9 @@ export default function Paywall() {
             <BankTransferPanel amount={priceFor(tier)} originalAmount={tier.price} coupon={coupon?.code} planLabel={L(tier)} />
           ) : (
             <div className="mt-6 flex flex-col items-center gap-3">
+              <p className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-amber-900 shadow-sm">
+                {t('packages.paypalNoAccountNote')}
+              </p>
               <button onClick={pay} disabled={busy} className="btn bg-white !px-8 !py-3.5 text-base font-extrabold text-brand-700 hover:bg-white/90">
                 {busy ? <Spinner /> : <>{payMethod === 'paypal' ? 'PayPal' : t('packages.pay')} — ${priceFor(tier)} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} /></>}
               </button>
