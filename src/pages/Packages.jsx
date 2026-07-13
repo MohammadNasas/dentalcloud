@@ -41,6 +41,7 @@ export default function Packages() {
 
   // Price for a tier after applying the active coupon (paid tiers only).
   const priceFor = (tier) => (coupon && tier.price > 0 ? applyDiscount(tier.price, coupon.percent) : tier.price)
+  const paypalTrialNote = (tier) => t('packages.paypalTrialNote').replace('{price}', tier.price)
 
   // Privately notify the app owner the moment a valid gift code is applied.
   useEffect(() => {
@@ -177,6 +178,11 @@ export default function Packages() {
                   <Tag size={11} /> {coupon.code} · {t('packages.couponOff').replace('{percent}', coupon.percent)}
                 </p>
               )}
+              {tier.price > 0 && (
+                <p className="mt-1 inline-flex w-fit rounded-full bg-brand-50 px-2 py-0.5 text-xs font-extrabold text-brand-700">
+                  {t('packages.freeTrialBadge')}
+                </p>
+              )}
               <p className="mt-2 text-sm text-ink-500">{t(`packages.${tier.id}Desc`)}</p>
 
               <div className="my-5 h-px bg-ink-100" />
@@ -275,15 +281,25 @@ export default function Packages() {
               ) : (
                 <>
                   {paymentsEnabled && TIERS[buying].price > 0 && payMethod === 'paypal' && (
-                    <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-amber-900">
-                      {t('packages.paypalNoAccountNote')}
-                    </p>
+                    <>
+                      <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-emerald-900">
+                        {paypalTrialNote(TIERS[buying])}
+                      </p>
+                      <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-amber-900">
+                        {t('packages.paypalNoAccountNote')}
+                      </p>
+                    </>
                   )}
                   <div className="mt-5 flex items-center justify-between rounded-xl bg-ink-50 p-4">
                     <div>
                       <p className="text-sm text-ink-400">{L(TIERS[buying])}</p>
                       <p className="text-2xl font-extrabold text-ink-800">
-                        {TIERS[buying].price === 0 ? t('packages.free') : (
+                        {TIERS[buying].price === 0 ? t('packages.free') : paymentsEnabled && payMethod === 'paypal' ? (
+                          <>
+                            <span dir="ltr">{t('packages.trialToday')}</span>
+                            <span className="text-sm font-normal text-ink-400"> · ${TIERS[buying].price} {tierPeriodLabel(TIERS[buying], t)}</span>
+                          </>
+                        ) : (
                           <>
                             {coupon && <span className="me-2 text-base font-bold text-ink-300 line-through" dir="ltr">${TIERS[buying].price}</span>}
                             <span dir="ltr">${priceFor(TIERS[buying])}</span>
@@ -291,12 +307,12 @@ export default function Packages() {
                           </>
                         )}
                       </p>
-                      {coupon && TIERS[buying].price > 0 && (
+                      {coupon && TIERS[buying].price > 0 && !(paymentsEnabled && payMethod === 'paypal') && (
                         <p className="mt-0.5 text-xs font-bold text-emerald-600">{coupon.code} · {t('packages.couponOff').replace('{percent}', coupon.percent)}</p>
                       )}
                     </div>
                     <button onClick={confirmBuy} disabled={processing} className="btn-primary !py-3 !px-6" style={{ background: PACKAGE_FEATURES[buying].accent }}>
-                      {processing ? <Spinner /> : <>{TIERS[buying].price === 0 ? t('packages.buyNow') : !paymentsEnabled ? t('packages.buyNow') : payMethod === 'paypal' ? 'PayPal' : t('packages.pay')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
+                      {processing ? <Spinner /> : <>{TIERS[buying].price === 0 ? t('packages.buyNow') : !paymentsEnabled ? t('packages.buyNow') : payMethod === 'paypal' ? `${t('packages.startTrial')} — ${t('packages.trialToday')}` : t('packages.pay')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
                     </button>
                   </div>
                   {paymentsEnabled && TIERS[buying].price > 0 && <p className="mt-2 text-center text-xs text-ink-400">🔒 {t('packages.securePay')}</p>}

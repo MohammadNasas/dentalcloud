@@ -1,15 +1,9 @@
-// Cloudflare Pages Function: starts a PayPal order for a subscription plan.
+// Cloudflare Pages Function: starts a PayPal subscription with a 1-month free trial.
 // Route: POST /api/paypal-create
 // Env vars: PAYPAL_CLIENT_ID, PAYPAL_SECRET, PAYPAL_BASE (optional), SITE_URL (optional)
-//   PAYPAL_BASE defaults to live (https://api-m.paypal.com); use
-//   https://api-m.sandbox.paypal.com for testing.
-const PRICES = { student: 5, economy: 70, pro: 100 }
-// Promo codes — keep in sync with src/lib/coupons.js and paypal-capture.js.
-const COUPONS = { DENTAL40: 40 }
-const discountedPrice = (tier, code) => {
-  const pct = COUPONS[String(code || '').trim().toUpperCase()] || 0
-  return Math.round(PRICES[tier] * (1 - pct / 100) * 100) / 100
-}
+// Optional: PAYPAL_PRODUCT_ID, PAYPAL_ECONOMY_TRIAL_PLAN_ID, PAYPAL_PRO_TRIAL_PLAN_ID
+const PRICES = { economy: 70, pro: 100 }
+const LABELS = { economy: 'Economy', pro: 'Pro' }
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -26,13 +20,85 @@ export const onRequestOptions = () =>
     },
   })
 
+const authHeader = (id, secret) => 'Basic ' + btoa(`${id}:${secret}`)
+const requestId = (prefix) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+
 async function token(base, id, secret) {
   const r = await fetch(`${base}/v1/oauth2/token`, {
     method: 'POST',
-    headers: { Authorization: 'Basic ' + btoa(`${id}:${secret}`), 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { Authorization: authHeader(id, secret), 'Content-Type': 'application/x-www-form-urlencoded' },
     body: 'grant_type=client_credentials',
   })
   return r.json()
+}
+
+async function paypalJson(url, accessToken, body, prefix) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Prefer: 'return=representation',
+      'PayPal-Request-Id': requestId(prefix),
+    },
+    body: JSON.stringify(body),
+  })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) {
+    const err = new Error(data.message || data.name || 'paypal_request_failed')
+    err.details = data.details
+    err.status = r.status
+    throw err
+  }
+  return data
+}
+
+async function createProduct(base, accessToken) {
+  return paypalJson(`${base}/v1/catalogs/products`, accessToken, {
+    name: 'DentalCloud',
+    description: 'DentalCloud dental clinic management subscription',
+    type: 'SERVICE',
+    category: 'SOFTWARE',
+  }, 'dc-product')
+}
+
+async function createTrialPlan(base, accessToken, { productId, tier, amount }) {
+  return paypalJson(`${base}/v1/billing/plans`, accessToken, {
+    product_id: productId,
+    name: `DentalCloud ${LABELS[tier]} - 1 month free trial`,
+    description: `First month free, then $${amount}/year.`,
+    status: 'ACTIVE',
+    billing_cycles: [
+      {
+        frequency: { interval_unit: 'MONTH', interval_count: 1 },
+        tenure_type: 'TRIAL',
+        sequence: 1,
+        total_cycles: 1,
+        pricing_scheme: { fixed_price: { currency_code: 'USD', value: '0' } },
+      },
+      {
+        frequency: { interval_unit: 'YEAR', interval_count: 1 },
+        tenure_type: 'REGULAR',
+        sequence: 2,
+        total_cycles: 0,
+        pricing_scheme: { fixed_price: { currency_code: 'USD', value: amount.toFixed(2) } },
+      },
+    ],
+    payment_preferences: {
+      auto_bill_outstanding: true,
+      setup_fee_failure_action: 'CANCEL',
+      payment_failure_threshold: 1,
+    },
+  }, `dc-plan-${tier}`)
+}
+
+async function ensurePlanId(env, base, accessToken, tier, amount) {
+  const explicit = env[`PAYPAL_${tier.toUpperCase()}_TRIAL_PLAN_ID`] || env[`PAYPAL_PLAN_${tier.toUpperCase()}`]
+  if (explicit) return explicit
+  const productId = env.PAYPAL_PRODUCT_ID || (await createProduct(base, accessToken)).id
+  const plan = await createTrialPlan(base, accessToken, { productId, tier, amount })
+  return plan.id
 }
 
 export const onRequestPost = async ({ request, env }) => {
@@ -43,45 +109,33 @@ export const onRequestPost = async ({ request, env }) => {
 
   let payload
   try { payload = await request.json() } catch { return json({ error: 'bad_json' }, 400) }
-  const { tier, clinicId, coupon } = payload || {}
+  const { tier, clinicId, email } = payload || {}
   if (!PRICES[tier] || !clinicId) return json({ error: 'bad_request' }, 400)
-  // The discount is computed server-side from our own coupon table, so the
-  // client can never dictate the charged amount.
-  const code = COUPONS[String(coupon || '').trim().toUpperCase()] ? String(coupon).trim().toUpperCase() : ''
-  const amount = discountedPrice(tier, code)
-
-  // custom_id carries clinicId + tier + coupon so capture can re-verify the amount.
-  const reference = `${clinicId}--${tier}--${code}--${Date.now()}`
 
   try {
     const tok = await token(base, id, secret)
     if (!tok.access_token) return json({ error: 'auth_failed', message: tok.error_description || tok.error }, 400)
 
-    const r = await fetch(`${base}/v2/checkout/orders`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${tok.access_token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        intent: 'CAPTURE',
-        purchase_units: [{
-          amount: { currency_code: 'USD', value: amount.toFixed(2) },
-          custom_id: reference,
-          description: `DentalCloud — ${tier}`,
-        }],
-        application_context: {
-          brand_name: 'DentalCloud',
-          landing_page: 'BILLING',
-          shipping_preference: 'NO_SHIPPING',
-          user_action: 'PAY_NOW',
-          return_url: `${siteUrl}/?paypal=return`,
-          cancel_url: `${siteUrl}/?paypal=cancel`,
-        },
-      }),
-    })
-    const order = await r.json()
-    const approve = (order.links || []).find((l) => l.rel === 'approve' || l.rel === 'payer-action')
-    if (!order.id || !approve) return json({ error: 'order_failed', message: order.message, details: order.details }, 400)
-    return json({ url: approve.href, orderId: order.id })
+    const amount = PRICES[tier]
+    const planId = await ensurePlanId(env, base, tok.access_token, tier, amount)
+    const reference = `${clinicId}--${tier}--trial--${Date.now()}`
+    const sub = await paypalJson(`${base}/v1/billing/subscriptions`, tok.access_token, {
+      plan_id: planId,
+      custom_id: reference,
+      subscriber: email ? { email_address: email } : undefined,
+      application_context: {
+        brand_name: 'DentalCloud',
+        shipping_preference: 'NO_SHIPPING',
+        user_action: 'SUBSCRIBE_NOW',
+        return_url: `${siteUrl}/?paypal=subscription&clinic=${encodeURIComponent(clinicId)}&tier=${encodeURIComponent(tier)}`,
+        cancel_url: `${siteUrl}/?paypal=cancel`,
+      },
+    }, `dc-sub-${clinicId}`)
+
+    const approve = (sub.links || []).find((l) => l.rel === 'approve')
+    if (!sub.id || !approve) return json({ error: 'subscription_failed', message: sub.message, details: sub.details }, 400)
+    return json({ url: approve.href, subscriptionId: sub.id, planId })
   } catch (e) {
-    return json({ error: 'request_failed', message: String(e) }, 500)
+    return json({ error: 'request_failed', message: String(e.message || e), details: e.details }, e.status || 500)
   }
 }

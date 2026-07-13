@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { hashPassword, DOCTOR_COLORS, resetDB, seedDB, isComplimentary, isAppOwner } from '../lib/db'
 import { backend } from '../lib/backend'
-import { clearPaymentReturn, getPaypalReturn, capturePaypal } from '../lib/payments'
+import { clearPaymentReturn, getPaypalReturn, capturePaypal, syncPaypalSubscription } from '../lib/payments'
 import { buildDemoState } from '../lib/demo'
 import { trackDailyActive } from '../lib/analytics'
 import { toast } from '../components/anim'
@@ -55,6 +55,10 @@ export function StoreProvider({ children }) {
         clinic = { ...clinic, tier: 'pro', paid: true }
         backend.saveClinic(clinic).catch((e) => console.error(e))
       }
+      if (backend.mode === 'cloud' && clinic?.paypalSubscriptionId) {
+        const synced = await syncPaypalSubscription({ subscriptionId: clinic.paypalSubscriptionId, clinicId: clinic.id })
+        if (synced.ok && synced.clinic) clinic = synced.clinic
+      }
       setState({
         clinic,
         currentUser: me.user,
@@ -89,12 +93,12 @@ export function StoreProvider({ children }) {
 
   // Handle the return from a PayPal payment → capture & refresh the plan.
   useEffect(() => {
-    const paypalOrder = getPaypalReturn()
-    if (!paypalOrder) return
+    const paypalPayment = getPaypalReturn()
+    if (!paypalPayment) return
     clearPaymentReturn()
     ;(async () => {
-      const res = await capturePaypal(paypalOrder)
-      if (res.ok) { await loadSession(); setPaymentResult({ ok: true, tier: res.tier }) }
+      const res = await capturePaypal(paypalPayment)
+      if (res.ok) { await loadSession(); setPaymentResult({ ok: true, tier: res.tier, subscription: res.subscription }) }
       else setPaymentResult({ ok: false, status: res.status, error: res.error, message: res.message })
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -139,6 +143,23 @@ export function StoreProvider({ children }) {
       document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [clinic?.id, currentUser?.id, isDemo])
+
+  // Keep subscription-gated access aligned with PayPal while the app is open.
+  useEffect(() => {
+    if (backend.mode !== 'cloud' || isDemo || !clinic?.id || !clinic?.paypalSubscriptionId) return
+    let stopped = false
+    const sync = async () => {
+      const latest = stateRef.current.clinic
+      if (!latest?.paypalSubscriptionId) return
+      const res = await syncPaypalSubscription({ subscriptionId: latest.paypalSubscriptionId, clinicId: latest.id })
+      if (!stopped && res.ok && res.clinic) setState((s) => ({ ...s, clinic: res.clinic }))
+    }
+    const timer = setInterval(sync, 10 * 60 * 1000)
+    return () => {
+      stopped = true
+      clearInterval(timer)
+    }
+  }, [clinic?.id, clinic?.paypalSubscriptionId, isDemo])
 
   // Resolve the app-owner flag whenever the logged-in user changes (async hash).
   useEffect(() => {

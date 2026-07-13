@@ -6,15 +6,24 @@ import { isCloud } from './supabaseClient'
 export const paymentsEnabled = isCloud
 
 // ── PayPal ──────────────────────────────────────────────────────────────
-export async function startPaypalCheckout({ tier, clinicId, coupon }) {
+const PENDING_PAYPAL_KEY = 'dentalcloud.pendingPaypalSubscription'
+
+export async function startPaypalCheckout({ tier, clinicId, coupon, email }) {
   try {
     const r = await fetch('/api/paypal-create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tier, clinicId, coupon }),
+      body: JSON.stringify({ tier, clinicId, coupon, email }),
     })
     const data = await r.json().catch(() => ({}))
-    if (r.ok && data.url) return { ok: true, url: data.url }
+    if (r.ok && data.url) {
+      if (data.subscriptionId) {
+        try {
+          sessionStorage.setItem(PENDING_PAYPAL_KEY, JSON.stringify({ subscriptionId: data.subscriptionId, clinicId, tier }))
+        } catch { /* sessionStorage can be blocked; PayPal usually returns the id too */ }
+      }
+      return { ok: true, url: data.url, subscriptionId: data.subscriptionId }
+    }
     return { ok: false, error: data.error || 'failed', message: data.message, status: r.status }
   } catch (e) {
     return { ok: false, error: 'network', message: String(e) }
@@ -39,12 +48,31 @@ export async function notifyCouponUse({ email, tier, coupon }) {
   } catch { /* notification is best-effort — never interrupt the purchase */ }
 }
 
-export async function capturePaypal(orderId) {
+export async function capturePaypal(payment) {
   try {
+    const payload = typeof payment === 'string' ? { orderId: payment } : payment
     const r = await fetch('/api/paypal-capture', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ orderId }),
+      body: JSON.stringify(payload),
+    })
+    const data = await r.json()
+    if (data.ok) {
+      try { sessionStorage.removeItem(PENDING_PAYPAL_KEY) } catch { /* ignore */ }
+    }
+    return data
+  } catch (e) {
+    return { ok: false, error: 'network', message: String(e) }
+  }
+}
+
+export async function syncPaypalSubscription({ subscriptionId, clinicId }) {
+  if (!subscriptionId || !clinicId) return { ok: false, error: 'missing_subscription' }
+  try {
+    const r = await fetch('/api/paypal-subscription-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subscriptionId, clinicId }),
     })
     return await r.json()
   } catch (e) {
@@ -52,11 +80,23 @@ export async function capturePaypal(orderId) {
   }
 }
 
-// PayPal returns to  …/?paypal=return&token=ORDERID&PayerID=…  Returns the
-// order id to capture, or null if this isn't a PayPal return.
+// PayPal returns to …/?paypal=subscription&subscription_id=I-… for trials, or
+// …/?paypal=return&token=ORDERID for legacy one-time orders.
 export function getPaypalReturn() {
   const p = new URLSearchParams(window.location.search)
-  if (p.get('paypal') === 'return') return p.get('token')
+  if (p.get('paypal') === 'subscription') {
+    let pending = {}
+    try { pending = JSON.parse(sessionStorage.getItem(PENDING_PAYPAL_KEY) || '{}') } catch { pending = {} }
+    const token = p.get('token') || ''
+    const subscriptionId = p.get('subscription_id') || p.get('subscriptionId') || p.get('subscriptionID') || (token.startsWith('I-') ? token : '') || pending.subscriptionId
+    return {
+      type: 'subscription',
+      subscriptionId,
+      clinicId: p.get('clinic') || pending.clinicId,
+      tier: p.get('tier') || pending.tier,
+    }
+  }
+  if (p.get('paypal') === 'return') return { type: 'order', orderId: p.get('token') }
   return null
 }
 

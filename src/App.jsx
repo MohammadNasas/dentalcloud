@@ -79,7 +79,7 @@ function PaymentResultOverlay({ result, onClose }) {
         {result.ok
           ? <SuccessCheck size={56} />
           : <XCircle size={52} className="text-rose-500" />}
-        <p className="text-lg font-bold text-ink-800">{result.ok ? t('packages.paySuccess') : t('packages.payCancelled')}</p>
+        <p className="text-lg font-bold text-ink-800">{result.ok ? (result.subscription ? t('packages.trialSuccess') : t('packages.paySuccess')) : t('packages.payCancelled')}</p>
         {detail && <p className="rounded-lg bg-ink-50 px-3 py-1.5 text-xs text-ink-500" dir="ltr">{detail}</p>}
         <button onClick={onClose} className="btn-primary mt-2">{t('common.close')}</button>
       </div>

@@ -35,6 +35,7 @@ export default function Paywall() {
 
   // Price for a tier after applying the active coupon.
   const priceFor = (ti) => (coupon && ti.price > 0 ? applyDiscount(ti.price, coupon.percent) : ti.price)
+  const paypalTrialNote = (ti) => t('packages.paypalTrialNote').replace('{price}', ti.price)
 
   // The moment a valid gift code is entered, privately notify the app owner
   // (by email) that this customer applied it — before they pay.
@@ -80,7 +81,7 @@ export default function Paywall() {
         </div>
 
         <div className="mt-7 grid gap-4 sm:grid-cols-3">
-          {Object.values(TIERS).map((ti) => {
+          {Object.values(TIERS).filter((ti) => ti.price > 0).map((ti) => {
             const Icon = ICONS[ti.id]; const accent = PACKAGE_FEATURES[ti.id].accent
             const active = selected === ti.id
             return (
@@ -93,6 +94,7 @@ export default function Paywall() {
                   {coupon && ti.price > 0 && <span className="me-1.5 text-base font-bold text-ink-300 line-through">${ti.price}</span>}
                   ${priceFor(ti)}<span className="text-xs font-normal text-ink-400"> {tierPeriodLabel(ti, t)}</span>
                 </p>
+                {ti.price > 0 && <p className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-extrabold text-emerald-700">{t('packages.freeTrialBadge')}</p>}
               </button>
             )
           })}
@@ -149,11 +151,14 @@ export default function Paywall() {
             <BankTransferPanel amount={priceFor(tier)} originalAmount={tier.price} coupon={coupon?.code} planLabel={L(tier)} />
           ) : (
             <div className="mt-6 flex flex-col items-center gap-3">
+              <p className="w-full rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-emerald-900 shadow-sm">
+                {paypalTrialNote(tier)}
+              </p>
               <p className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-amber-900 shadow-sm">
                 {t('packages.paypalNoAccountNote')}
               </p>
               <button onClick={pay} disabled={busy} className="btn bg-white !px-8 !py-3.5 text-base font-extrabold text-brand-700 hover:bg-white/90">
-                {busy ? <Spinner /> : <>{payMethod === 'paypal' ? 'PayPal' : t('packages.pay')} — ${priceFor(tier)} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} /></>}
+                {busy ? <Spinner /> : <>{t('packages.startTrial')} — {t('packages.trialToday')} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} /></>}
               </button>
               <p className="text-xs text-white/70">🔒 {t('packages.securePay')}</p>
             </div>
