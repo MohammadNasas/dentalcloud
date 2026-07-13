@@ -253,6 +253,7 @@ export default function Landing({ onEnter }) {
                   <div><h3 className="font-extrabold text-ink-800">{L(tier)}</h3><p className="text-xs font-semibold text-ink-400">{t(`tier.${tier.id}Tag`)}</p></div>
                 </div>
                 <div className="mt-4 flex items-end gap-1"><span className="text-4xl font-extrabold text-ink-800">${tier.price}</span><span className="mb-1 text-sm text-ink-400"> {tierPeriodLabel(tier, t)}</span></div>
+                {tier.price > 0 && <p className="mt-1 inline-flex w-fit rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-extrabold text-emerald-700">{t('packages.freeTrialBadge')}</p>}
                 <ul className="my-5 flex-1 space-y-2">
                   {inheritsId && (
                     <li className="flex items-start gap-2 text-sm font-bold" style={{ color: accent }}>

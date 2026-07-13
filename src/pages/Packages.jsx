@@ -41,7 +41,6 @@ export default function Packages() {
 
   // Price for a tier after applying the active coupon (paid tiers only).
   const priceFor = (tier) => (coupon && tier.price > 0 ? applyDiscount(tier.price, coupon.percent) : tier.price)
-  const paypalTrialNote = (tier) => t('packages.paypalTrialNote').replace('{price}', tier.price)
 
   // Privately notify the app owner the moment a valid gift code is applied.
   useEffect(() => {
@@ -281,14 +280,9 @@ export default function Packages() {
               ) : (
                 <>
                   {paymentsEnabled && TIERS[buying].price > 0 && payMethod === 'paypal' && (
-                    <>
-                      <p className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-emerald-900">
-                        {paypalTrialNote(TIERS[buying])}
-                      </p>
-                      <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-amber-900">
-                        {t('packages.paypalNoAccountNote')}
-                      </p>
-                    </>
+                    <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-amber-900">
+                      {t('packages.paypalNoAccountNote')}
+                    </p>
                   )}
                   <div className="mt-5 flex items-center justify-between rounded-xl bg-ink-50 p-4">
                     <div>
