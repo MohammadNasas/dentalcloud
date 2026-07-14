@@ -15,6 +15,8 @@ import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from '../lib/billing'
 import { isValidPhone, normalizePhone } from '../lib/phone'
 import WhatsAppIcon from '../components/WhatsAppIcon'
 
+const PHONE_AUTH_VISIBLE = false // Enable after the SMS provider approves the account.
+
 export default function Login({ initialTab = 'signin', onBack }) {
   const { t, L, lang, toggleLang, isRTL } = useI18n()
   const { login, register, resetPassword, mode, otpTarget, otpMethod, verifyOtp, resendOtp, cancelOtp } = useStore()
@@ -251,7 +253,9 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 <h2 className="text-2xl font-extrabold text-ink-800">{t('auth.welcome')}</h2>
                 <p className="text-sm text-ink-400">{t('auth.subtitle')}</p>
               </div>
-              <AuthMethodToggle value={signinMethod} onChange={(method) => { setSigninMethod(method); setError('') }} t={t} />
+              {PHONE_AUTH_VISIBLE && (
+                <AuthMethodToggle value={signinMethod} onChange={(method) => { setSigninMethod(method); setError('') }} t={t} />
+              )}
               {signinMethod === 'email' ? (
                 <FloatingField key="signin-email" label={t('auth.email')} type="text" dir="ltr" autoFocus value={signin.email}
                   onChange={(e) => setSignin({ ...signin, email: e.target.value })} />
@@ -292,7 +296,9 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 <h2 className="text-2xl font-extrabold text-ink-800">{t('auth.register')}</h2>
                 <p className="text-sm text-ink-400">{t('auth.anyDevice')}</p>
               </div>
-              <AuthMethodToggle value={registerMethod} onChange={(method) => { setRegisterMethod(method); setError('') }} t={t} />
+              {PHONE_AUTH_VISIBLE && (
+                <AuthMethodToggle value={registerMethod} onChange={(method) => { setRegisterMethod(method); setError('') }} t={t} />
+              )}
               <Field label={t('auth.clinicName')} required>
                 <input className="input" value={reg.clinicName} onChange={(e) => setReg({ ...reg, clinicName: e.target.value })} />
               </Field>
