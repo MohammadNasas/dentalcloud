@@ -3,7 +3,7 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, Pencil, FileDown, Trash2, Phone, MapPin, Briefcase,
   CalendarClock, Wallet, ClipboardList, Stethoscope, Grid3x3, Activity,
-  Images, History, NotebookPen, FileSignature,
+  Images, History, NotebookPen, FileSignature, ScanFace,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -13,6 +13,7 @@ import FeatureLock from '../components/FeatureLock'
 import HistoryForm from '../components/patient/HistoryForm'
 import DentalChart from '../components/patient/DentalChart'
 import PerioChart from '../components/patient/PerioChart'
+import OrthodonticsPanel from '../components/patient/OrthodonticsPanel'
 import TreatmentsPanel from '../components/patient/TreatmentsPanel'
 import PaymentsPanel from '../components/patient/PaymentsPanel'
 import ConsentForm from '../components/patient/ConsentForm'
@@ -28,6 +29,7 @@ const TABS = [
   { id: 'overview', icon: ClipboardList, key: 'overview' },
   { id: 'history', icon: Stethoscope, key: 'history' },
   { id: 'chart', icon: Grid3x3, key: 'chart' },
+  { id: 'orthodontics', icon: ScanFace, key: 'orthodontics', feature: 'orthodontics' },
   { id: 'perio', icon: Activity, key: 'perio', feature: 'perio' },
   { id: 'treatments', icon: NotebookPen, key: 'treatments' },
   { id: 'consent', icon: FileSignature, key: 'consent', feature: 'consent' },
@@ -168,6 +170,7 @@ export default function PatientProfile() {
         {tab === 'overview' && <Overview patient={patient} onTab={setTab} />}
         {tab === 'history' && <HistoryForm patient={patient} />}
         {tab === 'chart' && <DentalChart patient={patient} />}
+        {tab === 'orthodontics' && <FeatureLock feature="orthodontics"><OrthodonticsPanel patient={patient} /></FeatureLock>}
         {tab === 'perio' && <FeatureLock feature="perio"><PerioChart patient={patient} /></FeatureLock>}
         {tab === 'treatments' && <TreatmentsPanel patient={patient} />}
         {tab === 'consent' && <FeatureLock feature="consent"><ConsentForm patient={patient} /></FeatureLock>}

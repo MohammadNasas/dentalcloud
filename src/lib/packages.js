@@ -32,6 +32,7 @@ export const PACKAGE_FEATURES = {
     accent: '#7c3aed',
     inherits: 'economy',
     features: [
+      { en: 'Complete orthodontic examination & treatment plan', ar: 'فحص تقويم شامل + تشخيص وخطة علاج' },
       { en: 'Before/after photos & X-ray gallery', ar: 'معرض صور قبل/بعد وأشعة' },
       { en: 'Monthly performance reports & charts', ar: 'تقارير ورسوم أداء شهرية' },
       { en: 'Split payments (cash + card together)', ar: 'دفع مقسّم (نقد + بطاقة معاً)' },

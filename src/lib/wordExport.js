@@ -14,6 +14,7 @@ import {
 import { DENTAL_ITEMS } from './treatments'
 import { getTooth } from './teeth'
 import { PAYMENT_METHODS } from './utils'
+import { ORTHO_SECTIONS, orthoValueLabel } from './orthodontics'
 
 const BRAND = '0D9488'
 const INK = '1E293B'
@@ -145,6 +146,32 @@ function renderExam(patient, lang) {
   return [sectionTitle(L(CLINICAL_EXAM.title, lang), lang), ...lines]
 }
 
+function renderOrthodontics(patient, lang) {
+  const data = patient.orthodontics || {}
+  const body = []
+
+  for (const section of ORTHO_SECTIONS) {
+    const sectionBody = []
+    for (const group of section.groups) {
+      const lines = group.fields.flatMap((field) => {
+        const value = orthoValueLabel(field, data[field.id], lang)
+        return value ? [kv(L(field, lang), value, lang)] : []
+      })
+      if (lines.length) {
+        sectionBody.push(P(L(group, lang), { bold: true, size: 23, color: '7C3AED', lang, spacing: { before: 120, after: 70 } }))
+        sectionBody.push(...lines)
+      }
+    }
+    if (sectionBody.length) {
+      body.push(P(L(section, lang), { bold: true, size: 25, color: INK, lang, spacing: { before: 180, after: 80 } }))
+      body.push(...sectionBody)
+    }
+  }
+
+  if (!body.length) return []
+  return [sectionTitle(lang === 'ar' ? 'فحص التقويم وخطة العلاج' : 'Orthodontic Examination & Treatment Plan', lang), ...body]
+}
+
 function buildPatientSections(patient, ctx, lang, { pageBreakBefore } = {}) {
   const { getDoctor, recordsForPatient, paymentsForPatient, balanceForPatient, clinic } = ctx
   const currency = clinic?.settings?.currency || ''
@@ -173,6 +200,7 @@ function buildPatientSections(patient, ctx, lang, { pageBreakBefore } = {}) {
   // History + exam
   out.push(...renderHistory(patient, lang))
   out.push(...renderExam(patient, lang))
+  out.push(...renderOrthodontics(patient, lang))
 
   // Dental findings / treatments
   const records = recordsForPatient(patient.id)

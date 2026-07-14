@@ -15,7 +15,7 @@ export const FEATURE_MIN_TIER = {
   priorityTeeth: 'economy', reminders: 'economy', apptWorkLog: 'economy',
   paymentMethods: 'economy', clinicBalances: 'economy', consent: 'economy',
   instructionsFull: 'economy',
-  photos: 'pro', reports: 'pro', splitPayments: 'pro', lab: 'pro',
+  photos: 'pro', reports: 'pro', splitPayments: 'pro', lab: 'pro', orthodontics: 'pro',
   // Free for the Student plan: dental chart, perio/gum chart (perio, plaque),
   // a single X-ray gallery (see Gallery), and 3 ready instruction sheets.
 }
@@ -234,7 +234,7 @@ export function StoreProvider({ children }) {
       age: data.age || '', occupation: data.occupation || '', address: data.address || '',
       complaint: data.complaint || '',
       history: data.history || { dental: {}, medical: {}, systems: {}, allergies: [], medications: [], social: {} },
-      exam: data.exam || {}, perio: data.perio || {}, plaque: data.plaque || {}, photos: [],
+      exam: data.exam || {}, orthodontics: data.orthodontics || {}, perio: data.perio || {}, plaque: data.plaque || {}, photos: [],
       createdBy: currentUser?.id, createdAt: new Date().toISOString(),
     }
     upsert('patients', 'patients', patient)
