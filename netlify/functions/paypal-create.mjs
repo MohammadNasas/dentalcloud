@@ -1,8 +1,8 @@
 // Netlify Function: starts a PayPal subscription with a 1-month free trial.
 // Env vars: PAYPAL_CLIENT_ID, PAYPAL_SECRET, PAYPAL_BASE (optional), SITE_URL (optional)
-// Optional: PAYPAL_PRODUCT_ID, PAYPAL_ECONOMY_TRIAL_PLAN_ID, PAYPAL_PRO_TRIAL_PLAN_ID
-const PRICES = { economy: 70, pro: 100 }
-const LABELS = { economy: 'Economy', pro: 'Pro' }
+// Optional: PAYPAL_PRODUCT_ID, PAYPAL_PRO_TRIAL_PLAN_ID
+const PRICES = { pro: 50 }
+const LABELS = { pro: 'Pro' }
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } })
@@ -80,9 +80,23 @@ async function createTrialPlan(base, accessToken, { productId, tier, amount }) {
   }, `dc-plan-${tier}`)
 }
 
+async function updatePlanPrice(base, accessToken, planId, amount) {
+  await paypalJson(`${base}/v1/billing/plans/${encodeURIComponent(planId)}/update-pricing-schemes`, accessToken, {
+    pricing_schemes: [{
+      billing_cycle_sequence: 2,
+      pricing_scheme: { fixed_price: { currency_code: 'USD', value: amount.toFixed(2) } },
+    }],
+  }, `dc-plan-price-${planId}`)
+}
+
 async function ensurePlanId(env, base, accessToken, tier, amount) {
   const explicit = env[`PAYPAL_${tier.toUpperCase()}_TRIAL_PLAN_ID`] || env[`PAYPAL_PLAN_${tier.toUpperCase()}`]
-  if (explicit) return explicit
+  if (explicit) {
+    // Keep the PayPal approval screen and every existing subscriber on this
+    // plan aligned with the public price before starting a new subscription.
+    await updatePlanPrice(base, accessToken, explicit, amount)
+    return explicit
+  }
   const productId = env.PAYPAL_PRODUCT_ID || (await createProduct(base, accessToken)).id
   const plan = await createTrialPlan(base, accessToken, { productId, tier, amount })
   return plan.id

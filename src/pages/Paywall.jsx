@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Stethoscope, Check, ArrowRight, LogOut, GraduationCap, Building2, Crown, Lock, Landmark, Wallet, Tag, X } from 'lucide-react'
+import { Stethoscope, Check, ArrowRight, LogOut, GraduationCap, Crown, Lock, Landmark, Wallet, Tag, X } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
@@ -14,7 +14,7 @@ import BankTransferPanel from '../components/BankTransferPanel'
 import PaymentHelp from '../components/PaymentHelp'
 import logo from '../lib/logo'
 
-const ICONS = { student: GraduationCap, economy: Building2, pro: Crown }
+const ICONS = { student: GraduationCap, pro: Crown }
 
 // Pre-fill the code when the owner shares a private link with ?coupon=CODE.
 function initialCoupon() {
@@ -26,7 +26,7 @@ function initialCoupon() {
 export default function Paywall() {
   const { t, lang, L, isRTL, toggleLang } = useI18n()
   const { clinic, currentUser, logout, setTier } = useStore()
-  const [selected, setSelected] = useState(clinic?.tier || 'economy')
+  const [selected, setSelected] = useState(clinic?.tier === 'student' ? 'student' : 'pro')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [payMethod, setPayMethod] = useState('paypal')
@@ -84,7 +84,7 @@ export default function Paywall() {
           <p className="mt-1 text-white/80">{t('packages.activateSub')}</p>
         </div>
 
-        <div className="mt-7 grid gap-4 sm:grid-cols-3">
+        <div className="mx-auto mt-7 grid max-w-2xl gap-4 sm:grid-cols-2">
           {Object.values(TIERS).map((ti) => {
             const Icon = ICONS[ti.id]; const accent = PACKAGE_FEATURES[ti.id].accent
             const active = selected === ti.id

@@ -12,8 +12,7 @@ const DB_KEY = 'dentacare.db.v1'
 
 export const TIERS = {
   student: { id: 'student', en: 'Student', ar: 'الطالب', price: 0, period: 'free' },
-  economy: { id: 'economy', en: 'Economy', ar: 'العيادات الصغيرة', price: 70, period: 'year' },
-  pro: { id: 'pro', en: 'Pro', ar: 'الاحترافية', price: 100, period: 'year' },
+  pro: { id: 'pro', en: 'Pro', ar: 'الاحترافية', price: 50, period: 'year' },
 }
 
 // Billing period label for a tier (free, one-time/lifetime, or yearly).

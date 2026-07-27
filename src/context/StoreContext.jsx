@@ -8,13 +8,13 @@ import { toast } from '../components/anim'
 
 const StoreContext = createContext(null)
 
-const TIER_ORDER = { student: 0, economy: 1, pro: 2 }
+const TIER_ORDER = { student: 0, pro: 1 }
 export const FEATURE_MIN_TIER = {
-  appointments: 'economy', calendar: 'economy', multiDoctor: 'economy',
-  priceCatalog: 'economy',
-  priorityTeeth: 'economy', reminders: 'economy', apptWorkLog: 'economy',
-  paymentMethods: 'economy', clinicBalances: 'economy', consent: 'economy',
-  instructionsFull: 'economy',
+  appointments: 'pro', calendar: 'pro', multiDoctor: 'pro',
+  priceCatalog: 'pro',
+  priorityTeeth: 'pro', reminders: 'pro', apptWorkLog: 'pro',
+  paymentMethods: 'pro', clinicBalances: 'pro', consent: 'pro',
+  instructionsFull: 'pro',
   photos: 'pro', reports: 'pro', splitPayments: 'pro', lab: 'pro', orthodontics: 'pro',
   // Free for the Student plan: dental chart, perio/gum chart (perio, plaque),
   // a single X-ray gallery (see Gallery), and 3 ready instruction sheets.
@@ -50,6 +50,12 @@ export function StoreProvider({ children }) {
     if (me && me.clinic) {
       const data = await backend.bootstrap(me.clinic.id)
       let clinic = data.clinic || me.clinic
+      // Economy was retired in July 2026. Upgrade legacy accounts in place so
+      // they immediately receive the complete Pro feature set.
+      if (clinic?.tier === 'economy') {
+        clinic = { ...clinic, tier: 'pro' }
+        await backend.saveClinic(clinic)
+      }
       // Complimentary accounts → free Pro (skip the paywall).
       if (backend.mode === 'cloud' && (!clinic.paid || clinic.tier !== 'pro') && await isComplimentary(me.user?.email)) {
         clinic = { ...clinic, tier: 'pro', paid: true }
@@ -113,7 +119,7 @@ export function StoreProvider({ children }) {
   }, [loadSession])
 
   const { clinic, currentUser } = state
-  const tier = clinic?.tier || 'student'
+  const tier = clinic?.tier === 'economy' ? 'pro' : (clinic?.tier || 'student')
   const can = useCallback((feature) => {
     const need = FEATURE_MIN_TIER[feature]
     if (!need) return true

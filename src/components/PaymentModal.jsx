@@ -6,7 +6,7 @@ import { Modal, Field } from './ui'
 import { money, PAYMENT_METHODS, cx } from '../lib/utils'
 
 // Shared "record payment" modal used from a patient's payments tab and the
-// clinic-wide Payments page. Supports single method (Economy) and split (Pro).
+// clinic-wide Payments page. Pro supports both single-method and split payments.
 export default function PaymentModal({ patient, onClose }) {
   const { t, lang, L } = useI18n()
   const { addPayment, clinic, can, balanceForPatient } = useStore()

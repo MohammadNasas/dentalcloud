@@ -1,5 +1,6 @@
 // Netlify Function: sync a clinic's PayPal subscription status.
 const ACTIVE_STATUSES = new Set(['ACTIVE'])
+const PRO_PRICE = 50
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } })
@@ -11,6 +12,19 @@ async function token(base, id, secret) {
     body: 'grant_type=client_credentials',
   })
   return r.json()
+}
+
+async function updateSubscriptionPrice(base, accessToken, subscriptionId) {
+  const r = await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify([{
+      op: 'replace',
+      path: '/plan/billing_cycles/@sequence==2/pricing_scheme/fixed_price',
+      value: { currency_code: 'USD', value: PRO_PRICE.toFixed(2) },
+    }]),
+  })
+  return r.ok
 }
 
 export default async (req) => {
@@ -44,16 +58,23 @@ export default async (req) => {
     const rows = await getR.json()
     if (!Array.isArray(rows) || rows.length === 0) return json({ ok: false, error: 'clinic_not_found' }, 404)
 
+    const clinic = rows[0].data
     const paid = ACTIVE_STATUSES.has(sub.status)
+    let priceUpdated = Number(clinic.renewalPrice) === PRO_PRICE && !clinic.renewalPriceUpdatePending
+    if (paid && !priceUpdated) priceUpdated = await updateSubscriptionPrice(base, tok.access_token, subscriptionId)
+    const now = new Date().toISOString()
     const nextData = {
-      ...rows[0].data,
+      ...clinic,
+      tier: clinic.tier === 'economy' ? 'pro' : clinic.tier,
       paid,
       subscriptionProvider: 'paypal',
       paypalSubscriptionId: subscriptionId,
       subscriptionStatus: sub.status,
-      subscriptionSyncedAt: new Date().toISOString(),
-      nextBillingTime: sub.billing_info?.next_billing_time || rows[0].data?.nextBillingTime,
-      ...(paid ? {} : { subscriptionStoppedAt: new Date().toISOString() }),
+      subscriptionSyncedAt: now,
+      nextBillingTime: sub.billing_info?.next_billing_time || clinic.nextBillingTime,
+      ...(priceUpdated ? { renewalPrice: PRO_PRICE, renewalCurrency: 'USD', renewalPriceUpdatedAt: now } : {}),
+      renewalPriceUpdatePending: paid && !priceUpdated,
+      ...(paid ? {} : { subscriptionStoppedAt: now }),
     }
     const upR = await fetch(`${supaUrl}/rest/v1/clinics?id=eq.${clinicId}`, {
       method: 'PATCH',

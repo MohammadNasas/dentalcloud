@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from 'react'
 import {
   Stethoscope, Globe, ArrowRight, Check, Grid3x3, CalendarDays, Wallet,
   Activity, FileText, Images, BarChart3, ShieldCheck, Sparkles, Star, Crown,
-  GraduationCap, Building2, Languages, Cloud,
+  GraduationCap, Languages, Cloud,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
@@ -13,7 +13,7 @@ import { Accordion, StarRating } from '../components/anim'
 import { cx } from '../lib/utils'
 import logo from '../lib/logo'
 
-const TIER_ICON = { student: GraduationCap, economy: Building2, pro: Crown }
+const TIER_ICON = { student: GraduationCap, pro: Crown }
 
 function CountUp({ to, suffix = '', duration = 1.6 }) {
   const ref = useRef(null)
@@ -232,10 +232,10 @@ export default function Landing({ onEnter }) {
           <h2 className="text-3xl font-extrabold text-ink-800">{t('packages.title')}</h2>
           <p className="mt-1 text-ink-400">{t('packages.subtitle')}</p>
         </div>
-        <div className="grid gap-5 lg:grid-cols-3">
+        <div className="mx-auto grid max-w-4xl gap-5 md:grid-cols-2">
           {Object.values(TIERS).map((tier, idx) => {
             const Icon = TIER_ICON[tier.id]; const accent = PACKAGE_FEATURES[tier.id].accent
-            const popular = tier.id === 'economy'
+            const popular = tier.id === 'pro'
             const own = PACKAGE_FEATURES[tier.id].features
             const inheritsId = PACKAGE_FEATURES[tier.id].inherits
             return (

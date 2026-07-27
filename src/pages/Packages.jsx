@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Check, Sparkles, Crown, GraduationCap, Building2, X, ArrowRight, Star, Landmark, Wallet, Tag } from 'lucide-react'
+import { Check, Sparkles, Crown, GraduationCap, X, ArrowRight, Star, Landmark, Wallet, Tag } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
@@ -14,9 +14,9 @@ import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/P
 import BankTransferPanel from '../components/BankTransferPanel'
 import PaymentHelp from '../components/PaymentHelp'
 
-const ICONS = { student: GraduationCap, economy: Building2, pro: Crown }
+const ICONS = { student: GraduationCap, pro: Crown }
 
-// Tier ranking (student < economy < pro) so we can block downgrades.
+// Tier ranking (student < pro) so we can block downgrades.
 const TIER_ORDER = Object.keys(TIERS)
 const tierRank = (id) => TIER_ORDER.indexOf(id)
 
@@ -124,13 +124,13 @@ export default function Packages() {
       </div>
 
       {/* Pricing cards */}
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="mx-auto grid max-w-4xl gap-5 md:grid-cols-2">
         {Object.values(TIERS).map((tier, idx) => {
           const Icon = ICONS[tier.id]
           const accent = PACKAGE_FEATURES[tier.id].accent
           const isCurrent = current === tier.id
           const isDowngrade = current && tierRank(tier.id) < tierRank(current)
-          const popular = tier.id === 'economy'
+          const popular = tier.id === 'pro'
           const features = fullFeatures(tier.id)
           const own = PACKAGE_FEATURES[tier.id].features
           const inheritsId = PACKAGE_FEATURES[tier.id].inherits

@@ -2,12 +2,17 @@
 // New flow: verifies an approved PayPal subscription/trial and activates the clinic.
 // Legacy flow: still captures old one-time PayPal orders if a user returns from one.
 // Route: POST /api/paypal-capture
-const PRICES = { economy: 70, pro: 100 }
+const PRICES = { pro: 50 }
+// Kept only so a checkout created before Economy was retired can still finish.
+const LEGACY_PRICES = { economy: 70 }
 const COUPONS = { DENTAL40: 40 }
 const expectedPrice = (tier, code) => {
   const pct = COUPONS[String(code || '').trim().toUpperCase()] || 0
-  return Math.round((PRICES[tier] || 0) * (1 - pct / 100) * 100) / 100
+  const base = PRICES[tier] || LEGACY_PRICES[tier] || 0
+  return Math.round(base * (1 - pct / 100) * 100) / 100
 }
+const canonicalTier = (tier) => tier === 'economy' ? 'pro' : tier
+const validTier = (tier) => Boolean(PRICES[tier] || LEGACY_PRICES[tier])
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -57,6 +62,19 @@ function addOneMonthIso() {
   return d.toISOString()
 }
 
+async function updateSubscriptionPrice(base, accessToken, subscriptionId) {
+  const r = await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify([{
+      op: 'replace',
+      path: '/plan/billing_cycles/@sequence==2/pricing_scheme/fixed_price',
+      value: { currency_code: 'USD', value: PRICES.pro.toFixed(2) },
+    }]),
+  })
+  return r.ok
+}
+
 async function finalizeSubscription({ base, accessToken, supaUrl, headers, subscriptionId, clinicId: hintedClinicId, tier: hintedTier }) {
   if (!subscriptionId) return json({ ok: false, error: 'no_subscription' }, 400)
   const subR = await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
@@ -67,8 +85,9 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, subsc
 
   const [refClinicId, refTier] = String(sub.custom_id || '').split('--')
   const clinicId = refClinicId || hintedClinicId
-  const tier = refTier || hintedTier
-  if (!clinicId || !PRICES[tier]) return json({ ok: false, error: 'bad_subscription_reference' }, 400)
+  const originalTier = refTier || hintedTier
+  const tier = canonicalTier(originalTier)
+  if (!clinicId || !validTier(originalTier) || !PRICES[tier]) return json({ ok: false, error: 'bad_subscription_reference' }, 400)
   if (sub.status !== 'ACTIVE') return json({ ok: false, error: 'subscription_not_active', status: sub.status }, 400)
 
   const clinic = await getClinic(supaUrl, headers, clinicId)
@@ -76,6 +95,7 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, subsc
 
   const now = new Date().toISOString()
   const nextBillingTime = sub.billing_info?.next_billing_time || addOneMonthIso()
+  const priceUpdated = await updateSubscriptionPrice(base, accessToken, subscriptionId)
   const nextData = {
     ...clinic,
     tier,
@@ -87,8 +107,10 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, subsc
     trialStartedAt: clinic.trialStartedAt || now,
     trialEndsAt: clinic.trialEndsAt || nextBillingTime,
     nextBillingTime,
-    renewalPrice: PRICES[tier],
+    renewalPrice: priceUpdated ? PRICES[tier] : clinic.renewalPrice,
     renewalCurrency: 'USD',
+    renewalPriceUpdatePending: !priceUpdated,
+    ...(priceUpdated ? { renewalPriceUpdatedAt: now } : {}),
   }
   await saveClinic(supaUrl, headers, clinicId, nextData)
   return json({ ok: true, tier, clinicId, subscription: true, subscriptionId, nextBillingTime })
@@ -107,10 +129,11 @@ async function finalizeLegacyOrder({ base, accessToken, supaUrl, headers, orderI
   const capture = pu.payments?.captures?.[0] || {}
   const reference = capture.custom_id || pu.custom_id || ''
   const paid = Number(capture.amount?.value || 0)
-  const [clinicId, tier, coupon] = String(reference).split('--')
-  if (!clinicId || !PRICES[tier]) return json({ ok: false, error: 'bad_reference' }, 400)
+  const [clinicId, originalTier, coupon] = String(reference).split('--')
+  const tier = canonicalTier(originalTier)
+  if (!clinicId || !validTier(originalTier) || !PRICES[tier]) return json({ ok: false, error: 'bad_reference' }, 400)
 
-  const expected = expectedPrice(tier, coupon)
+  const expected = expectedPrice(originalTier, coupon)
   if (Math.abs(paid - expected) > 0.01) return json({ ok: false, error: 'amount_mismatch', paid, expected }, 400)
 
   const clinic = await getClinic(supaUrl, headers, clinicId)

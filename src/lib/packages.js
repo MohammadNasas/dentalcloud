@@ -12,8 +12,8 @@ export const PACKAGE_FEATURES = {
       { en: 'Export to Word & treatment timeline', ar: 'تصدير إلى Word + الخط الزمني' },
     ],
   },
-  economy: {
-    accent: '#0d9488',
+  pro: {
+    accent: '#7c3aed',
     inherits: 'student',
     features: [
       { en: 'Unified appointments calendar', ar: 'تقويم مواعيد موحّد' },
@@ -26,12 +26,6 @@ export const PACKAGE_FEATURES = {
       { en: 'Payment methods (cash / card / insurance / cheque)', ar: 'طرق دفع (نقد / بطاقة / تأمين / شيك)' },
       { en: 'Fees / paid / remaining tracking', ar: 'تتبّع الأجور / المدفوع / المتبقي' },
       { en: 'Editable, printable treatment-consent form', ar: 'نموذج موافقة على العلاج قابل للتعديل والطباعة' },
-    ],
-  },
-  pro: {
-    accent: '#7c3aed',
-    inherits: 'economy',
-    features: [
       { en: 'Complete orthodontic examination & treatment plan', ar: 'فحص تقويم شامل + تشخيص وخطة علاج' },
       { en: 'Before/after photos & X-ray gallery', ar: 'معرض صور قبل/بعد وأشعة' },
       { en: 'Monthly performance reports & charts', ar: 'تقارير ورسوم أداء شهرية' },
