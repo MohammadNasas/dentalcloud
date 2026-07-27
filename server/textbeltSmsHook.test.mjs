@@ -97,6 +97,25 @@ test('accepts the phone from Supabase identity data and an enveloped payload', a
   assert.equal(response.status, 204)
 })
 
+test('restores the plus prefix when Supabase sends E.164 digits only', async () => {
+  const secretBytes = crypto.getRandomValues(new Uint8Array(32))
+  const { request, secret } = await signedRequest(
+    { user: { phone: '970599510078' }, sms: { otp: '561166' } },
+    secretBytes,
+  )
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.body.get('phone'), '+970599510078')
+    return Response.json({ success: true, quotaRemaining: 24, textId: 'text_test' })
+  }
+
+  const response = await handleTextbeltSmsHook(request, {
+    TEXTBELT_API_KEY: 'textbelt-key',
+    SUPABASE_AUTH_HOOK_SECRET: secret,
+  })
+
+  assert.equal(response.status, 204)
+})
+
 test('rejects an invalid webhook signature before sending', async () => {
   const secretBytes = crypto.getRandomValues(new Uint8Array(32))
   const { request, secret } = await signedRequest(

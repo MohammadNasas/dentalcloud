@@ -73,7 +73,8 @@ function normalizeInternationalPhone(value) {
   const compact = String(value || '').trim().replace(/[\s().-]/g, '')
   if (compact.startsWith('00')) return `+${compact.slice(2).replace(/\D/g, '')}`
   if (compact.startsWith('+')) return `+${compact.slice(1).replace(/\D/g, '')}`
-  return compact.replace(/\D/g, '')
+  const digits = compact.replace(/\D/g, '')
+  return digits ? `+${digits}` : ''
 }
 
 function extractSmsEvent(event) {
