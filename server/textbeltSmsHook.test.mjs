@@ -64,9 +64,37 @@ test('forwards a valid Supabase OTP to Textbelt', async () => {
     SUPABASE_AUTH_HOOK_SECRET: secret,
   })
 
-  assert.equal(response.status, 200)
-  assert.deepEqual(await response.json(), {})
+  assert.equal(response.status, 204)
+  assert.equal(await response.text(), '')
   assert.equal(calls, 1)
+})
+
+test('accepts the phone from Supabase identity data and an enveloped payload', async () => {
+  const secretBytes = crypto.getRandomValues(new Uint8Array(32))
+  const { request, secret } = await signedRequest(
+    {
+      data: {
+        user: {
+          phone: '',
+          identities: [{ identity_data: { phone: '+970 59 123 4567' } }],
+        },
+        sms: { otp: 561166 },
+      },
+    },
+    secretBytes,
+  )
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(options.body.get('phone'), '+970591234567')
+    assert.match(options.body.get('message'), /561166/)
+    return Response.json({ success: true, quotaRemaining: 24, textId: 'text_test' })
+  }
+
+  const response = await handleTextbeltSmsHook(request, {
+    TEXTBELT_API_KEY: 'textbelt-key',
+    SUPABASE_AUTH_HOOK_SECRET: secret,
+  })
+
+  assert.equal(response.status, 204)
 })
 
 test('rejects an invalid webhook signature before sending', async () => {

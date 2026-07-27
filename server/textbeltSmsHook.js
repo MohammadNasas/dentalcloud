@@ -65,6 +65,39 @@ function authHookError(message, httpCode = 500, responseStatus = httpCode) {
   return json({ error: { http_code: httpCode, message } }, responseStatus)
 }
 
+function firstValue(...values) {
+  return values.find((value) => value !== undefined && value !== null && String(value).trim() !== '')
+}
+
+function normalizeInternationalPhone(value) {
+  const compact = String(value || '').trim().replace(/[\s().-]/g, '')
+  if (compact.startsWith('00')) return `+${compact.slice(2).replace(/\D/g, '')}`
+  if (compact.startsWith('+')) return `+${compact.slice(1).replace(/\D/g, '')}`
+  return compact.replace(/\D/g, '')
+}
+
+function extractSmsEvent(event) {
+  const payload = event?.payload || event?.data || event || {}
+  const identityPhone = payload?.user?.identities
+    ?.map((identity) => identity?.identity_data?.phone)
+    .find(Boolean)
+  const phone = normalizeInternationalPhone(firstValue(
+    payload?.user?.phone,
+    payload?.user?.new_phone,
+    payload?.user?.phone_change,
+    identityPhone,
+    payload?.sms?.phone,
+    payload?.phone,
+  ))
+  const otp = String(firstValue(
+    payload?.sms?.otp,
+    payload?.sms?.code,
+    payload?.otp,
+    payload?.code,
+  ) || '').trim()
+  return { phone, otp }
+}
+
 async function sendWithTextbelt({ apiKey, phone, otp }) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 4000)
@@ -110,8 +143,7 @@ export async function handleTextbeltSmsHook(request, env) {
     return authHookError('Invalid webhook payload', 400)
   }
 
-  const phone = String(event?.user?.phone || '').trim()
-  const otp = String(event?.sms?.otp || '').trim()
+  const { phone, otp } = extractSmsEvent(event)
   if (!/^\+[1-9]\d{7,14}$/.test(phone) || !/^\d{4,10}$/.test(otp))
     return authHookError('Invalid phone or verification code', 400)
 
@@ -124,7 +156,8 @@ export async function handleTextbeltSmsHook(request, env) {
       })
       return authHookError('SMS provider could not send the verification code', 502)
     }
-    return json({})
+    // Supabase Send SMS hooks require no output on success.
+    return new Response(null, { status: 204 })
   } catch (error) {
     console.error('Textbelt SMS hook error', {
       name: error?.name || 'Error',
@@ -134,4 +167,4 @@ export async function handleTextbeltSmsHook(request, env) {
   }
 }
 
-export const _test = { verifyStandardWebhook, webhookSecretBytes }
+export const _test = { verifyStandardWebhook, webhookSecretBytes, extractSmsEvent }
