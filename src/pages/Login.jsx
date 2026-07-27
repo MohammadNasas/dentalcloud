@@ -15,7 +15,7 @@ import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from '../lib/billing'
 import { isValidPhone, normalizePhone } from '../lib/phone'
 import WhatsAppIcon from '../components/WhatsAppIcon'
 
-const PHONE_AUTH_VISIBLE = false // Enable after the SMS provider approves the account.
+const PHONE_AUTH_VISIBLE = true
 
 export default function Login({ initialTab = 'signin', onBack }) {
   const { t, L, lang, toggleLang, isRTL } = useI18n()
