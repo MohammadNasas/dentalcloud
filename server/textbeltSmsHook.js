@@ -98,6 +98,34 @@ function extractSmsEvent(event) {
   return { phone, otp }
 }
 
+function payloadShape(event) {
+  const payload = event?.payload || event?.data || event || {}
+  const phoneCandidate = firstValue(
+    payload?.user?.phone,
+    payload?.user?.new_phone,
+    payload?.user?.phone_change,
+    payload?.sms?.phone,
+    payload?.phone,
+  )
+  const otpCandidate = firstValue(
+    payload?.sms?.otp,
+    payload?.sms?.code,
+    payload?.otp,
+    payload?.code,
+  )
+  return {
+    topLevelKeys: Object.keys(event || {}),
+    payloadKeys: Object.keys(payload || {}),
+    userKeys: Object.keys(payload?.user || {}),
+    smsKeys: Object.keys(payload?.sms || {}),
+    hasPhoneCandidate: phoneCandidate !== undefined,
+    phoneLength: String(phoneCandidate || '').length,
+    hasOtpCandidate: otpCandidate !== undefined,
+    otpType: typeof otpCandidate,
+    otpLength: String(otpCandidate || '').length,
+  }
+}
+
 async function sendWithTextbelt({ apiKey, phone, otp }) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 4000)
@@ -144,8 +172,10 @@ export async function handleTextbeltSmsHook(request, env) {
   }
 
   const { phone, otp } = extractSmsEvent(event)
-  if (!/^\+[1-9]\d{7,14}$/.test(phone) || !/^\d{4,10}$/.test(otp))
+  if (!/^\+[1-9]\d{7,14}$/.test(phone) || !/^\d{4,10}$/.test(otp)) {
+    console.error('Invalid Supabase SMS hook payload shape', payloadShape(event))
     return authHookError('Invalid phone or verification code', 400)
+  }
 
   try {
     const result = await sendWithTextbelt({ apiKey, phone, otp })
