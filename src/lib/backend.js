@@ -201,7 +201,10 @@ const cloudBackend = {
     if (error) {
       const msg = error.message || ''
       if (/registered|exists/i.test(msg)) return { ok: false, error: 'userExists' }
-      if (/phone.*disabled|sms.*provider|unsupported.*phone/i.test(msg)) return { ok: false, error: 'phoneNotReady' }
+      if (
+        error.code === 'sms_send_failed'
+        || /phone.*disabled|sms.*provider|unsupported.*phone|send.*sms|sms.*send/i.test(msg)
+      ) return { ok: false, error: 'phoneNotReady' }
       return { ok: false, error: 'signupFailed', message: msg }
     }
     // Supabase returns an empty identities array when the email already exists.
