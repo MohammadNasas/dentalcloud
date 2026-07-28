@@ -148,6 +148,10 @@ async function sendWithTextbelt({ apiKey, phone, otp }) {
       ok: response.ok && result.success === true,
       status: response.status,
       error: String(result.error || ''),
+      textId: result.textId ? String(result.textId) : '',
+      quotaRemaining: Number.isFinite(Number(result.quotaRemaining))
+        ? Number(result.quotaRemaining)
+        : null,
     }
   } finally {
     clearTimeout(timeout)
@@ -187,6 +191,10 @@ export async function handleTextbeltSmsHook(request, env) {
       })
       return authHookError('SMS provider could not send the verification code', 502)
     }
+    console.info('Textbelt accepted SMS', {
+      textId: result.textId,
+      quotaRemaining: result.quotaRemaining,
+    })
     // Supabase Send SMS hooks require no output on success.
     return new Response(null, { status: 204 })
   } catch (error) {
