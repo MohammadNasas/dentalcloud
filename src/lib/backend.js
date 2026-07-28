@@ -17,7 +17,6 @@
 //    genId()                        -> new id (uuid in cloud)
 // ──────────────────────────────────────────────────────────────────────────
 import { isCloud, supabase } from './supabaseClient'
-import { normalizePhone } from './phone'
 import {
   getOrInitDB, saveDB, genId as localGenId, hashPassword, DOCTOR_COLORS,
 } from './db'
@@ -41,9 +40,9 @@ function newClinic(clinicName, tier, paid = false) {
     customInstructions: {},
   }
 }
-function newDoctor(name, email, specialty, phone = '') {
+function newDoctor(name, email, specialty) {
   return {
-    email: email || '', phone: phone || '', name, nameAr: name, role: 'admin', color: DOCTOR_COLORS[0],
+    email, name, nameAr: name, role: 'admin', color: DOCTOR_COLORS[0],
     specialty: specialty || '', isOwner: true,
   }
 }
@@ -66,9 +65,8 @@ const localBackend = {
   async signIn(identifier, password) {
     const db = getOrInitDB()
     const id = identifier.trim().toLowerCase()
-    const phoneId = normalizePhone(identifier)
     const u = db.users.find(
-      (x) => (x.username || '').toLowerCase() === id || (x.email || '').toLowerCase() === id || (phoneId && normalizePhone(x.phone) === phoneId)
+      (x) => (x.username || '').toLowerCase() === id || (x.email || '').toLowerCase() === id
     )
     if (!u || u.passwordHash !== hashPassword(password)) return { ok: false, error: 'wrongCreds' }
     db.session.currentUserId = u.id
@@ -76,17 +74,16 @@ const localBackend = {
     return { ok: true }
   },
 
-  async signUp({ clinicName, doctorName, email, phone, password, specialty, tier = 'student', authMethod = 'email' }) {
+  async signUp({ clinicName, doctorName, email, password, specialty, tier = 'student' }) {
     const db = getOrInitDB()
-    const normalizedPhone = normalizePhone(phone)
-    const ident = authMethod === 'phone' ? normalizedPhone : (email || '').trim().toLowerCase()
-    if (db.users.some((u) => (u.email || '').toLowerCase() === ident || (u.username || '').toLowerCase() === ident || normalizePhone(u.phone) === ident))
+    const ident = (email || '').trim().toLowerCase()
+    if (db.users.some((u) => (u.email || '').toLowerCase() === ident || (u.username || '').toLowerCase() === ident))
       return { ok: false, error: 'userExists' }
     const clinicId = localGenId('clinic')
     const userId = localGenId('user')
     const clinic = { id: clinicId, ...newClinic(clinicName, tier, true) } // local mode = no payment
     const user = {
-      id: userId, clinicId, username: ident, ...newDoctor(doctorName, email, specialty, normalizedPhone),
+      id: userId, clinicId, username: email, ...newDoctor(doctorName, email, specialty),
       passwordHash: hashPassword(password),
     }
     db.clinics.push(clinic)
@@ -162,10 +159,10 @@ async function loadMe(uid) {
 }
 
 // Creates the clinic + owner-doctor rows for a freshly-authenticated user.
-async function createClinicForUser(uid, { clinicName, doctorName, email, phone, specialty, tier = 'student' }) {
+async function createClinicForUser(uid, { clinicName, doctorName, email, specialty, tier = 'student' }) {
   const clinicId = crypto.randomUUID ? crypto.randomUUID() : localGenId()
   const clinicObj = { id: clinicId, ...newClinic(clinicName, tier) }
-  const doctorObj = { id: uid, clinicId, ...newDoctor(doctorName, email, specialty, phone) }
+  const doctorObj = { id: uid, clinicId, ...newDoctor(doctorName, email, specialty) }
   let r = await supabase.from('clinics').insert({ id: clinicId, owner_id: uid, data: clinicObj })
   if (r.error) return { ok: false, error: 'dbError', message: r.error.message }
   r = await supabase.from('doctors').insert({ id: uid, clinic_id: clinicId, data: doctorObj })
@@ -183,28 +180,18 @@ const cloudBackend = {
     return await loadMe(session.user.id)
   },
 
-  async signIn(identifier, password, authMethod = 'email') {
-    const identity = authMethod === 'phone' ? normalizePhone(identifier) : identifier.trim()
-    const { error } = await supabase.auth.signInWithPassword({ [authMethod]: identity, password })
+  async signIn(email, password) {
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     if (error) return { ok: false, error: 'wrongCreds' }
     return { ok: true }
   },
 
   async signUp(payload) {
-    const authMethod = payload.authMethod === 'phone' ? 'phone' : 'email'
-    const email = authMethod === 'email' ? (payload.email || '').trim() : ''
-    const phone = authMethod === 'phone' ? normalizePhone(payload.phone) : ''
-    const credentials = authMethod === 'phone'
-      ? { phone, password: payload.password, options: { channel: 'sms' } }
-      : { email, password: payload.password }
-    const { data, error } = await supabase.auth.signUp(credentials)
+    const email = (payload.email || '').trim()
+    const { data, error } = await supabase.auth.signUp({ email, password: payload.password })
     if (error) {
       const msg = error.message || ''
       if (/registered|exists/i.test(msg)) return { ok: false, error: 'userExists' }
-      if (
-        error.code === 'sms_send_failed'
-        || /phone.*disabled|sms.*provider|unsupported.*phone|send.*sms|sms.*send/i.test(msg)
-      ) return { ok: false, error: 'phoneNotReady' }
       return { ok: false, error: 'signupFailed', message: msg }
     }
     // Supabase returns an empty identities array when the email already exists.
@@ -212,28 +199,21 @@ const cloudBackend = {
       return { ok: false, error: 'userExists' }
 
     if (data.session) {
-      // Confirmation is OFF → create the clinic immediately.
-      return await createClinicForUser(data.user.id, { ...payload, email, phone })
+      // Email confirmation is OFF → create the clinic immediately.
+      return await createClinicForUser(data.user.id, { ...payload, email })
     }
-    // Confirmation is ON → ask for the code, create clinic after verifying.
-    const identifier = authMethod === 'phone' ? phone : email
-    return { ok: false, needsOtp: true, identifier, method: authMethod, pending: { ...payload, email, phone } }
+    // Email confirmation is ON → ask for the code, create clinic after verifying.
+    return { ok: false, needsOtp: true, email, pending: { ...payload, email } }
   },
 
-  // Verify the email or SMS signup code, then create the clinic.
-  async verifyOtp(identifier, method, token, pending) {
-    const credentials = method === 'phone'
-      ? { phone: normalizePhone(identifier), token: token.trim(), type: 'sms' }
-      : { email: identifier.trim(), token: token.trim(), type: 'signup' }
-    const { data, error } = await supabase.auth.verifyOtp(credentials)
+  // Verify the emailed signup code, then create the clinic.
+  async verifyOtp(email, token, pending) {
+    const { data, error } = await supabase.auth.verifyOtp({ email: email.trim(), token: token.trim(), type: 'signup' })
     if (error || !data.session) return { ok: false, error: 'wrongCode', message: error?.message }
     return await createClinicForUser(data.user.id, pending)
   },
-  async resendOtp(identifier, method) {
-    const credentials = method === 'phone'
-      ? { type: 'sms', phone: normalizePhone(identifier) }
-      : { type: 'signup', email: identifier.trim() }
-    const { error } = await supabase.auth.resend(credentials)
+  async resendOtp(email) {
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() })
     return { ok: !error, error: error?.message }
   },
 

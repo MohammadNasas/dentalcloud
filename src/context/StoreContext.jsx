@@ -175,8 +175,8 @@ export function StoreProvider({ children }) {
   }, [currentUser?.email])
 
   // ── Auth ────────────────────────────────────────────────────────────────
-  const login = useCallback(async (identifier, password, authMethod = 'email') => {
-    const res = await backend.signIn(identifier, password, authMethod)
+  const login = useCallback(async (identifier, password) => {
+    const res = await backend.signIn(identifier, password)
     if (res.ok) await loadSession()
     return res
   }, [loadSession])
@@ -184,17 +184,17 @@ export function StoreProvider({ children }) {
   const register = useCallback(async (payload) => {
     const res = await backend.signUp(payload)
     if (res.ok) await loadSession()
-    else if (res.needsOtp) setPendingOtp({ identifier: res.identifier, method: res.method, pending: res.pending })
+    else if (res.needsOtp) setPendingOtp({ email: res.email, pending: res.pending })
     return res
   }, [loadSession])
 
   const verifyOtp = useCallback(async (token) => {
     if (!pendingOtp) return { ok: false }
-    const res = await backend.verifyOtp(pendingOtp.identifier, pendingOtp.method, token, pendingOtp.pending)
+    const res = await backend.verifyOtp(pendingOtp.email, token, pendingOtp.pending)
     if (res.ok) { setPendingOtp(null); await loadSession() }
     return res
   }, [pendingOtp, loadSession])
-  const resendOtp = useCallback(() => (pendingOtp ? backend.resendOtp(pendingOtp.identifier, pendingOtp.method) : Promise.resolve({ ok: false })), [pendingOtp])
+  const resendOtp = useCallback(() => (pendingOtp ? backend.resendOtp(pendingOtp.email) : Promise.resolve({ ok: false })), [pendingOtp])
   const cancelOtp = useCallback(() => setPendingOtp(null), [])
 
   const logout = useCallback(() => {
@@ -354,7 +354,7 @@ export function StoreProvider({ children }) {
 
   const value = {
     booting, recovery, mode: backend.mode,
-    otpTarget: pendingOtp?.identifier || null, otpMethod: pendingOtp?.method || null, verifyOtp, resendOtp, cancelOtp,
+    otpEmail: pendingOtp?.email || null, verifyOtp, resendOtp, cancelOtp,
     paymentResult, dismissPaymentResult,
     clinic, currentUser, tier, can, isOwner, readOnly: isDemo,
     login, logout, register, resetPassword, updatePassword,

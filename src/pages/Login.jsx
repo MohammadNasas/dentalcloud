@@ -12,14 +12,11 @@ import { FloatingField } from '../components/anim'
 import { cx } from '../lib/utils'
 import logo from '../lib/logo'
 import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from '../lib/billing'
-import { isValidPhone, normalizePhone } from '../lib/phone'
 import WhatsAppIcon from '../components/WhatsAppIcon'
-
-const PHONE_AUTH_VISIBLE = true
 
 export default function Login({ initialTab = 'signin', onBack }) {
   const { t, L, lang, toggleLang, isRTL } = useI18n()
-  const { login, register, resetPassword, mode, otpTarget, otpMethod, verifyOtp, resendOtp, cancelOtp } = useStore()
+  const { login, register, resetPassword, mode, otpEmail, verifyOtp, resendOtp, cancelOtp } = useStore()
   const [tab, setTab] = useState(initialTab)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -43,11 +40,9 @@ export default function Login({ initialTab = 'signin', onBack }) {
     await resendOtp(); setResent(true)
   }
 
-  const [signinMethod, setSigninMethod] = useState('email')
-  const [registerMethod, setRegisterMethod] = useState('email')
-  const [signin, setSignin] = useState({ email: '', phone: '+970', password: '' })
+  const [signin, setSignin] = useState({ email: '', password: '' })
   const [reg, setReg] = useState({
-    clinicName: '', doctorName: '', email: '', phone: '+970', password: '', specialty: '', tier: 'student',
+    clinicName: '', doctorName: '', email: '', password: '', specialty: '', tier: 'student',
   })
   const isCloud = mode === 'cloud'
   const supportWaLink = `https://wa.me/${SUPPORT_WHATSAPP.replace(/\D/g, '')}`
@@ -65,12 +60,10 @@ export default function Login({ initialTab = 'signin', onBack }) {
   async function doSignin(e) {
     e.preventDefault()
     setError('')
-    const identifier = signinMethod === 'phone' ? normalizePhone(signin.phone) : signin.email.trim()
-    if (!identifier || !signin.password) { setError(t('auth.fillAll')); return }
-    if (signinMethod === 'phone' && !isValidPhone(identifier)) { setError(t('auth.invalidPhone')); return }
+    if (!signin.email.trim() || !signin.password) { setError(t('auth.fillAll')); return }
     setBusy(true)
     localStorage.setItem('_rememberMe', String(rememberMe))
-    const res = await login(identifier, signin.password, signinMethod)
+    const res = await login(signin.email, signin.password)
     setBusy(false)
     if (!res.ok) setError(t(`auth.${res.error || 'wrongCreds'}`))
   }
@@ -78,21 +71,14 @@ export default function Login({ initialTab = 'signin', onBack }) {
   async function doRegister(e) {
     e.preventDefault()
     setError('')
-    const identifier = registerMethod === 'phone' ? normalizePhone(reg.phone) : reg.email.trim()
-    if (!reg.clinicName || !reg.doctorName || !identifier || !reg.password) {
+    if (!reg.clinicName || !reg.doctorName || !reg.email.trim() || !reg.password) {
       setError(t('auth.fillAll')); return
     }
-    if (registerMethod === 'phone' && !isValidPhone(identifier)) { setError(t('auth.invalidPhone')); return }
     if (!agreedTerms) {
       setError(lang === 'ar' ? 'يجب الموافقة على الشروط وسياسة الخصوصية' : 'You must agree to the Terms and Privacy Policy'); return
     }
     setBusy(true)
-    const res = await register({
-      ...reg,
-      authMethod: registerMethod,
-      email: registerMethod === 'email' ? reg.email.trim() : '',
-      phone: registerMethod === 'phone' ? identifier : '',
-    })
+    const res = await register({ ...reg, email: reg.email.trim() })
     setBusy(false)
     // needsOtp isn't an error — it's the normal transition to the code screen.
     if (!res.ok && !res.needsOtp) setError(t(`auth.${res.error || 'signupFailed'}`) + (res.message ? ` (${res.message})` : ''))
@@ -191,11 +177,11 @@ export default function Login({ initialTab = 'signin', onBack }) {
             </div>
           )}
 
-          {otpTarget ? (
+          {otpEmail ? (
             <div className="space-y-4">
               <div>
-                <h2 className="text-2xl font-extrabold text-ink-800">{otpMethod === 'phone' ? t('auth.verifyPhone') : t('auth.verifyEmail')}</h2>
-                <p className="text-sm text-ink-400">{t('auth.otpSentTo')} <b dir="ltr">{otpTarget}</b></p>
+                <h2 className="text-2xl font-extrabold text-ink-800">{t('auth.verifyEmail')}</h2>
+                <p className="text-sm text-ink-400">{t('auth.otpSentTo')} <b dir="ltr">{otpEmail}</b></p>
               </div>
               <form onSubmit={doVerify} className="space-y-4">
                 <Field label={t('auth.verificationCode')}>
@@ -253,16 +239,8 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 <h2 className="text-2xl font-extrabold text-ink-800">{t('auth.welcome')}</h2>
                 <p className="text-sm text-ink-400">{t('auth.subtitle')}</p>
               </div>
-              {PHONE_AUTH_VISIBLE && (
-                <AuthMethodToggle value={signinMethod} onChange={(method) => { setSigninMethod(method); setError('') }} t={t} />
-              )}
-              {signinMethod === 'email' ? (
-                <FloatingField key="signin-email" label={t('auth.email')} type="text" dir="ltr" autoFocus value={signin.email}
-                  onChange={(e) => setSignin({ ...signin, email: e.target.value })} />
-              ) : (
-                <FloatingField key="signin-phone" label={t('auth.phone')} type="tel" dir="ltr" autoFocus value={signin.phone}
-                  onChange={(e) => setSignin({ ...signin, phone: e.target.value })} />
-              )}
+              <FloatingField label={t('auth.email')} type="text" dir="ltr" autoFocus value={signin.email}
+                onChange={(e) => setSignin({ ...signin, email: e.target.value })} />
               <FloatingField label={t('auth.password')} type="password" dir="ltr" value={signin.password}
                 onChange={(e) => setSignin({ ...signin, password: e.target.value })} />
               <div className="flex items-center justify-between">
@@ -271,7 +249,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
                     className="h-4 w-4 rounded border-ink-300 accent-brand-600 cursor-pointer" />
                   <span className="text-sm text-ink-600">{t('auth.rememberMe')}</span>
                 </label>
-                {isCloud && signinMethod === 'email' && (
+                {isCloud && (
                   <button type="button" onClick={() => { setForgot({ open: true, email: signin.email, sent: false }); setError('') }}
                     className="text-xs font-bold text-brand-600 hover:underline">{t('auth.forgotPassword')}</button>
                 )}
@@ -285,7 +263,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 <div className="rounded-xl border border-dashed border-brand-200 bg-brand-50/50 p-3 text-center text-sm">
                   <span className="font-bold text-brand-700">{t('auth.demoHint')}:</span>{' '}
                   <span className="text-ink-600">{DEMO_LOGIN.username} / {DEMO_LOGIN.password}</span>
-                  <button type="button" onClick={() => { setSigninMethod('email'); setSignin({ ...signin, email: DEMO_LOGIN.username, password: DEMO_LOGIN.password }) }}
+                  <button type="button" onClick={() => setSignin({ email: DEMO_LOGIN.username, password: DEMO_LOGIN.password })}
                     className="ms-2 font-bold text-brand-600 underline">{t('common.apply')}</button>
                 </div>
               )}
@@ -296,9 +274,6 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 <h2 className="text-2xl font-extrabold text-ink-800">{t('auth.register')}</h2>
                 <p className="text-sm text-ink-400">{t('auth.anyDevice')}</p>
               </div>
-              {PHONE_AUTH_VISIBLE && (
-                <AuthMethodToggle value={registerMethod} onChange={(method) => { setRegisterMethod(method); setError('') }} t={t} />
-              )}
               <Field label={t('auth.clinicName')} required>
                 <input className="input" value={reg.clinicName} onChange={(e) => setReg({ ...reg, clinicName: e.target.value })} />
               </Field>
@@ -311,15 +286,9 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 </Field>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                {registerMethod === 'email' ? (
-                  <Field label={t('auth.email')} required>
-                    <input className="input" type="email" dir="ltr" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="name@clinic.com" />
-                  </Field>
-                ) : (
-                  <Field label={t('auth.phone')} hint={t('auth.phoneHint')} required>
-                    <input className="input" type="tel" dir="ltr" inputMode="tel" value={reg.phone} onChange={(e) => setReg({ ...reg, phone: e.target.value })} placeholder="+970 59 123 4567" />
-                  </Field>
-                )}
+                <Field label={t('auth.email')} required>
+                  <input className="input" type="email" dir="ltr" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="name@clinic.com" />
+                </Field>
                 <Field label={t('auth.password')} required>
                   <input className="input" type="password" dir="ltr" value={reg.password} onChange={(e) => setReg({ ...reg, password: e.target.value })} />
                 </Field>
@@ -390,32 +359,6 @@ export default function Login({ initialTab = 'signin', onBack }) {
           <p className="mt-6 text-center text-xs text-ink-400">{isCloud ? t('auth.cloudReady') : t('auth.secureLocal')}</p>
         </div>
       </div>
-    </div>
-  )
-}
-
-function AuthMethodToggle({ value, onChange, t }) {
-  const options = [
-    { id: 'email', label: t('auth.emailOption'), icon: Mail },
-    { id: 'phone', label: t('auth.phoneOption'), icon: Smartphone },
-  ]
-  return (
-    <div className="grid grid-cols-2 rounded-xl bg-ink-100 p-1" role="tablist" aria-label={t('auth.loginMethod')}>
-      {options.map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          role="tab"
-          aria-selected={value === option.id}
-          onClick={() => onChange(option.id)}
-          className={cx(
-            'flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition-colors',
-            value === option.id ? 'bg-white text-brand-700 shadow-soft' : 'text-ink-500 hover:text-ink-700'
-          )}
-        >
-          <option.icon size={16} /> {option.label}
-        </button>
-      ))}
     </div>
   )
 }
