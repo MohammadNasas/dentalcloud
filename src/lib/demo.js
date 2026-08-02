@@ -23,6 +23,10 @@ export function buildDemoState() {
     id: CID, name: 'Bright Smile Dental', nameAr: 'عيادة الابتسامة',
     tier: 'pro', paid: true, createdAt: ago(420),
     prices: [], settings: { currency: 'JOD', appointmentReminders: true, logo: null }, customInstructions: {}, customSheets: [],
+    labs: [
+      { id: 'demo-lab-precision', name: 'مختبر الدقة', phone: '+970599200001' },
+      { id: 'demo-lab-master', name: 'مختبر الإتقان', phone: '+970599200002' },
+    ],
   }
 
   const P = (n, name, nameAr, phone, gender, age, complaint, extra = {}) => ({
@@ -97,8 +101,8 @@ export function buildDemoState() {
   ]
 
   const labOrders = [
-    { id: 'lab1', clinicId: CID, createdBy: D1, createdAt: ago(12), patientId: 'demo-p1', labName: 'مختبر الدقة', workType: 'crown', customWorkType: '', shade: 'A2', pieces: 1, toothIds: ['16'], specs: 'تاج خزفي على معدن', price: 90, paid: 50, dueDate: at(4), linkedAppointmentId: '', status: 'sent' },
-    { id: 'lab2', clinicId: CID, createdBy: D2, createdAt: ago(40), patientId: 'demo-p5', labName: 'مختبر الإتقان', workType: 'crown', customWorkType: '', shade: 'A3', pieces: 1, toothIds: ['26'], specs: 'تاج زيركون', price: 110, paid: 110, dueDate: ago(20), linkedAppointmentId: '', status: 'completed' },
+    { id: 'lab1', clinicId: CID, createdBy: D1, createdAt: ago(12), patientId: 'demo-p1', patientName: 'أحمد محمود', labId: 'demo-lab-precision', labName: 'مختبر الدقة', labPhone: '+970599200001', workType: 'crown', customWorkType: '', shade: 'A2', pieces: 1, toothIds: ['16'], specs: 'تاج خزفي على معدن', price: 90, paid: 50, dueDate: at(4), linkedAppointmentId: '', status: 'sent' },
+    { id: 'lab2', clinicId: CID, createdBy: D2, createdAt: ago(40), patientId: 'demo-p5', patientName: 'محمد صالح', labId: 'demo-lab-master', labName: 'مختبر الإتقان', labPhone: '+970599200002', workType: 'crown', customWorkType: '', shade: 'A3', pieces: 1, toothIds: ['26'], specs: 'تاج زيركون', price: 110, paid: 110, dueDate: ago(20), linkedAppointmentId: '', status: 'completed' },
   ]
 
   return {

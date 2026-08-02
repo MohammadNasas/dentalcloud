@@ -94,6 +94,84 @@ export function waLink(phone, message) {
   return `https://wa.me/${waNumber(phone)}${message ? `?text=${encodeURIComponent(message)}` : ''}`
 }
 
+// Ready-to-send WhatsApp copy shared by the web and desktop builds.
+export function buildInstructionWhatsAppMessage({
+  lang = 'ar', clinicName = '', patientName = '', treatmentName = '', title = '', points = [],
+}) {
+  const cleanPoints = points.map((point) => String(point || '').trim()).filter(Boolean)
+  const lines = lang === 'ar'
+    ? [
+        clinicName && `*${clinicName}*`,
+        '*ورقة تعليمات للمريض*',
+        '',
+        patientName && `المريض: ${patientName}`,
+        treatmentName && `العلاج: ${treatmentName}`,
+        '',
+        title && `*${title}*`,
+        '',
+        ...cleanPoints.map((point) => `• ${point}`),
+        '',
+        'نتمنى لك السلامة والشفاء التام.',
+      ]
+    : [
+        clinicName && `*${clinicName}*`,
+        '*Patient Instruction Sheet*',
+        '',
+        patientName && `Patient: ${patientName}`,
+        treatmentName && `Treatment: ${treatmentName}`,
+        '',
+        title && `*${title}*`,
+        '',
+        ...cleanPoints.map((point) => `• ${point}`),
+        '',
+        'Wishing you a safe and speedy recovery.',
+      ]
+  return lines.filter((line, index, all) => line || (index > 0 && all[index - 1])).join('\n').trim()
+}
+
+export function buildLabOrderWhatsAppMessage({
+  lang = 'ar', clinicName = '', labName = '', patientName = '', workType = '',
+  teeth = [], shade = '', pieces = '', dueDate = '', specs = '', price = '', paid = '', remaining = '',
+}) {
+  const toothList = Array.isArray(teeth) ? teeth.filter(Boolean).join(', ') : teeth
+  const lines = lang === 'ar'
+    ? [
+        clinicName && `*${clinicName}*`,
+        '*طلب مختبر أسنان*',
+        '',
+        labName && `المختبر: ${labName}`,
+        patientName && `المريض: ${patientName}`,
+        workType && `نوع العمل: ${workType}`,
+        toothList && `الأسنان: ${toothList}`,
+        shade && `اللون / الشيد: ${shade}`,
+        pieces && `عدد القطع: ${pieces}`,
+        dueDate && `موعد التسليم: ${dueDate}`,
+        specs && `المواصفات والملاحظات: ${specs}`,
+        '',
+        price && `سعر المختبر: ${price}`,
+        paid && `المدفوع: ${paid}`,
+        remaining && `المتبقي: ${remaining}`,
+      ]
+    : [
+        clinicName && `*${clinicName}*`,
+        '*Dental Lab Order*',
+        '',
+        labName && `Lab: ${labName}`,
+        patientName && `Patient: ${patientName}`,
+        workType && `Work type: ${workType}`,
+        toothList && `Teeth: ${toothList}`,
+        shade && `Shade: ${shade}`,
+        pieces && `Pieces: ${pieces}`,
+        dueDate && `Due date: ${dueDate}`,
+        specs && `Specifications / notes: ${specs}`,
+        '',
+        price && `Lab price: ${price}`,
+        paid && `Paid: ${paid}`,
+        remaining && `Remaining: ${remaining}`,
+      ]
+  return lines.filter((line, index, all) => line || (index > 0 && all[index - 1])).join('\n').trim()
+}
+
 export const PAYMENT_METHODS = {
   cash: { en: 'Cash', ar: 'نقدي', icon: '💵' },
   card: { en: 'Card / Visa', ar: 'بطاقة / فيزا', icon: '💳' },

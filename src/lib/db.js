@@ -96,6 +96,7 @@ export function seedDB() {
       logo: null,
     },
     customInstructions: {}, // edited instruction sheets, keyed by treatment
+    labs: [], // saved dental labs with WhatsApp numbers
   }
 
   const users = [

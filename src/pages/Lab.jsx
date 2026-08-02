@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
   FlaskConical, Plus, Trash2, Search, ChevronDown, ChevronUp,
-  CheckCircle2, Clock, Truck, PackageCheck, Edit2, X, Save,
+  CheckCircle2, Clock, Truck, PackageCheck, Edit2, X, Save, Phone, BookUser,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -9,8 +9,10 @@ import { Modal, Field, Segmented, Badge, EmptyState } from '../components/ui'
 import FeatureLock from '../components/FeatureLock'
 import PageHero from '../components/PageHero'
 import { fmtDate } from '../lib/dates'
-import { money, cx } from '../lib/utils'
-import { chartRows, toothLabel } from '../lib/teeth'
+import { money, cx, waLink, waNumber, buildLabOrderWhatsAppMessage } from '../lib/utils'
+import { genId } from '../lib/db'
+import { chartRows } from '../lib/teeth'
+import WhatsAppIcon from '../components/WhatsAppIcon'
 
 const WORK_TYPES = [
   { key: 'crown',       en: 'Crown',               ar: 'تاج' },
@@ -35,7 +37,7 @@ const STATUS_CONFIG = {
 }
 
 const DEFAULT_FORM = {
-  patientId: '', labName: '', workType: 'crown', customWorkType: '',
+  patientId: '', labId: '', labName: '', labPhone: '', workType: 'crown', customWorkType: '',
   shade: 'A2', pieces: 1, toothIds: [], specs: '',
   price: '', paid: '', dueDate: '', linkedAppointmentId: '',
   status: 'sent',
@@ -48,16 +50,18 @@ export default function Lab() {
 }
 
 function LabContent() {
-  const { t, lang, L } = useI18n()
+  const { lang } = useI18n()
   const { labOrders = [], addLabOrder, updateLabOrder, deleteLabOrder,
-          patients, clinic, appointments } = useStore()
+          patients, clinic, appointments, updateClinic } = useStore()
   const currency = clinic?.settings?.currency || 'JOD'
+  const labs = clinic?.labs || []
 
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [editingId, setEditingId] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
+  const [labsOpen, setLabsOpen] = useState(false)
 
   const filtered = useMemo(() => {
     let list = [...labOrders].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
@@ -84,11 +88,14 @@ function LabContent() {
         icon={<FlaskConical size={22} />}
         title={lang === 'ar' ? 'إدارة المختبر' : 'Lab Management'}
         subtitle={lang === 'ar' ? 'تتبّع طلبات المختبر والمدفوعات' : 'Track lab orders and payments'}
-        actions={
+        actions={<div className="flex flex-wrap gap-2">
+          <button onClick={() => setLabsOpen(true)} className="btn bg-white/15 font-bold text-white ring-1 ring-white/20 hover:bg-white/25">
+            <BookUser size={16} /> {lang === 'ar' ? 'المختبرات' : 'Labs'}
+          </button>
           <button onClick={() => setAddOpen(true)} className="btn bg-white font-bold text-brand-700 hover:bg-white/90">
             <Plus size={16} /> {lang === 'ar' ? 'طلب جديد' : 'New Order'}
           </button>
-        }
+        </div>}
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
@@ -104,6 +111,38 @@ function LabContent() {
           ))}
         </div>
       </PageHero>
+
+      {/* Saved labs directory */}
+      <div className="card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 font-bold text-ink-800"><BookUser size={18} className="text-violet-500" /> {lang === 'ar' ? 'المختبرات المحفوظة' : 'Saved Labs'}</h2>
+            <p className="mt-0.5 text-xs text-ink-400">{lang === 'ar' ? 'احفظ اسم المختبر ورقم واتسابه مرة واحدة ثم اختره داخل أي طلب.' : 'Save each lab and its WhatsApp number once, then select it in any order.'}</p>
+          </div>
+          <button onClick={() => setLabsOpen(true)} className="btn-outline !py-2"><Plus size={15} /> {lang === 'ar' ? 'إضافة / تعديل' : 'Add / edit'}</button>
+        </div>
+        {labs.length > 0 ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {labs.map((lab) => (
+              <div key={lab.id} className="flex items-center gap-3 rounded-xl border border-ink-100 bg-ink-50/40 p-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600"><FlaskConical size={17} /></div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-bold text-ink-700">{lab.name}</p>
+                  <p dir="ltr" className="truncate text-start text-xs text-ink-400">{lab.phone}</p>
+                </div>
+                {waNumber(lab.phone).length >= 8 && (
+                  <a href={waLink(lab.phone)} target="_blank" rel="noopener noreferrer" title={lang === 'ar' ? 'فتح واتساب المختبر' : 'Open lab WhatsApp'}
+                    className="rounded-lg bg-emerald-50 p-2 text-emerald-600 hover:bg-emerald-100"><WhatsAppIcon size={16} /></a>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <button onClick={() => setLabsOpen(true)} className="mt-3 w-full rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-4 text-sm font-semibold text-violet-600 hover:bg-violet-50">
+            {lang === 'ar' ? '+ أضف أول مختبر ورقم واتسابه' : '+ Add the first lab and WhatsApp number'}
+          </button>
+        )}
+      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
@@ -133,7 +172,7 @@ function LabContent() {
         <div className="space-y-3">
           {filtered.map((order) => (
             <LabOrderCard key={order.id} order={order}
-              currency={currency} lang={lang}
+              currency={currency} lang={lang} clinic={clinic} labs={labs}
               expanded={expandedId === order.id}
               onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
               onEdit={() => setEditingId(order.id)}
@@ -148,8 +187,9 @@ function LabContent() {
       {(addOpen || editingId) && (
         <LabOrderModal
           order={editingId ? labOrders.find((o) => o.id === editingId) : null}
-          patients={patients} currency={currency} lang={lang}
-          appointments={appointments}
+          patients={patients} currency={currency} lang={lang} clinic={clinic}
+          appointments={appointments} labs={labs}
+          onManageLabs={() => { setAddOpen(false); setEditingId(null); setLabsOpen(true) }}
           onSave={(data) => {
             if (editingId) updateLabOrder(editingId, data)
             else addLabOrder(data)
@@ -158,15 +198,43 @@ function LabContent() {
           onClose={() => { setAddOpen(false); setEditingId(null) }}
         />
       )}
+
+      {labsOpen && (
+        <LabsDirectoryModal
+          labs={labs} lang={lang}
+          onSave={(nextLabs) => { updateClinic({ labs: nextLabs }); setLabsOpen(false) }}
+          onClose={() => setLabsOpen(false)}
+        />
+      )}
     </div>
   )
 }
 
-function LabOrderCard({ order, currency, lang, expanded, onToggle, onEdit, onDelete, onStatusChange }) {
+function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle, onEdit, onDelete, onStatusChange }) {
   const wt = WORK_TYPES.find((w) => w.key === order.workType)
   const st = STATUS_CONFIG[order.status] || STATUS_CONFIG.draft
   const remaining = Math.max(0, (Number(order.price) || 0) - (Number(order.paid) || 0))
   const StatusIcon = st.icon
+  const savedLab = labs.find((lab) => lab.id === order.labId)
+  const labPhone = savedLab?.phone || order.labPhone || ''
+  const workType = order.workType === 'custom'
+    ? order.customWorkType
+    : (lang === 'ar' ? wt?.ar : wt?.en)
+  const message = buildLabOrderWhatsAppMessage({
+    lang,
+    clinicName: lang === 'ar' ? clinic?.nameAr || clinic?.name : clinic?.name,
+    labName: savedLab?.name || order.labName,
+    patientName: order.patientName,
+    workType,
+    teeth: order.toothIds || [],
+    shade: order.shade,
+    pieces: order.pieces,
+    dueDate: order.dueDate ? fmtDate(order.dueDate, lang) : '',
+    specs: order.specs,
+    price: Number(order.price) > 0 ? money(order.price, currency) : '',
+    paid: Number(order.paid) > 0 ? money(order.paid, currency) : '',
+    remaining: remaining > 0 ? money(remaining, currency) : '',
+  })
 
   return (
     <div className="card overflow-hidden">
@@ -197,6 +265,11 @@ function LabOrderCard({ order, currency, lang, expanded, onToggle, onEdit, onDel
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {waNumber(labPhone).length >= 8 && (
+            <a href={waLink(labPhone, message)} target="_blank" rel="noopener noreferrer"
+              title={lang === 'ar' ? 'إرسال الطلب للمختبر عبر واتساب' : 'Send order to lab on WhatsApp'}
+              className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600 hover:bg-emerald-100"><WhatsAppIcon size={15} /></a>
+          )}
           <button onClick={onEdit} className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-50 hover:text-brand-600"><Edit2 size={15} /></button>
           <button onClick={onDelete} className="rounded-lg p-1.5 text-ink-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>
           <button onClick={onToggle} className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-50">
@@ -226,16 +299,29 @@ function LabOrderCard({ order, currency, lang, expanded, onToggle, onEdit, onDel
           )}
           {/* Specs */}
           {order.specs && <p className="text-xs text-ink-600 whitespace-pre-wrap">{order.specs}</p>}
+          {waNumber(labPhone).length >= 8 ? (
+            <a href={waLink(labPhone, message)} target="_blank" rel="noopener noreferrer"
+              className="btn !py-2 bg-emerald-500 text-white hover:bg-emerald-600">
+              <WhatsAppIcon size={16} /> {lang === 'ar' ? 'إرسال الطلب كاملًا على واتساب المختبر' : 'Send full order to lab WhatsApp'}
+            </a>
+          ) : (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+              {lang === 'ar' ? 'أضف رقم واتساب لهذا المختبر لتتمكن من إرسال الطلب بضغطة.' : 'Add this lab’s WhatsApp number to send the order in one click.'}
+            </p>
+          )}
         </div>
       )}
     </div>
   )
 }
 
-function LabOrderModal({ order, patients, currency, lang, appointments, onSave, onClose }) {
+function LabOrderModal({ order, patients, currency, lang, clinic, appointments, labs, onManageLabs, onSave, onClose }) {
+  const matchedLab = order && (labs.find((lab) => lab.id === order.labId) || labs.find((lab) => lab.name === order.labName))
   const [form, setForm] = useState(order ? {
     patientId: order.patientId || '',
-    labName: order.labName || '',
+    labId: matchedLab?.id || '',
+    labName: matchedLab?.name || order.labName || '',
+    labPhone: matchedLab?.phone || order.labPhone || '',
     workType: order.workType || 'crown',
     customWorkType: order.customWorkType || '',
     shade: order.shade || 'A2',
@@ -252,6 +338,11 @@ function LabOrderModal({ order, patients, currency, lang, appointments, onSave, 
 
   const selectedPatient = patients.find((p) => p.id === form.patientId)
 
+  function selectLab(labId) {
+    const lab = labs.find((item) => item.id === labId)
+    setForm((prev) => ({ ...prev, labId, labName: lab?.name || '', labPhone: lab?.phone || '' }))
+  }
+
   // Tooth picker — permanent arch
   const rows = chartRows('permanent')
   const allTeeth = [...rows.upper.right, ...rows.upper.left, ...rows.lower.right, ...rows.lower.left]
@@ -264,14 +355,40 @@ function LabOrderModal({ order, patients, currency, lang, appointments, onSave, 
     }))
   }
 
-  function submit() {
+  function buildData(statusOverride) {
     const patient = patients.find((p) => p.id === form.patientId)
-    onSave({
+    return {
       ...form,
+      status: statusOverride || form.status,
       patientName: lang === 'ar' ? (patient?.nameAr || patient?.name || '') : (patient?.name || ''),
       price: Number(form.price) || 0,
       paid: Number(form.paid) || 0,
-    })
+    }
+  }
+
+  function submit(sendWhatsApp = false) {
+    const data = buildData(sendWhatsApp ? 'sent' : undefined)
+    if (sendWhatsApp && waNumber(data.labPhone).length >= 8) {
+      const wt = WORK_TYPES.find((item) => item.key === data.workType)
+      const remaining = Math.max(0, data.price - data.paid)
+      const message = buildLabOrderWhatsAppMessage({
+        lang,
+        clinicName: lang === 'ar' ? clinic?.nameAr || clinic?.name : clinic?.name,
+        labName: data.labName,
+        patientName: data.patientName,
+        workType: data.workType === 'custom' ? data.customWorkType : (lang === 'ar' ? wt?.ar : wt?.en),
+        teeth: data.toothIds,
+        shade: data.shade,
+        pieces: data.pieces,
+        dueDate: data.dueDate ? fmtDate(data.dueDate, lang) : '',
+        specs: data.specs,
+        price: data.price > 0 ? money(data.price, currency) : '',
+        paid: data.paid > 0 ? money(data.paid, currency) : '',
+        remaining: remaining > 0 ? money(remaining, currency) : '',
+      })
+      window.open(waLink(data.labPhone, message), '_blank', 'noopener,noreferrer')
+    }
+    onSave(data)
   }
 
   return (
@@ -280,7 +397,9 @@ function LabOrderModal({ order, patients, currency, lang, appointments, onSave, 
       icon={<FlaskConical size={18} className="text-violet-500" />}
       footer={<>
         <button onClick={onClose} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-        <button onClick={submit} className="btn-primary"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
+        <button onClick={() => submit(false)} disabled={!form.patientId || !form.labId} className="btn-outline"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
+        <button onClick={() => submit(true)} disabled={!form.patientId || !form.labId || waNumber(form.labPhone).length < 8}
+          className="btn bg-emerald-500 text-white hover:bg-emerald-600"><WhatsAppIcon size={16} /> {lang === 'ar' ? 'حفظ وإرسال واتساب' : 'Save & send WhatsApp'}</button>
       </>}
     >
       <div className="grid gap-4 md:grid-cols-2">
@@ -294,10 +413,16 @@ function LabOrderModal({ order, patients, currency, lang, appointments, onSave, 
           </select>
         </Field>
 
-        {/* Lab name */}
-        <Field label={lang === 'ar' ? 'اسم المختبر' : 'Lab Name'} required>
-          <input className="input" value={form.labName} onChange={(e) => f('labName', e.target.value)}
-            placeholder={lang === 'ar' ? 'اسم المختبر…' : 'Lab name…'} />
+        {/* Saved lab */}
+        <Field label={lang === 'ar' ? 'المختبر' : 'Lab'} required hint={form.labPhone ? `${lang === 'ar' ? 'واتساب' : 'WhatsApp'}: ${form.labPhone}` : undefined}>
+          <div className="flex gap-2">
+            <select className="input" value={form.labId} onChange={(e) => selectLab(e.target.value)}>
+              <option value="">{lang === 'ar' ? '— اختر مختبراً —' : '— Select lab —'}</option>
+              {labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name} · {lab.phone}</option>)}
+            </select>
+            <button type="button" onClick={onManageLabs} className="btn-outline shrink-0 !px-3" title={lang === 'ar' ? 'إدارة المختبرات' : 'Manage labs'}><Plus size={16} /></button>
+          </div>
+          {labs.length === 0 && <button type="button" onClick={onManageLabs} className="mt-2 text-xs font-bold text-violet-600 hover:underline">{lang === 'ar' ? 'أضف مختبراً ورقم واتسابه أولًا' : 'Add a lab and its WhatsApp number first'}</button>}
         </Field>
 
         {/* Work type */}
@@ -403,6 +528,71 @@ function LabOrderModal({ order, patients, currency, lang, appointments, onSave, 
           </p>
         )}
       </div>
+    </Modal>
+  )
+}
+
+function LabsDirectoryModal({ labs, lang, onSave, onClose }) {
+  const [rows, setRows] = useState(() => labs.length
+    ? labs.map((lab) => ({ ...lab }))
+    : [{ id: genId('lab'), name: '', phone: '' }])
+  const [error, setError] = useState('')
+
+  function updateRow(id, patch) {
+    setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)))
+    setError('')
+  }
+
+  function removeRow(row) {
+    if (row.name && !confirm(lang === 'ar' ? `حذف المختبر «${row.name}»؟` : `Delete “${row.name}”?`)) return
+    setRows((current) => current.filter((item) => item.id !== row.id))
+  }
+
+  function save() {
+    const entered = rows.filter((row) => row.name.trim() || row.phone.trim())
+    const incomplete = entered.some((row) => !row.name.trim() || waNumber(row.phone).length < 8)
+    if (incomplete) {
+      setError(lang === 'ar'
+        ? 'أدخل اسمًا ورقم واتساب صحيحًا مع رمز الدولة لكل مختبر.'
+        : 'Enter a name and valid WhatsApp number with country code for every lab.')
+      return
+    }
+    onSave(entered.map((row) => ({ id: row.id || genId('lab'), name: row.name.trim(), phone: row.phone.trim() })))
+  }
+
+  return (
+    <Modal open onClose={onClose} size="lg"
+      title={lang === 'ar' ? 'دليل المختبرات' : 'Labs Directory'}
+      icon={<BookUser size={18} className="text-violet-500" />}
+      footer={<>
+        <button onClick={onClose} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+        <button onClick={save} className="btn-primary"><Save size={16} /> {lang === 'ar' ? 'حفظ المختبرات' : 'Save labs'}</button>
+      </>}
+    >
+      <p className="mb-4 text-sm text-ink-500">
+        {lang === 'ar' ? 'أضف اسم كل مختبر ورقم واتسابه. اكتب الرقم مع رمز الدولة، مثل: +962… أو +970…' : 'Add each lab and its WhatsApp number. Include the country code, for example +962… or +970…'}
+      </p>
+      <div className="space-y-3">
+        {rows.map((row) => (
+          <div key={row.id} className="grid gap-2 rounded-xl border border-ink-100 bg-ink-50/40 p-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <Field label={lang === 'ar' ? 'اسم المختبر' : 'Lab name'} required>
+              <input className="input" value={row.name} onChange={(e) => updateRow(row.id, { name: e.target.value })}
+                placeholder={lang === 'ar' ? 'مثال: مختبر الإتقان' : 'e.g. Master Dental Lab'} />
+            </Field>
+            <Field label={lang === 'ar' ? 'رقم واتساب المختبر' : 'Lab WhatsApp'} required>
+              <div className="relative">
+                <Phone size={15} className="absolute top-1/2 -translate-y-1/2 text-ink-400 start-3" />
+                <input dir="ltr" type="tel" className="input ps-9 text-start" value={row.phone}
+                  onChange={(e) => updateRow(row.id, { phone: e.target.value })} placeholder="+962 7…" />
+              </div>
+            </Field>
+            <button type="button" onClick={() => removeRow(row)} className="btn-ghost !px-3 text-rose-500 hover:bg-rose-50" title={lang === 'ar' ? 'حذف' : 'Delete'}><Trash2 size={16} /></button>
+          </div>
+        ))}
+      </div>
+      <button type="button" onClick={() => setRows((current) => [...current, { id: genId('lab'), name: '', phone: '' }])}
+        className="btn-soft mt-3"><Plus size={15} /> {lang === 'ar' ? 'إضافة مختبر آخر' : 'Add another lab'}</button>
+      {error && <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{error}</p>}
     </Modal>
   )
 }

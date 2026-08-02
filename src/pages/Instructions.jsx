@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FileText, Plus, Printer, Pencil, Trash2, Save, Lock } from 'lucide-react'
+import { FileText, Plus, Printer, Pencil, Trash2, Save, Lock, Phone } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { INSTRUCTIONS } from '../lib/treatments'
@@ -7,17 +7,19 @@ import { genId } from '../lib/db'
 import { Modal, Field, Badge } from '../components/ui'
 import PageHero from '../components/PageHero'
 import FeatureLock from '../components/FeatureLock'
-import { cx } from '../lib/utils'
+import { cx, waLink, waNumber, buildInstructionWhatsAppMessage } from '../lib/utils'
 import { printSheet, escapeHtml } from '../lib/print'
+import WhatsAppIcon from '../components/WhatsAppIcon'
 
 // On the free Student plan only these 3 sheets are open; the rest are locked.
 const FREE_SHEETS = ['extraction', 'rct', 'scaling']
 
 export default function Instructions() {
   const { t, lang } = useI18n()
-  const { clinic, updateClinic, can } = useStore()
+  const { clinic, updateClinic, can, patients, updatePatient } = useStore()
   const fullInstr = can('instructionsFull')
   const [editing, setEditing] = useState(null)
+  const [sendingSheet, setSendingSheet] = useState(null)
   const customSheets = clinic?.customSheets || []
   const defaultKeys = Object.keys(INSTRUCTIONS)
   const clinicName = lang === 'ar' ? clinic?.nameAr || clinic?.name : clinic?.name
@@ -56,6 +58,8 @@ export default function Instructions() {
                 <p className="mt-1 text-xs text-ink-400">{s.points.length} {lang === 'ar' ? 'بنود' : 'points'}</p>
                 <div className="mt-3 flex gap-1.5">
                   <button onClick={() => doPrint(s.title, s.points)} className="btn-soft !py-1.5 flex-1 text-xs"><Printer size={13} /> {t('common.print')}</button>
+                  <button onClick={() => setSendingSheet({ title: s.title, points: s.points })} title={lang === 'ar' ? 'إرسال للمريض على واتساب' : 'Send to patient on WhatsApp'}
+                    className="btn !px-2.5 !py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"><WhatsAppIcon size={14} /></button>
                   <button onClick={() => setEditing({ type: 'custom', id: s.id })} className="btn-outline !py-1.5 !px-2.5"><Pencil size={13} /></button>
                   <button onClick={() => deleteCustom(s.id)} className="btn-ghost !py-1.5 !px-2.5 text-rose-500 hover:bg-rose-50"><Trash2 size={13} /></button>
                 </div>
@@ -87,6 +91,8 @@ export default function Instructions() {
                   ) : (
                     <>
                       <button onClick={() => doPrint(sheet.title, sheet.points)} className="btn-soft !py-1.5 flex-1 text-xs"><Printer size={13} /> {t('common.print')}</button>
+                      <button onClick={() => setSendingSheet({ title: sheet.title, points: sheet.points })} title={lang === 'ar' ? 'إرسال للمريض على واتساب' : 'Send to patient on WhatsApp'}
+                        className="btn !px-2.5 !py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"><WhatsAppIcon size={14} /></button>
                       <button onClick={() => setEditing({ type: 'default', key })} className="btn-outline !py-1.5 !px-2.5"><Pencil size={13} /></button>
                     </>
                   )}
@@ -98,6 +104,12 @@ export default function Instructions() {
       </div>
 
       {editing && <SheetEditor editing={editing} onClose={() => setEditing(null)} />}
+      {sendingSheet && (
+        <InstructionWhatsAppModal
+          sheet={sendingSheet} patients={patients} clinic={clinic} lang={lang}
+          updatePatient={updatePatient} onClose={() => setSendingSheet(null)}
+        />
+      )}
     </div>
   )
 
@@ -146,4 +158,68 @@ export default function Instructions() {
       </Modal>
     )
   }
+}
+
+function InstructionWhatsAppModal({ sheet, patients, clinic, lang, updatePatient, onClose }) {
+  const [patientId, setPatientId] = useState('')
+  const [phone, setPhone] = useState('')
+  const patient = patients.find((item) => item.id === patientId)
+  const patientName = patient ? (lang === 'ar' ? patient.nameAr || patient.name : patient.name) : ''
+  const message = buildInstructionWhatsAppMessage({
+    lang,
+    clinicName: lang === 'ar' ? clinic?.nameAr || clinic?.name : clinic?.name,
+    patientName,
+    title: sheet.title,
+    points: sheet.points,
+  })
+
+  function selectPatient(id) {
+    const nextPatient = patients.find((item) => item.id === id)
+    setPatientId(id)
+    setPhone(nextPatient?.phone || '')
+  }
+
+  function rememberNumber() {
+    if (patient && phone.trim() !== (patient.phone || '').trim()) updatePatient(patient.id, { phone: phone.trim() })
+  }
+
+  return (
+    <Modal open onClose={onClose} size="md"
+      title={lang === 'ar' ? 'إرسال ورقة التعليمات للمريض' : 'Send Instructions to Patient'}
+      icon={<WhatsAppIcon size={18} className="text-emerald-600" />}
+      footer={<>
+        <button onClick={onClose} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+        {patientId && waNumber(phone).length >= 8 ? (
+          <a href={waLink(phone, message)} target="_blank" rel="noopener noreferrer" onClick={rememberNumber}
+            className="btn bg-emerald-500 text-white hover:bg-emerald-600"><WhatsAppIcon size={16} /> {lang === 'ar' ? 'فتح الشات بالورقة' : 'Open chat with sheet'}</a>
+        ) : (
+          <button disabled className="btn bg-emerald-500 text-white"><WhatsAppIcon size={16} /> {lang === 'ar' ? 'فتح الشات بالورقة' : 'Open chat with sheet'}</button>
+        )}
+      </>}
+    >
+      <div className="space-y-4">
+        <div className="rounded-xl border border-brand-100 bg-brand-50/50 p-3">
+          <p className="text-xs font-semibold text-brand-600">{lang === 'ar' ? 'الورقة المختارة' : 'Selected sheet'}</p>
+          <p className="mt-1 font-bold text-ink-800">{sheet.title}</p>
+          <p className="mt-0.5 text-xs text-ink-400">{sheet.points.filter((point) => point.trim()).length} {lang === 'ar' ? 'بنود ستُرسل كاملة' : 'points will be sent in full'}</p>
+        </div>
+        <Field label={lang === 'ar' ? 'المريض' : 'Patient'} required>
+          <select className="input" value={patientId} onChange={(e) => selectPatient(e.target.value)}>
+            <option value="">{lang === 'ar' ? '— اختر مريضاً —' : '— Select patient —'}</option>
+            {patients.map((item) => <option key={item.id} value={item.id}>{lang === 'ar' ? item.nameAr || item.name : item.name}</option>)}
+          </select>
+        </Field>
+        <Field label={lang === 'ar' ? 'رقم واتساب المريض' : 'Patient WhatsApp number'} required
+          hint={lang === 'ar' ? 'اكتب الرقم مع رمز الدولة؛ سيُحفظ في ملف المريض عند الإرسال.' : 'Include the country code; it will be saved to the patient profile when sent.'}>
+          <div className="relative">
+            <Phone size={15} className="absolute top-1/2 -translate-y-1/2 text-ink-400 start-3" />
+            <input dir="ltr" type="tel" className="input ps-9 text-start" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+970… / +962…" />
+          </div>
+        </Field>
+        <p className="rounded-xl bg-emerald-50 px-3 py-2.5 text-xs text-emerald-700">
+          {lang === 'ar' ? 'عند الضغط سيفتح شات المريض وفيه ورقة التعليمات كاملة وجاهزة؛ يبقى عليك ضغط إرسال فقط.' : 'The patient chat will open with the complete instruction sheet ready; you only need to press Send.'}
+        </p>
+      </div>
+    </Modal>
+  )
 }

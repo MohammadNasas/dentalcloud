@@ -3,24 +3,35 @@ import { Printer, Plus, Trash2, Save, FileText } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { INSTRUCTIONS, instructionKeyFor, DENTAL_ITEMS } from '../lib/treatments'
-import { Modal } from './ui'
+import { Modal, Field } from './ui'
 import { printSheet, escapeHtml } from '../lib/print'
+import { waLink, waNumber, buildInstructionWhatsAppMessage } from '../lib/utils'
+import WhatsAppIcon from './WhatsAppIcon'
 
 // Editable, printable post-op / treatment instruction sheet. Each treatment has
 // default instructions; the dentist can add/edit/remove points before printing,
 // and optionally save the edits as the clinic default.
 export default function InstructionsModal({ patient, treatmentKey, onClose }) {
   const { t, lang } = useI18n()
-  const { clinic, updateClinic } = useStore()
+  const { clinic, updateClinic, updatePatient } = useStore()
   const key = instructionKeyFor(treatmentKey)
   const custom = clinic?.customInstructions?.[key]?.[lang]
   const base = custom || INSTRUCTIONS[key][lang]
 
   const [title, setTitle] = useState(base.title)
   const [points, setPoints] = useState([...base.points])
+  const [phone, setPhone] = useState(patient.phone || '')
 
   const treatmentName = DENTAL_ITEMS[treatmentKey]?.[lang] || ''
   const patientName = lang === 'ar' ? patient.nameAr || patient.name : patient.name
+  const whatsAppMessage = buildInstructionWhatsAppMessage({
+    lang,
+    clinicName: lang === 'ar' ? clinic?.nameAr || clinic?.name : clinic?.name,
+    patientName,
+    treatmentName,
+    title,
+    points,
+  })
 
   function setPoint(i, v) { setPoints((p) => p.map((x, idx) => (idx === i ? v : x))) }
   function addPoint() { setPoints((p) => [...p, '']) }
@@ -48,6 +59,10 @@ export default function InstructionsModal({ patient, treatmentKey, onClose }) {
     })
   }
 
+  function rememberWhatsAppNumber() {
+    if (phone.trim() !== (patient.phone || '').trim()) updatePatient(patient.id, { phone: phone.trim() })
+  }
+
   return (
     <Modal
       open
@@ -58,11 +73,22 @@ export default function InstructionsModal({ patient, treatmentKey, onClose }) {
       footer={
         <>
           <button onClick={saveDefault} className="btn-ghost"><Save size={15} /> {t('common.save')}</button>
-          <button onClick={doPrint} className="btn-primary"><Printer size={16} /> {t('instructions.printGive')}</button>
+          <button onClick={doPrint} className="btn-outline"><Printer size={16} /> {t('instructions.printGive')}</button>
+          {waNumber(phone).length >= 8 ? (
+            <a href={waLink(phone, whatsAppMessage)} target="_blank" rel="noopener noreferrer" onClick={rememberWhatsAppNumber}
+              className="btn bg-emerald-500 text-white hover:bg-emerald-600"><WhatsAppIcon size={16} /> {lang === 'ar' ? 'إرسال على واتساب' : 'Send on WhatsApp'}</a>
+          ) : (
+            <button disabled className="btn bg-emerald-500 text-white"><WhatsAppIcon size={16} /> {lang === 'ar' ? 'إرسال على واتساب' : 'Send on WhatsApp'}</button>
+          )}
         </>
       }
     >
       <p className="mb-3 text-xs text-ink-400">{t('instructions.editBeforePrint')}</p>
+      <Field label={lang === 'ar' ? 'رقم واتساب المريض' : 'Patient WhatsApp number'}
+        hint={lang === 'ar' ? 'اكتب الرقم مع رمز الدولة؛ سيُحفظ في ملف المريض عند الإرسال.' : 'Include the country code; it will be saved to the patient profile when sent.'}
+        className="mb-3">
+        <input dir="ltr" type="tel" className="input text-start" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+970… / +962…" />
+      </Field>
       <input
         className="input mb-3 font-bold"
         value={title}

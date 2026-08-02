@@ -38,6 +38,7 @@ function newClinic(clinicName, tier, paid = false) {
     createdAt: new Date().toISOString(), prices: [],
     settings: { currency: 'JOD', appointmentReminders: true, logo: null },
     customInstructions: {},
+    labs: [],
   }
 }
 function newDoctor(name, email, specialty) {
