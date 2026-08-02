@@ -38,7 +38,7 @@ const STATUS_CONFIG = {
 
 const DEFAULT_FORM = {
   patientId: '', labId: '', labName: '', labPhone: '', workType: 'crown', customWorkType: '',
-  shade: 'A2', pieces: 1, toothIds: [], specs: '',
+  shade: 'A2', pieces: '1', toothIds: [], specs: '',
   price: '', paid: '', dueDate: '', linkedAppointmentId: '',
   status: 'sent',
 }
@@ -325,7 +325,7 @@ function LabOrderModal({ order, patients, currency, lang, clinic, appointments, 
     workType: order.workType || 'crown',
     customWorkType: order.customWorkType || '',
     shade: order.shade || 'A2',
-    pieces: order.pieces || 1,
+    pieces: String(order.pieces || 1),
     toothIds: order.toothIds || [],
     specs: order.specs || '',
     price: String(order.price || ''),
@@ -361,6 +361,7 @@ function LabOrderModal({ order, patients, currency, lang, clinic, appointments, 
       ...form,
       status: statusOverride || form.status,
       patientName: lang === 'ar' ? (patient?.nameAr || patient?.name || '') : (patient?.name || ''),
+      pieces: Math.max(1, Number(form.pieces) || 1),
       price: Number(form.price) || 0,
       paid: Number(form.paid) || 0,
     }
@@ -452,8 +453,9 @@ function LabOrderModal({ order, patients, currency, lang, clinic, appointments, 
 
         {/* Pieces */}
         <Field label={lang === 'ar' ? 'عدد القطع' : 'Pieces'}>
-          <input type="number" min={1} className="input" value={form.pieces}
-            onChange={(e) => f('pieces', Number(e.target.value) || 1)} />
+          <input type="number" min={1} step={1} className="input" value={form.pieces}
+            onChange={(e) => f('pieces', e.target.value)}
+            onBlur={() => f('pieces', String(Math.max(1, Number(form.pieces) || 1)))} />
         </Field>
 
         {/* Price */}
