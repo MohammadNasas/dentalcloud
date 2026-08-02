@@ -35,14 +35,26 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => mainWindow.show())
 
-  // Print sheets (window.open) open as child windows; external http links go to
-  // the system browser.
+  // Print sheets (window.open) open as child windows; external web links go to
+  // the system browser, while WhatsApp links open the installed desktop app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('http://localhost') || url === 'about:blank') {
       return { action: 'allow' }
     }
     if (url.startsWith('http')) {
       shell.openExternal(url)
+      return { action: 'deny' }
+    }
+    if (url.startsWith('whatsapp://')) {
+      shell.openExternal(url).catch(() => {
+        // If WhatsApp Desktop is not installed, keep the same recipient and
+        // prepared message and fall back to WhatsApp Web.
+        const deepLink = new URL(url)
+        const phone = deepLink.searchParams.get('phone') || ''
+        const text = deepLink.searchParams.get('text') || ''
+        const webUrl = `https://web.whatsapp.com/send?phone=${encodeURIComponent(phone)}${text ? `&text=${encodeURIComponent(text)}` : ''}`
+        shell.openExternal(webUrl).catch(() => {})
+      })
       return { action: 'deny' }
     }
     return { action: 'allow' }

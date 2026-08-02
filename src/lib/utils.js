@@ -89,9 +89,42 @@ export function waNumber(phone) {
   if (d.startsWith('00')) d = d.slice(2)
   return d
 }
-// Build a WhatsApp deep link, optionally with a pre-filled message.
+export function waWebLink(phone, message) {
+  const number = waNumber(phone)
+  return `https://web.whatsapp.com/send?phone=${number}${message ? `&text=${encodeURIComponent(message)}` : ''}`
+}
+
+export function waAppLink(phone, message) {
+  const number = waNumber(phone)
+  return `whatsapp://send?phone=${number}${message ? `&text=${encodeURIComponent(message)}` : ''}`
+}
+
+function isElectronApp() {
+  return typeof navigator !== 'undefined' && /Electron/i.test(navigator.userAgent || '')
+}
+
+function isMobileDevice() {
+  if (typeof navigator === 'undefined') return false
+  const nav = navigator
+  return nav.userAgentData?.mobile === true ||
+    /Android|iPhone|iPad|iPod|Mobile|IEMobile|Opera Mini/i.test(nav.userAgent || '') ||
+    (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1)
+}
+
+// Use the route that preserves pre-filled text best on each platform:
+// WhatsApp Desktop's native protocol inside Electron, wa.me on phones, and
+// WhatsApp Web in desktop browsers (avoids losing text during app hand-off).
+export function waLinkForDevice(phone, message, device = 'web') {
+  const number = waNumber(phone)
+  if (!message) return `https://wa.me/${number}`
+  if (device === 'app') return waAppLink(number, message)
+  if (device === 'mobile') return `https://wa.me/${number}?text=${encodeURIComponent(message)}`
+  return waWebLink(number, message)
+}
+
 export function waLink(phone, message) {
-  return `https://wa.me/${waNumber(phone)}${message ? `?text=${encodeURIComponent(message)}` : ''}`
+  const device = isElectronApp() ? 'app' : isMobileDevice() ? 'mobile' : 'web'
+  return waLinkForDevice(phone, message, device)
 }
 
 // Ready-to-send WhatsApp copy shared by the web and desktop builds.
