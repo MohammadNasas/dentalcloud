@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
   FlaskConical, Plus, Trash2, Search, ChevronDown, ChevronUp,
-  CheckCircle2, Clock, Truck, PackageCheck, Edit2, X, Save, Phone, BookUser,
+  CheckCircle2, Clock, Truck, PackageCheck, Edit2, X, Save, Phone, BookUser, Copy, Check,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -37,9 +37,9 @@ const STATUS_CONFIG = {
 }
 
 const DEFAULT_FORM = {
-  patientId: '', labId: '', labName: '', labPhone: '', workType: 'crown', customWorkType: '',
+  labId: '', labName: '', labPhone: '', workType: 'crown', customWorkType: '',
   shade: 'A2', pieces: '1', toothIds: [], specs: '',
-  price: '', paid: '', dueDate: '', linkedAppointmentId: '',
+  price: '', paid: '', dueDate: '',
   status: 'sent',
 }
 
@@ -52,7 +52,7 @@ export default function Lab() {
 function LabContent() {
   const { lang } = useI18n()
   const { labOrders = [], addLabOrder, updateLabOrder, deleteLabOrder,
-          patients, clinic, appointments, updateClinic } = useStore()
+          clinic, updateClinic } = useStore()
   const currency = clinic?.settings?.currency || 'JOD'
   const labs = clinic?.labs || []
 
@@ -69,8 +69,9 @@ function LabContent() {
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter((o) =>
-        (o.patientName || '').toLowerCase().includes(q) ||
-        (o.labName || '').toLowerCase().includes(q)
+        (o.labName || '').toLowerCase().includes(q) ||
+        (o.customWorkType || '').toLowerCase().includes(q) ||
+        (o.specs || '').toLowerCase().includes(q)
       )
     }
     return list
@@ -148,7 +149,7 @@ function LabContent() {
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-48">
           <Search size={15} className="absolute top-1/2 -translate-y-1/2 text-ink-400 start-3" />
-          <input className="input ps-9" placeholder={lang === 'ar' ? 'بحث بالمريض أو المختبر…' : 'Search patient or lab…'}
+          <input className="input ps-9" placeholder={lang === 'ar' ? 'بحث بالمختبر أو تفاصيل الطلب…' : 'Search lab or order details…'}
             value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Segmented size="sm" value={filterStatus} onChange={setFilterStatus}
@@ -187,8 +188,7 @@ function LabContent() {
       {(addOpen || editingId) && (
         <LabOrderModal
           order={editingId ? labOrders.find((o) => o.id === editingId) : null}
-          patients={patients} currency={currency} lang={lang} clinic={clinic}
-          appointments={appointments} labs={labs}
+          currency={currency} lang={lang} clinic={clinic} labs={labs}
           onManageLabs={() => { setAddOpen(false); setEditingId(null); setLabsOpen(true) }}
           onSave={(data) => {
             if (editingId) updateLabOrder(editingId, data)
@@ -211,6 +211,7 @@ function LabContent() {
 }
 
 function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle, onEdit, onDelete, onStatusChange }) {
+  const [copied, setCopied] = useState(false)
   const wt = WORK_TYPES.find((w) => w.key === order.workType)
   const st = STATUS_CONFIG[order.status] || STATUS_CONFIG.draft
   const remaining = Math.max(0, (Number(order.price) || 0) - (Number(order.paid) || 0))
@@ -224,7 +225,6 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
     lang,
     clinicName: lang === 'ar' ? clinic?.nameAr || clinic?.name : clinic?.name,
     labName: savedLab?.name || order.labName,
-    patientName: order.patientName,
     workType,
     teeth: order.toothIds || [],
     shade: order.shade,
@@ -236,6 +236,27 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
     remaining: remaining > 0 ? money(remaining, currency) : '',
   })
 
+  async function copyOrder() {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(message)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = message
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        textarea.remove()
+      }
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    } catch (error) {
+      console.error('copy lab order failed', error)
+    }
+  }
+
   return (
     <div className="card overflow-hidden">
       <div className="flex items-start gap-3 p-4">
@@ -244,12 +265,11 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-bold text-ink-800">{order.patientName || '—'}</span>
+            <span className="font-bold text-ink-800">{workType || (lang === 'ar' ? 'طلب مختبر' : 'Lab order')}</span>
             <Badge color={st.color}><StatusIcon size={11} /> {lang === 'ar' ? st.ar : st.en}</Badge>
           </div>
           <p className="mt-0.5 text-sm text-ink-500">
-            {lang === 'ar' ? wt?.ar || order.customWorkType : wt?.en || order.customWorkType}
-            {order.labName && <> · <span className="font-semibold">{order.labName}</span></>}
+            {(savedLab?.name || order.labName) && <span className="font-semibold">{savedLab?.name || order.labName}</span>}
             {order.shade && <> · {lang === 'ar' ? 'اللون:' : 'Shade:'} {order.shade}</>}
             {order.pieces > 1 && <> · {order.pieces} {lang === 'ar' ? 'قطع' : 'pcs'}</>}
           </p>
@@ -265,6 +285,12 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <button type="button" onClick={copyOrder}
+            aria-label={lang === 'ar' ? 'نسخ الطلب كاملًا' : 'Copy full order'}
+            title={copied ? (lang === 'ar' ? 'تم نسخ الطلب' : 'Order copied') : (lang === 'ar' ? 'نسخ الطلب كاملًا' : 'Copy full order')}
+            className={cx('rounded-lg p-1.5 transition-colors', copied ? 'bg-violet-100 text-violet-600' : 'bg-violet-50 text-violet-600 hover:bg-violet-100')}>
+            {copied ? <Check size={15} /> : <Copy size={15} />}
+          </button>
           {waNumber(labPhone).length >= 8 && (
             <a href={waLink(labPhone, message)} target="_blank" rel="noopener noreferrer"
               title={lang === 'ar' ? 'إرسال الطلب للمختبر عبر واتساب' : 'Send order to lab on WhatsApp'}
@@ -315,10 +341,9 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
   )
 }
 
-function LabOrderModal({ order, patients, currency, lang, clinic, appointments, labs, onManageLabs, onSave, onClose }) {
+function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSave, onClose }) {
   const matchedLab = order && (labs.find((lab) => lab.id === order.labId) || labs.find((lab) => lab.name === order.labName))
   const [form, setForm] = useState(order ? {
-    patientId: order.patientId || '',
     labId: matchedLab?.id || '',
     labName: matchedLab?.name || order.labName || '',
     labPhone: matchedLab?.phone || order.labPhone || '',
@@ -335,8 +360,6 @@ function LabOrderModal({ order, patients, currency, lang, clinic, appointments, 
   } : { ...DEFAULT_FORM })
 
   const f = (k, v) => setForm((prev) => ({ ...prev, [k]: v }))
-
-  const selectedPatient = patients.find((p) => p.id === form.patientId)
 
   function selectLab(labId) {
     const lab = labs.find((item) => item.id === labId)
@@ -356,11 +379,11 @@ function LabOrderModal({ order, patients, currency, lang, clinic, appointments, 
   }
 
   function buildData(statusOverride) {
-    const patient = patients.find((p) => p.id === form.patientId)
     return {
       ...form,
       status: statusOverride || form.status,
-      patientName: lang === 'ar' ? (patient?.nameAr || patient?.name || '') : (patient?.name || ''),
+      patientId: undefined,
+      patientName: undefined,
       pieces: Math.max(1, Number(form.pieces) || 1),
       price: Number(form.price) || 0,
       paid: Number(form.paid) || 0,
@@ -376,7 +399,6 @@ function LabOrderModal({ order, patients, currency, lang, clinic, appointments, 
         lang,
         clinicName: lang === 'ar' ? clinic?.nameAr || clinic?.name : clinic?.name,
         labName: data.labName,
-        patientName: data.patientName,
         workType: data.workType === 'custom' ? data.customWorkType : (lang === 'ar' ? wt?.ar : wt?.en),
         teeth: data.toothIds,
         shade: data.shade,
@@ -398,22 +420,12 @@ function LabOrderModal({ order, patients, currency, lang, clinic, appointments, 
       icon={<FlaskConical size={18} className="text-violet-500" />}
       footer={<>
         <button onClick={onClose} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-        <button onClick={() => submit(false)} disabled={!form.patientId || !form.labId} className="btn-outline"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
-        <button onClick={() => submit(true)} disabled={!form.patientId || !form.labId || waNumber(form.labPhone).length < 8}
+        <button onClick={() => submit(false)} disabled={!form.labId} className="btn-outline"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
+        <button onClick={() => submit(true)} disabled={!form.labId || waNumber(form.labPhone).length < 8}
           className="btn bg-emerald-500 text-white hover:bg-emerald-600"><WhatsAppIcon size={16} /> {lang === 'ar' ? 'حفظ وإرسال واتساب' : 'Save & send WhatsApp'}</button>
       </>}
     >
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Patient */}
-        <Field label={lang === 'ar' ? 'المريض' : 'Patient'} required>
-          <select className="input" value={form.patientId} onChange={(e) => f('patientId', e.target.value)}>
-            <option value="">{lang === 'ar' ? '— اختر مريضاً —' : '— Select patient —'}</option>
-            {patients.map((p) => (
-              <option key={p.id} value={p.id}>{lang === 'ar' ? (p.nameAr || p.name) : p.name}</option>
-            ))}
-          </select>
-        </Field>
-
         {/* Saved lab */}
         <Field label={lang === 'ar' ? 'المختبر' : 'Lab'} required hint={form.labPhone ? `${lang === 'ar' ? 'واتساب' : 'WhatsApp'}: ${form.labPhone}` : undefined}>
           <div className="flex gap-2">

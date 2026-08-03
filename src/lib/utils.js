@@ -163,7 +163,7 @@ export function buildInstructionWhatsAppMessage({
 }
 
 export function buildLabOrderWhatsAppMessage({
-  lang = 'ar', clinicName = '', labName = '', patientName = '', workType = '',
+  lang = 'ar', clinicName = '', labName = '', workType = '',
   teeth = [], shade = '', pieces = '', dueDate = '', specs = '', price = '', paid = '', remaining = '',
 }) {
   const toothList = Array.isArray(teeth) ? teeth.filter(Boolean).join(', ') : teeth
@@ -173,7 +173,6 @@ export function buildLabOrderWhatsAppMessage({
         '*طلب مختبر أسنان*',
         '',
         labName && `المختبر: ${labName}`,
-        patientName && `المريض: ${patientName}`,
         workType && `نوع العمل: ${workType}`,
         toothList && `الأسنان: ${toothList}`,
         shade && `اللون / الشيد: ${shade}`,
@@ -190,7 +189,6 @@ export function buildLabOrderWhatsAppMessage({
         '*Dental Lab Order*',
         '',
         labName && `Lab: ${labName}`,
-        patientName && `Patient: ${patientName}`,
         workType && `Work type: ${workType}`,
         toothList && `Teeth: ${toothList}`,
         shade && `Shade: ${shade}`,
