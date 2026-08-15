@@ -86,11 +86,19 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, subsc
   const nextData = {
     ...clinic,
     tier,
-    paid: true,
-    paidAt: now,
+    // Subscription approval starts the free trial; it is not a payment.
+    // paid becomes true only after a verified $50 PayPal payment.
+    paid: false,
+    paidAt: null,
     subscriptionProvider: 'paypal',
     paypalSubscriptionId: subscriptionId,
     subscriptionStatus: sub.status,
+    subscriptionPaymentVerified: false,
+    subscriptionVerifiedAmount: null,
+    subscriptionVerifiedCurrency: null,
+    subscriptionVerifiedPaymentId: null,
+    subscriptionPaymentVerificationSource: null,
+    subscriptionLastPaidAt: null,
     trialStartedAt: clinic.trialStartedAt || now,
     trialEndsAt: clinic.trialEndsAt || nextBillingTime,
     nextBillingTime,
@@ -100,7 +108,7 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, subsc
     ...(priceUpdated ? { renewalPriceUpdatedAt: now } : {}),
   }
   await saveClinic(supaUrl, headers, clinicId, nextData)
-  return json({ ok: true, tier, clinicId, subscription: true, subscriptionId, nextBillingTime })
+  return json({ ok: true, tier, clinicId, subscription: true, subscriptionId, trialEndsAt: nextData.trialEndsAt, nextBillingTime })
 }
 
 async function finalizeLegacyOrder({ base, accessToken, supaUrl, headers, orderId }) {

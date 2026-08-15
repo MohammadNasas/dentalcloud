@@ -87,8 +87,17 @@ function PaymentResultOverlay({ result, onClose }) {
   )
 }
 
+function hasVerifiedPaidAccess(clinic) {
+  if (!clinic?.paid) return false
+  if (clinic.subscriptionProvider !== 'paypal') return true
+  const amount = Number(clinic.subscriptionVerifiedAmount)
+  const currency = String(clinic.subscriptionVerifiedCurrency || '').toUpperCase()
+  return clinic.subscriptionPaymentVerified === true && Number.isFinite(amount) && Math.abs(amount - 50) <= 0.01 && currency === 'USD'
+}
+
 export default function App() {
   const { booting, currentUser, recovery, paymentResult, dismissPaymentResult, mode, clinic } = useStore()
+  const verifiedPaidAccess = hasVerifiedPaidAccess(clinic)
 
   // Keep the splash on screen long enough for the logo reveal to actually be
   // seen, even when boot finishes instantly.
@@ -98,14 +107,34 @@ export default function App() {
     return () => clearTimeout(id)
   }, [])
 
+  // A PayPal trial grants temporary Pro access, but it is deliberately not a
+  // payment. Re-evaluate at the exact expiry time so an open app is locked as
+  // soon as the free month ends unless a verified $50 payment set paid=true.
+  const [accessClock, setAccessClock] = useState(Date.now())
+  useEffect(() => {
+    if (verifiedPaidAccess || !clinic?.trialEndsAt) return
+    const trialEnd = Date.parse(clinic.trialEndsAt)
+    if (!Number.isFinite(trialEnd)) return
+    const remaining = trialEnd - Date.now()
+    if (remaining <= 0) {
+      if (accessClock < trialEnd) setAccessClock(Date.now())
+      return
+    }
+    // Browsers cap setTimeout at a little under 25 days; reschedule if needed.
+    const id = setTimeout(() => setAccessClock(Date.now()), Math.min(remaining + 100, 2_000_000_000))
+    return () => clearTimeout(id)
+  }, [verifiedPaidAccess, clinic?.trialEndsAt, accessClock])
+
   const overlay = paymentResult ? <PaymentResultOverlay result={paymentResult} onClose={dismissPaymentResult} /> : null
 
   if (booting || minSplash) return <Splash />
   if (recovery) return <ResetPassword />
   if (!currentUser) return <>{<PublicEntry />}{overlay}<ToastHost /></>
-  // Paid tiers must pay before entering; the Student plan is free, so it enters
-  // straight away.
-  if (mode === 'cloud' && clinic && !clinic.paid && clinic.tier !== 'student') return <>{<Paywall />}{overlay}<ToastHost /></>
+  const trialEnd = Date.parse(clinic?.trialEndsAt || '')
+  const trialActive = Number.isFinite(trialEnd) && accessClock < trialEnd
+  // Pro access is allowed during the free month or after a verified payment.
+  // Merely having an ACTIVE PayPal agreement never counts as paid access.
+  if (mode === 'cloud' && clinic && !verifiedPaidAccess && !trialActive && clinic.tier !== 'student') return <>{<Paywall />}{overlay}<ToastHost /></>
 
   return (
     <>

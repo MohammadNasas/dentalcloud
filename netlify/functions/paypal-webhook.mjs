@@ -1,6 +1,9 @@
 // Netlify Function: PayPal subscription webhooks.
 // Configure /api/paypal-webhook in PayPal and set PAYPAL_WEBHOOK_ID for signature verification.
-const PAID_EVENTS = new Set(['BILLING.SUBSCRIPTION.ACTIVATED', 'PAYMENT.SALE.COMPLETED'])
+const PRO_PRICE = 50
+// Activating a subscription only starts its free trial. Payment is granted
+// exclusively by a signed, completed $50 PayPal sale event.
+const PAID_EVENTS = new Set(['PAYMENT.SALE.COMPLETED'])
 const STOP_EVENTS = new Set([
   'BILLING.SUBSCRIPTION.PAYMENT.FAILED',
   'BILLING.SUBSCRIPTION.SUSPENDED',
@@ -43,6 +46,15 @@ async function verifyWebhook({ base, accessToken, req, event, webhookId }) {
 function subscriptionIdFrom(event) {
   const r = event.resource || {}
   return r.billing_agreement_id || r.subscription_id || (String(r.id || '').startsWith('I-') ? r.id : '') || ''
+}
+
+function verifiedPaymentFrom(event) {
+  const r = event.resource || {}
+  const amount = Number(r.amount?.total ?? r.amount?.value ?? r.transaction_info?.transaction_amount?.value)
+  const currency = String(r.amount?.currency || r.amount?.currency_code || r.transaction_info?.transaction_amount?.currency_code || '').toUpperCase()
+  const state = String(r.state || r.status || 'COMPLETED').toUpperCase()
+  if (state !== 'COMPLETED' || !Number.isFinite(amount) || Math.abs(amount - PRO_PRICE) > 0.01 || currency !== 'USD') return null
+  return { amount, currency, id: r.id || null, time: event.create_time || r.create_time || null }
 }
 
 async function findClinicBySubscription(supaUrl, headers, subscriptionId) {
@@ -98,6 +110,12 @@ export default async (req) => {
     if (STOP_EVENTS.has(eventType)) {
       await updateClinic(supaUrl, headers, clinic, {
         paid: false,
+        paidAt: null,
+        subscriptionPaymentVerified: false,
+        subscriptionVerifiedAmount: null,
+        subscriptionVerifiedCurrency: null,
+        subscriptionVerifiedPaymentId: null,
+        subscriptionPaymentVerificationSource: null,
         subscriptionStatus: eventType.replace('BILLING.SUBSCRIPTION.', '').replace('PAYMENT.SALE.', ''),
         subscriptionStoppedAt: now,
         subscriptionLastEvent: eventType,
@@ -105,10 +123,31 @@ export default async (req) => {
       return json({ ok: true, paid: false, subscriptionId })
     }
 
+    const payment = verifiedPaymentFrom(event)
+    if (!payment) {
+      await updateClinic(supaUrl, headers, clinic, {
+        paid: false,
+        paidAt: null,
+        subscriptionPaymentVerified: false,
+        subscriptionVerifiedAmount: null,
+        subscriptionVerifiedCurrency: null,
+        subscriptionVerifiedPaymentId: null,
+        subscriptionPaymentVerificationSource: null,
+        subscriptionLastEvent: eventType,
+      })
+      return json({ ok: true, paid: false, ignored: 'payment_not_50_usd', subscriptionId })
+    }
+
     await updateClinic(supaUrl, headers, clinic, {
       paid: true,
+      paidAt: payment.time || now,
       subscriptionStatus: 'ACTIVE',
-      subscriptionLastPaidAt: now,
+      subscriptionPaymentVerified: true,
+      subscriptionVerifiedAmount: payment.amount,
+      subscriptionVerifiedCurrency: payment.currency,
+      subscriptionVerifiedPaymentId: payment.id,
+      subscriptionPaymentVerificationSource: 'verified_webhook',
+      subscriptionLastPaidAt: payment.time || now,
       subscriptionLastEvent: eventType,
     })
     return json({ ok: true, paid: true, subscriptionId })

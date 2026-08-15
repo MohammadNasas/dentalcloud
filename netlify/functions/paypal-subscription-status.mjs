@@ -27,6 +27,21 @@ async function updateSubscriptionPrice(base, accessToken, subscriptionId) {
   return r.ok
 }
 
+function verifiedPaymentFromSubscription(sub) {
+  const last = sub?.billing_info?.last_payment
+  const amount = Number(last?.amount?.value ?? last?.amount?.total)
+  const currency = String(last?.amount?.currency_code || last?.amount?.currency || '').toUpperCase()
+  if (!Number.isFinite(amount) || Math.abs(amount - PRO_PRICE) > 0.01 || currency !== 'USD') return null
+  return { amount, currency, time: last.time || null, source: 'paypal_subscription' }
+}
+
+function verifiedPaymentFromWebhook(clinic) {
+  const amount = Number(clinic?.subscriptionVerifiedAmount)
+  const currency = String(clinic?.subscriptionVerifiedCurrency || '').toUpperCase()
+  if (clinic?.subscriptionPaymentVerified !== true || !Number.isFinite(amount) || Math.abs(amount - PRO_PRICE) > 0.01 || currency !== 'USD') return null
+  return { amount, currency, time: clinic.subscriptionLastPaidAt || clinic.paidAt || null, source: 'verified_webhook' }
+}
+
 export default async (req) => {
   if (req.method === 'OPTIONS')
     return new Response('', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } })
@@ -53,13 +68,19 @@ export default async (req) => {
     const sub = await subR.json().catch(() => ({}))
     if (!subR.ok) return json({ ok: false, error: 'subscription_lookup_failed', message: sub.message }, subR.status)
 
+    const [refClinicId] = String(sub.custom_id || '').split('--')
+    if (!refClinicId || refClinicId !== clinicId) return json({ ok: false, error: 'subscription_clinic_mismatch' }, 403)
+
     const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' }
     const getR = await fetch(`${supaUrl}/rest/v1/clinics?id=eq.${clinicId}&select=data`, { headers })
     const rows = await getR.json()
     if (!Array.isArray(rows) || rows.length === 0) return json({ ok: false, error: 'clinic_not_found' }, 404)
 
     const clinic = rows[0].data
-    const paid = ACTIVE_STATUSES.has(sub.status)
+    // ACTIVE also describes the free trial. It must never be treated as proof
+    // of payment. Only an exact $50 USD payment reported by PayPal unlocks paid.
+    const verifiedPayment = verifiedPaymentFromSubscription(sub) || verifiedPaymentFromWebhook(clinic)
+    const paid = ACTIVE_STATUSES.has(sub.status) && Boolean(verifiedPayment)
     let priceUpdated = Number(clinic.renewalPrice) === PRO_PRICE && !clinic.renewalPriceUpdatePending
     if (paid && !priceUpdated) priceUpdated = await updateSubscriptionPrice(base, tok.access_token, subscriptionId)
     const now = new Date().toISOString()
@@ -71,10 +92,16 @@ export default async (req) => {
       paypalSubscriptionId: subscriptionId,
       subscriptionStatus: sub.status,
       subscriptionSyncedAt: now,
+      subscriptionPaymentVerified: paid,
+      subscriptionVerifiedAmount: paid ? verifiedPayment.amount : null,
+      subscriptionVerifiedCurrency: paid ? verifiedPayment.currency : null,
+      subscriptionPaymentVerificationSource: paid ? verifiedPayment.source : null,
+      subscriptionLastPaidAt: paid ? (verifiedPayment.time || clinic.subscriptionLastPaidAt || now) : null,
+      paidAt: paid ? (verifiedPayment.time || clinic.paidAt || now) : null,
       nextBillingTime: sub.billing_info?.next_billing_time || clinic.nextBillingTime,
       ...(priceUpdated ? { renewalPrice: PRO_PRICE, renewalCurrency: 'USD', renewalPriceUpdatedAt: now } : {}),
       renewalPriceUpdatePending: paid && !priceUpdated,
-      ...(paid ? {} : { subscriptionStoppedAt: now }),
+      ...(ACTIVE_STATUSES.has(sub.status) ? { subscriptionStoppedAt: null } : { subscriptionStoppedAt: now }),
     }
     const upR = await fetch(`${supaUrl}/rest/v1/clinics?id=eq.${clinicId}`, {
       method: 'PATCH',
@@ -82,7 +109,7 @@ export default async (req) => {
       body: JSON.stringify({ data: nextData }),
     })
     if (!upR.ok) return json({ ok: false, error: 'update_failed', message: await upR.text() }, 500)
-    return json({ ok: true, status: sub.status, paid, clinic: { ...nextData, id: clinicId } })
+    return json({ ok: true, status: sub.status, paid, paymentVerified: paid, clinic: { ...nextData, id: clinicId } })
   } catch (e) {
     return json({ ok: false, error: 'server_error', message: String(e.message || e) }, 500)
   }
