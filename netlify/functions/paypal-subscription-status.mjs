@@ -77,6 +77,11 @@ export default async (req) => {
     if (!Array.isArray(rows) || rows.length === 0) return json({ ok: false, error: 'clinic_not_found' }, 404)
 
     const clinic = rows[0].data
+    // Status sync must only ever update the subscription already attached to
+    // this clinic. Otherwise an abandoned second checkout could replace the
+    // original subscription record.
+    if (clinic.paypalSubscriptionId !== subscriptionId)
+      return json({ ok: false, error: 'subscription_not_current' }, 409)
     // ACTIVE also describes the free trial. It must never be treated as proof
     // of payment. Only an exact $50 USD payment reported by PayPal unlocks paid.
     const verifiedPayment = verifiedPaymentFromSubscription(sub) || verifiedPaymentFromWebhook(clinic)

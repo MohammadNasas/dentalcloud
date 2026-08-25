@@ -1,6 +1,6 @@
 // Client helpers for the PayPal payment flow. Calls the serverless payment
 // functions at /api/* — works on Cloudflare Pages (native) and Netlify (redirect).
-import { isCloud } from './supabaseClient'
+import { isCloud, supabase } from './supabaseClient'
 
 // Real payments only run in cloud mode (the serverless functions need the host).
 export const paymentsEnabled = isCloud
@@ -10,9 +10,11 @@ const PENDING_PAYPAL_KEY = 'dentalcloud.pendingPaypalSubscription'
 
 export async function startPaypalCheckout({ tier, clinicId, coupon, email }) {
   try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return { ok: false, error: 'unauthorized' }
     const r = await fetch('/api/paypal-create', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ tier, clinicId, coupon, email }),
     })
     const data = await r.json().catch(() => ({}))

@@ -18,6 +18,10 @@ Goal: one account that works on the **website** and the **desktop app**, same da
 2. افتح الملف **`supabase/schema.sql`** (موجود بمجلد المشروع)، انسخ **كل** محتواه.
 3. الصقه بالمحرّر واضغط **Run** ▶️. لازم يطلع «Success».
 
+> إذا مشروع Supabase موجود من قبل: نفّذ ملف
+> **`supabase/trial_protection.sql`** مرة واحدة أيضاً. يحفظ سجل التجارب السابقة
+> ويمنع نفس الإيميل من الحصول على شهر مجاني مرة ثانية.
+
 ## 3) أطفئ تأكيد البريد (عشان التسجيل يصير فوري)
 1. من القائمة: **Authentication** → **Providers** → **Email**.
 2. عطّل خيار **"Confirm email"** ثم **Save**.

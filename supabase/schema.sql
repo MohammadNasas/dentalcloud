@@ -15,6 +15,23 @@ create table if not exists public.clinics (
   created_at timestamptz default now()
 );
 
+-- A permanent, server-only record of each email address that has claimed a
+-- PayPal free trial.  This is deliberately separate from `clinics.data`: a
+-- user cannot reset it by abandoning a clinic or by starting another checkout.
+create table if not exists public.subscription_trials (
+  email text primary key check (email = lower(btrim(email))),
+  user_id uuid not null,
+  clinic_id uuid not null references public.clinics(id) on delete restrict,
+  status text not null default 'pending' check (status in ('pending', 'active', 'paid', 'expired', 'cancelled')),
+  paypal_subscription_id text unique,
+  paypal_payer_id text,
+  paypal_email text check (paypal_email is null or paypal_email = lower(btrim(paypal_email))),
+  trial_started_at timestamptz,
+  trial_ends_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.doctors (
   id uuid primary key,                    -- = auth.uid() for login users
   clinic_id uuid not null references public.clinics(id) on delete cascade,
@@ -79,6 +96,11 @@ create table if not exists public.daily_active_users (
 );
 
 create index if not exists idx_doctors_clinic on public.doctors(clinic_id);
+create index if not exists idx_subscription_trials_clinic on public.subscription_trials(clinic_id);
+create unique index if not exists idx_subscription_trials_paypal_payer
+  on public.subscription_trials(paypal_payer_id) where paypal_payer_id is not null;
+create unique index if not exists idx_subscription_trials_paypal_email
+  on public.subscription_trials(paypal_email) where paypal_email is not null;
 create index if not exists idx_patients_clinic on public.patients(clinic_id);
 create index if not exists idx_tooth_clinic on public.tooth_records(clinic_id);
 create index if not exists idx_appt_clinic on public.appointments(clinic_id);
@@ -149,6 +171,7 @@ grant execute on function public.track_daily_active(date, text, text, jsonb) to 
 
 -- ── Enable Row-Level Security ────────────────────────────────────────────
 alter table public.clinics       enable row level security;
+alter table public.subscription_trials enable row level security;
 alter table public.doctors       enable row level security;
 alter table public.patients      enable row level security;
 alter table public.tooth_records enable row level security;

@@ -13,6 +13,7 @@ const expectedPrice = (tier, code) => {
 }
 const canonicalTier = (tier) => tier === 'economy' ? 'pro' : tier
 const validTier = (tier) => Boolean(PRICES[tier] || LEGACY_PRICES[tier])
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -75,6 +76,69 @@ async function updateSubscriptionPrice(base, accessToken, subscriptionId) {
   return r.ok
 }
 
+async function cancelSubscription(base, accessToken, subscriptionId) {
+  if (!subscriptionId) return
+  await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: 'A free trial was already used for this account' }),
+  })
+}
+
+async function getTrialBySubscription(supaUrl, headers, subscriptionId) {
+  const url = new URL(`${supaUrl}/rest/v1/subscription_trials`)
+  url.searchParams.set('select', 'email,user_id,clinic_id,status,paypal_subscription_id,paypal_payer_id,paypal_email,trial_started_at,trial_ends_at')
+  url.searchParams.set('paypal_subscription_id', `eq.${subscriptionId}`)
+  const r = await fetch(url, { headers })
+  if (!r.ok) throw new Error(`trial_lookup_failed: ${await r.text()}`)
+  const rows = await r.json().catch(() => [])
+  return Array.isArray(rows) ? rows[0] || null : null
+}
+
+function paypalIdentity(subscription) {
+  const payerId = String(subscription?.subscriber?.payer_id || '').trim()
+  const email = normalizeEmail(subscription?.subscriber?.email_address)
+  return { payerId: payerId || null, email: email || null }
+}
+
+// App emails can be changed by creating a second account. PayPal's payer ID
+// (with its billing email as a fallback) is the cross-account trial identity.
+async function claimPaypalIdentity(supaUrl, headers, subscriptionId, identity) {
+  if (!identity.payerId && !identity.email) return true
+  const url = new URL(`${supaUrl}/rest/v1/subscription_trials`)
+  url.searchParams.set('paypal_subscription_id', `eq.${subscriptionId}`)
+  const r = await fetch(url, {
+    method: 'PATCH',
+    headers: { ...headers, Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      ...(identity.payerId ? { paypal_payer_id: identity.payerId } : {}),
+      ...(identity.email ? { paypal_email: identity.email } : {}),
+      updated_at: new Date().toISOString(),
+    }),
+  })
+  // A unique-index conflict means that this PayPal payer has already claimed
+  // a trial through another app account.
+  if (r.status === 409) return false
+  if (!r.ok) throw new Error(`paypal_identity_claim_failed: ${await r.text()}`)
+  return true
+}
+
+async function activateTrial(supaUrl, headers, subscriptionId, trialStartedAt, trialEndsAt) {
+  const url = new URL(`${supaUrl}/rest/v1/subscription_trials`)
+  url.searchParams.set('paypal_subscription_id', `eq.${subscriptionId}`)
+  const r = await fetch(url, {
+    method: 'PATCH',
+    headers: { ...headers, Prefer: 'return=minimal' },
+    body: JSON.stringify({
+      status: 'active',
+      trial_started_at: trialStartedAt,
+      trial_ends_at: trialEndsAt,
+      updated_at: new Date().toISOString(),
+    }),
+  })
+  if (!r.ok) throw new Error(`trial_activation_failed: ${await r.text()}`)
+}
+
 async function finalizeSubscription({ base, accessToken, supaUrl, headers, subscriptionId, clinicId: hintedClinicId, tier: hintedTier }) {
   if (!subscriptionId) return json({ ok: false, error: 'no_subscription' }, 400)
   const subR = await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
@@ -93,8 +157,28 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, subsc
   const clinic = await getClinic(supaUrl, headers, clinicId)
   if (!clinic) return json({ ok: false, error: 'clinic_not_found' }, 404)
 
+  const trial = await getTrialBySubscription(supaUrl, headers, subscriptionId)
+  const isCurrentSubscription = clinic.paypalSubscriptionId === subscriptionId
+  // A legacy subscription that was already accepted before this ledger existed
+  // remains retry-safe. Every new trial must have a reservation in the ledger.
+  const legacyRetry = isCurrentSubscription && Boolean(clinic.trialStartedAt || clinic.trialUsedAt)
+  if ((!trial || trial.clinic_id !== clinicId) && !legacyRetry) {
+    await cancelSubscription(base, accessToken, subscriptionId)
+    return json({ ok: false, error: 'trial_not_reserved' }, 409)
+  }
+  if (trial && !await claimPaypalIdentity(supaUrl, headers, subscriptionId, paypalIdentity(sub))) {
+    await cancelSubscription(base, accessToken, subscriptionId)
+    return json({ ok: false, error: 'trial_already_used' }, 409)
+  }
+  if ((clinic.trialStartedAt || clinic.trialUsedAt || clinic.paypalSubscriptionId) && !isCurrentSubscription) {
+    await cancelSubscription(base, accessToken, subscriptionId)
+    return json({ ok: false, error: 'trial_already_used' }, 409)
+  }
+
   const now = new Date().toISOString()
-  const nextBillingTime = sub.billing_info?.next_billing_time || addOneMonthIso()
+  const trialStartedAt = clinic.trialStartedAt || clinic.trialUsedAt || now
+  const nextBillingTime = clinic.trialEndsAt || sub.billing_info?.next_billing_time || addOneMonthIso()
+  if (trial) await activateTrial(supaUrl, headers, subscriptionId, trialStartedAt, nextBillingTime)
   const priceUpdated = await updateSubscriptionPrice(base, accessToken, subscriptionId)
   const nextData = {
     ...clinic,
@@ -112,8 +196,11 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, subsc
     subscriptionVerifiedPaymentId: null,
     subscriptionPaymentVerificationSource: null,
     subscriptionLastPaidAt: null,
-    trialStartedAt: clinic.trialStartedAt || now,
-    trialEndsAt: clinic.trialEndsAt || nextBillingTime,
+    // These fields are intentionally never reset: the same email can never
+    // receive a second free month after cancelling or returning later.
+    trialUsedAt: clinic.trialUsedAt || trialStartedAt,
+    trialStartedAt,
+    trialEndsAt: nextBillingTime,
     nextBillingTime,
     renewalPrice: priceUpdated ? PRICES[tier] : clinic.renewalPrice,
     renewalCurrency: 'USD',
