@@ -250,7 +250,9 @@ export function StoreProvider({ children }) {
   const updatePatient = useCallback((id, patch) => {
     const old = stateRef.current.patients.find((p) => p.id === id)
     if (!old) return
-    upsert('patients', 'patients', { ...old, ...patch })
+    const resolvedPatch = typeof patch === 'function' ? patch(old) : patch
+    if (!resolvedPatch) return
+    upsert('patients', 'patients', { ...old, ...resolvedPatch })
   }, [upsert])
 
   const deletePatient = useCallback((id) => {

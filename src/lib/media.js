@@ -1,10 +1,16 @@
 // ──────────────────────────────────────────────────────────────────────────
-//  IndexedDB media store for patient photos / x-rays (large binary data that
-//  would overflow localStorage). Stores images as data-URL strings keyed by id.
+//  Patient media storage.
+//
+//  Every image is cached in IndexedDB for fast/offline viewing. In cloud mode
+//  it is also stored in the private Supabase `patient-images` bucket so the
+//  same image is available on the clinic's other phones and computers.
 // ──────────────────────────────────────────────────────────────────────────
+
+import { isCloud, supabase } from './supabaseClient'
 
 const DB_NAME = 'dentacare.media'
 const STORE = 'images'
+const BUCKET = 'patient-images'
 let _dbPromise = null
 
 function open() {
@@ -49,6 +55,160 @@ export async function deleteImage(id) {
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
   })
+}
+
+function safeSegment(value, label) {
+  const segment = String(value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_')
+  if (!segment) throw new Error(`Missing ${label} for patient image`)
+  return segment
+}
+
+// The first folder is deliberately the clinic id: Supabase Storage policies
+// use it to ensure an authenticated user can only access their own clinic.
+export function patientImagePath({ clinicId, patientId, imageId }) {
+  return `${safeSegment(clinicId, 'clinic id')}/${safeSegment(patientId, 'patient id')}/${safeSegment(imageId, 'image id')}.jpg`
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [header, encoded] = String(dataUrl).split(',', 2)
+  if (!header || !encoded) throw new Error('Invalid image data')
+  const mime = header.match(/^data:([^;]+);base64$/i)?.[1] || 'image/jpeg'
+  const binary = atob(encoded)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return new Blob([bytes], { type: mime })
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error || new Error('Could not read downloaded image'))
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function withTimeout(promise, ms, message) {
+  let timer
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), ms)
+      }),
+    ])
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+async function cacheImage(id, dataUrl) {
+  try {
+    await withTimeout(putImage(id, dataUrl), 8000, 'Local image cache timed out')
+  } catch (error) {
+    // A full/disabled IndexedDB cache must not prevent cloud images from
+    // uploading or displaying during the current session.
+    if (!isCloud) throw error
+    console.warn('Could not cache patient image locally:', error)
+  }
+}
+
+async function readCachedImage(id) {
+  try {
+    return await withTimeout(getImage(id), 8000, 'Local image cache timed out')
+  } catch (error) {
+    if (!isCloud) throw error
+    console.warn('Could not read patient image cache:', error)
+    return null
+  }
+}
+
+async function uploadCloudImage(storagePath, dataUrl) {
+  const blob = dataUrlToBlob(dataUrl)
+  const { error } = await withTimeout(
+    supabase.storage.from(BUCKET).upload(storagePath, blob, {
+      cacheControl: '3600',
+      contentType: blob.type || 'image/jpeg',
+      upsert: true,
+    }),
+    30000,
+    'Cloud image upload timed out'
+  )
+  if (error) {
+    const wrapped = new Error(error.message || 'Cloud image upload failed')
+    wrapped.code = error.statusCode || error.status || error.name
+    wrapped.cause = error
+    throw wrapped
+  }
+}
+
+/**
+ * Save a newly selected patient image locally and, in cloud mode, remotely.
+ * Returns the private storage path to keep in the patient's photo metadata.
+ */
+export async function savePatientImage(id, dataUrl, { clinicId, patientId }) {
+  await cacheImage(id, dataUrl)
+  if (!isCloud) return null
+
+  const storagePath = patientImagePath({ clinicId, patientId, imageId: id })
+  await uploadCloudImage(storagePath, dataUrl)
+  return storagePath
+}
+
+/**
+ * Load a photo from the device cache or the private cloud bucket. Legacy
+ * device-only photos are uploaded automatically when opened on their original
+ * device, allowing their metadata to be migrated without losing the image.
+ */
+export async function loadPatientImage(photo, { clinicId, patientId }) {
+  const cached = await readCachedImage(photo.id)
+
+  if (!isCloud) return { dataUrl: cached, storagePath: null, error: null }
+
+  const storagePath = photo.storagePath || patientImagePath({ clinicId, patientId, imageId: photo.id })
+  if (cached) {
+    if (!photo.storagePath) {
+      try {
+        await uploadCloudImage(storagePath, cached)
+        return { dataUrl: cached, storagePath, error: null }
+      } catch (error) {
+        // Keep showing the local copy. A later visit can retry migration after
+        // connectivity or the bucket setup is fixed.
+        return { dataUrl: cached, storagePath: null, error }
+      }
+    }
+    return { dataUrl: cached, storagePath: photo.storagePath, error: null }
+  }
+
+  const { data, error } = await withTimeout(
+    supabase.storage.from(BUCKET).download(storagePath),
+    30000,
+    'Cloud image download timed out'
+  )
+  if (error || !data) return { dataUrl: null, storagePath: photo.storagePath || null, error: error || new Error('Image not found') }
+
+  const dataUrl = await blobToDataUrl(data)
+  await cacheImage(photo.id, dataUrl)
+  return { dataUrl, storagePath, error: null }
+}
+
+/** Remove both the local cache and the shared cloud object. */
+export async function deletePatientImage(photo, { clinicId, patientId }) {
+  try {
+    await deleteImage(photo.id)
+  } catch (error) {
+    if (!isCloud) throw error
+    console.warn('Could not remove patient image cache:', error)
+  }
+
+  if (!isCloud) return
+  const storagePath = photo.storagePath || patientImagePath({ clinicId, patientId, imageId: photo.id })
+  const { error } = await withTimeout(
+    supabase.storage.from(BUCKET).remove([storagePath]),
+    30000,
+    'Cloud image deletion timed out'
+  )
+  if (error) throw error
 }
 
 // Resize an uploaded image to keep storage reasonable, returns a JPEG data URL.

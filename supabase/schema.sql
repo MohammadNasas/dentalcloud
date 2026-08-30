@@ -241,4 +241,28 @@ drop policy if exists suggestions_owner_read on public.suggestions;
 create policy suggestions_owner_read on public.suggestions for select
   using ( lower(auth.jwt() ->> 'email') = 'mohammadissogood556@gmail.com' );
 
+-- ── Private patient photos / X-rays ─────────────────────────────────────
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('patient-images', 'patient-images', false, 10485760, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+-- Paths are <clinic-id>/<patient-id>/<image-id>.jpg. The first folder is
+-- checked against the signed-in doctor's clinic for every storage operation.
+drop policy if exists patient_images_select on storage.objects;
+create policy patient_images_select on storage.objects for select to authenticated
+  using (bucket_id = 'patient-images' and (storage.foldername(name))[1] = public.current_clinic_id()::text);
+drop policy if exists patient_images_insert on storage.objects;
+create policy patient_images_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'patient-images' and (storage.foldername(name))[1] = public.current_clinic_id()::text);
+drop policy if exists patient_images_update on storage.objects;
+create policy patient_images_update on storage.objects for update to authenticated
+  using (bucket_id = 'patient-images' and (storage.foldername(name))[1] = public.current_clinic_id()::text)
+  with check (bucket_id = 'patient-images' and (storage.foldername(name))[1] = public.current_clinic_id()::text);
+drop policy if exists patient_images_delete on storage.objects;
+create policy patient_images_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'patient-images' and (storage.foldername(name))[1] = public.current_clinic_id()::text);
+
 -- Done. ✅  Next: copy your Project URL + anon key into the app's .env (see SUPABASE_SETUP.md)

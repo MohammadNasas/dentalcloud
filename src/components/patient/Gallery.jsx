@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, Trash2, Images, X, Scan } from 'lucide-react'
+import { Upload, Trash2, Images, X, Scan, ImageOff, RefreshCw } from 'lucide-react'
 import { useI18n } from '../../i18n/I18nContext'
 import { useStore } from '../../context/StoreContext'
-import { putImage, getImage, deleteImage, fileToResizedDataURL } from '../../lib/media'
+import { savePatientImage, loadPatientImage, deletePatientImage, fileToResizedDataURL } from '../../lib/media'
 import { genId } from '../../lib/db'
 import { EmptyState, Segmented } from '../ui'
 import { toast } from '../anim'
@@ -20,7 +20,7 @@ const CATEGORIES = {
 
 export default function Gallery({ patient }) {
   const { t, lang, L } = useI18n()
-  const { updatePatient, can } = useStore()
+  const { updatePatient, can, clinic, mode } = useStore()
   const fullGallery = can('photos') // Pro: before/during/after/x-ray. Else: a single X-ray box.
   const photos = patient.photos || []
   const [urls, setUrls] = useState({})
@@ -28,22 +28,61 @@ export default function Gallery({ patient }) {
   const [busy, setBusy] = useState(false)
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [lightbox, setLightbox] = useState(null)
+  const [loadState, setLoadState] = useState({})
+  const [reloadToken, setReloadToken] = useState(0)
+  const [uploadError, setUploadError] = useState('')
+  const attemptedRef = useRef(new Set())
   const fileRef = useRef()
 
   useEffect(() => {
     let active = true
-    ;(async () => {
-      const map = {}
-      for (const p of photos) {
-        if (!urls[p.id]) { const d = await getImage(p.id); if (d) map[p.id] = d }
-      }
-      if (active && Object.keys(map).length) setUrls((u) => ({ ...u, ...map }))
-    })()
+    const currentIds = new Set(photos.map((p) => p.id))
+    for (const id of attemptedRef.current) {
+      if (!currentIds.has(id)) attemptedRef.current.delete(id)
+    }
+
+    for (const photo of photos) {
+      if (urls[photo.id] || attemptedRef.current.has(photo.id)) continue
+      attemptedRef.current.add(photo.id)
+      setLoadState((s) => ({ ...s, [photo.id]: 'loading' }))
+      ;(async () => {
+        try {
+          const result = await loadPatientImage(photo, { clinicId: clinic?.id, patientId: patient.id })
+          if (!active) return
+          if (result.dataUrl) {
+            setUrls((u) => ({ ...u, [photo.id]: result.dataUrl }))
+            setLoadState((s) => ({ ...s, [photo.id]: 'ready' }))
+            if (result.error && mode === 'cloud') {
+              setUploadError(lang === 'ar'
+                ? 'إحدى الصور ظاهرة من هذا الجهاز، لكن تعذرت مزامنتها مع السحابة. تحقق من الإنترنت وإعداد تخزين الصور.'
+                : 'An image is available on this device, but could not sync to the cloud. Check the connection and image-storage setup.')
+            }
+          } else {
+            const missing = !photo.storagePath && /not found|404|does not exist/i.test(`${result.error?.message || ''} ${result.error?.statusCode || ''}`)
+            setLoadState((s) => ({ ...s, [photo.id]: missing ? 'missing' : 'error' }))
+          }
+
+          // Persist the path discovered during a legacy-image migration.
+          if (result.storagePath && result.storagePath !== photo.storagePath) {
+            updatePatient(patient.id, (latest) => ({
+              photos: (latest.photos || []).map((p) => p.id === photo.id ? { ...p, storagePath: result.storagePath } : p),
+            }))
+          }
+        } catch (error) {
+          console.error('Failed to load patient image:', error)
+          if (active) setLoadState((s) => ({ ...s, [photo.id]: 'error' }))
+        }
+      })()
+    }
     return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [photos.length])
+  }, [patient.id, photos, clinic?.id, reloadToken])
 
-  const [uploadError, setUploadError] = useState('')
+  useEffect(() => {
+    setUrls({})
+    setLoadState({})
+    attemptedRef.current.clear()
+  }, [patient.id])
 
   async function onFiles(files) {
     const images = files.filter((f) => f.type.startsWith('image/'))
@@ -59,13 +98,16 @@ export default function Gallery({ patient }) {
         try {
           const dataUrl = await fileToResizedDataURL(file)
           const id = genId('img')
-          await putImage(id, dataUrl)
+          const storagePath = await savePatientImage(id, dataUrl, { clinicId: clinic?.id, patientId: patient.id })
           setUrls((u) => ({ ...u, [id]: dataUrl }))
-          next.push({ id, category, caption: '', date: new Date().toISOString() })
+          next.push({ id, category, caption: '', date: new Date().toISOString(), ...(storagePath ? { storagePath } : {}) })
           added++
         } catch (err) {
           console.error('Failed to process image:', err)
-          setUploadError(lang === 'ar' ? 'فشل تحميل إحدى الصور، حاول مرة أخرى' : 'Failed to upload an image, try again')
+          const storageMissing = mode === 'cloud' && /bucket|not found|404/i.test(`${err?.message || ''} ${err?.code || ''}`)
+          setUploadError(storageMissing
+            ? (lang === 'ar' ? 'تخزين الصور السحابي غير مفعّل بعد. شغّل إعداد تخزين الصور ثم حاول مرة أخرى.' : 'Cloud image storage is not enabled yet. Run the image-storage setup, then try again.')
+            : (lang === 'ar' ? 'فشل رفع إحدى الصور. تحقق من الإنترنت وحاول مرة أخرى.' : 'Failed to upload an image. Check your connection and try again.'))
         }
         setProgress((p) => ({ ...p, done: p.done + 1 }))
       }
@@ -85,9 +127,22 @@ export default function Gallery({ patient }) {
     if (files.length) onFiles(files)
   }
 
-  async function remove(id) {
-    await deleteImage(id)
-    updatePatient(patient.id, { photos: photos.filter((p) => p.id !== id) })
+  async function remove(photo) {
+    try {
+      await deletePatientImage(photo, { clinicId: clinic?.id, patientId: patient.id })
+      setUrls((u) => { const next = { ...u }; delete next[photo.id]; return next })
+      attemptedRef.current.delete(photo.id)
+      updatePatient(patient.id, (latest) => ({ photos: (latest.photos || []).filter((p) => p.id !== photo.id) }))
+    } catch (error) {
+      console.error('Failed to delete patient image:', error)
+      setUploadError(lang === 'ar' ? 'تعذر حذف الصورة، حاول مرة أخرى.' : 'Could not delete the image. Please try again.')
+    }
+  }
+
+  function retryLoad(id) {
+    attemptedRef.current.delete(id)
+    setLoadState((s) => ({ ...s, [id]: 'loading' }))
+    setReloadToken((n) => n + 1)
   }
 
   const groups = (fullGallery ? ['before', 'during', 'after', 'xray', 'other'] : ['xray']).map((c) => ({ c, items: photos.filter((p) => p.category === c) })).filter((g) => g.items.length)
@@ -151,8 +206,26 @@ export default function Gallery({ patient }) {
                 <div key={p.id} className="group relative aspect-square overflow-hidden rounded-xl border border-ink-100 bg-ink-50">
                   {urls[p.id] ? (
                     <img src={urls[p.id]} alt="" onClick={() => setLightbox(urls[p.id])} className={cx('h-full w-full cursor-zoom-in object-cover', g.c === 'xray' && 'bg-black')} />
-                  ) : <span className="shimmer block h-full w-full" />}
-                  <button onClick={() => remove(p.id)} className="absolute top-2 rounded-lg bg-white/90 p-1.5 text-rose-500 opacity-0 shadow transition-opacity group-hover:opacity-100 end-2"><Trash2 size={14} /></button>
+                  ) : loadState[p.id] === 'loading' || !loadState[p.id] ? (
+                    <span className="shimmer block h-full w-full" />
+                  ) : (
+                    <div className="flex h-full flex-col items-center justify-center gap-2 p-3 text-center text-ink-400">
+                      <ImageOff size={24} />
+                      <span className="text-[11px] font-semibold leading-relaxed">
+                        {lang === 'ar'
+                          ? (loadState[p.id] === 'missing'
+                              ? 'الصورة القديمة لم تُرفع للسحابة بعد. افتحها مرة من الجهاز الذي أُضيفت منه.'
+                              : 'تعذر تحميل الصورة. تحقق من الإنترنت ثم أعد المحاولة.')
+                          : (loadState[p.id] === 'missing'
+                              ? 'This older image is not in the cloud yet. Open it once on the device where it was added.'
+                              : 'Could not load the image. Check your connection, then retry.')}
+                      </span>
+                      <button type="button" onClick={() => retryLoad(p.id)} className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-600">
+                        <RefreshCw size={12} /> {lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+                      </button>
+                    </div>
+                  )}
+                  <button onClick={() => remove(p)} className="absolute top-2 rounded-lg bg-white/90 p-1.5 text-rose-500 opacity-100 shadow transition-opacity sm:opacity-0 sm:group-hover:opacity-100 end-2"><Trash2 size={14} /></button>
                   <span className="absolute bottom-1 rounded bg-black/50 px-1.5 py-0.5 text-[10px] text-white start-1">{fmtDate(p.date, lang)}</span>
                 </div>
               ))}
