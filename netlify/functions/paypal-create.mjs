@@ -1,7 +1,8 @@
-// Netlify Function: starts a PayPal subscription with a 1-month free trial.
+// Netlify Function: starts either a first-time free trial or an immediate paid
+// PayPal subscription when that payment identity used its trial.
 // Env vars: PAYPAL_CLIENT_ID, PAYPAL_SECRET, SUPABASE_URL,
 // SUPABASE_SERVICE_ROLE_KEY, PAYPAL_BASE (optional), SITE_URL (optional)
-// Optional: PAYPAL_PRODUCT_ID, PAYPAL_PRO_TRIAL_PLAN_ID
+// Optional: PAYPAL_PRODUCT_ID, PAYPAL_PRO_TRIAL_PLAN_ID, PAYPAL_PRO_PAID_PLAN_ID
 const PRICES = { pro: 50 }
 const LABELS = { pro: 'Pro' }
 
@@ -81,25 +82,51 @@ async function createTrialPlan(base, accessToken, { productId, tier, amount }) {
   }, `dc-plan-${tier}`)
 }
 
-async function updatePlanPrice(base, accessToken, planId, amount) {
+async function createPaidPlan(base, accessToken, { productId, tier, amount }) {
+  return paypalJson(`${base}/v1/billing/plans`, accessToken, {
+    product_id: productId,
+    name: `DentalCloud ${LABELS[tier]} - paid annually`,
+    description: `$${amount} charged now, then annually. No free trial.`,
+    status: 'ACTIVE',
+    billing_cycles: [{
+      frequency: { interval_unit: 'YEAR', interval_count: 1 },
+      tenure_type: 'REGULAR',
+      sequence: 1,
+      total_cycles: 0,
+      pricing_scheme: { fixed_price: { currency_code: 'USD', value: amount.toFixed(2) } },
+    }],
+    payment_preferences: {
+      auto_bill_outstanding: true,
+      setup_fee_failure_action: 'CANCEL',
+      payment_failure_threshold: 1,
+    },
+  }, `dc-paid-plan-${tier}`)
+}
+
+async function updatePlanPrice(base, accessToken, planId, amount, sequence) {
   await paypalJson(`${base}/v1/billing/plans/${encodeURIComponent(planId)}/update-pricing-schemes`, accessToken, {
     pricing_schemes: [{
-      billing_cycle_sequence: 2,
+      billing_cycle_sequence: sequence,
       pricing_scheme: { fixed_price: { currency_code: 'USD', value: amount.toFixed(2) } },
     }],
   }, `dc-plan-price-${planId}`)
 }
 
-async function ensurePlanId(env, base, accessToken, tier, amount) {
-  const explicit = env[`PAYPAL_${tier.toUpperCase()}_TRIAL_PLAN_ID`] || env[`PAYPAL_PLAN_${tier.toUpperCase()}`]
+async function ensurePlanId(env, base, accessToken, tier, amount, checkoutMode) {
+  const isPaid = checkoutMode === 'paid'
+  const explicit = isPaid
+    ? env[`PAYPAL_${tier.toUpperCase()}_PAID_PLAN_ID`]
+    : env[`PAYPAL_${tier.toUpperCase()}_TRIAL_PLAN_ID`] || env[`PAYPAL_PLAN_${tier.toUpperCase()}`]
   if (explicit) {
     // Keep the PayPal approval screen and every existing subscriber on this
     // plan aligned with the public price before starting a new subscription.
-    await updatePlanPrice(base, accessToken, explicit, amount)
+    await updatePlanPrice(base, accessToken, explicit, amount, isPaid ? 1 : 2)
     return explicit
   }
   const productId = env.PAYPAL_PRODUCT_ID || (await createProduct(base, accessToken)).id
-  const plan = await createTrialPlan(base, accessToken, { productId, tier, amount })
+  const plan = isPaid
+    ? await createPaidPlan(base, accessToken, { productId, tier, amount })
+    : await createTrialPlan(base, accessToken, { productId, tier, amount })
   return plan.id
 }
 
@@ -187,7 +214,7 @@ async function cancelSubscription(base, accessToken, subscriptionId) {
 
 export default async (req) => {
   if (req.method === 'OPTIONS')
-    return new Response('', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } })
+    return new Response('', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Allow-Methods': 'POST, OPTIONS' } })
   if (req.method !== 'POST') return json({ error: 'method' }, 405)
 
   const id = process.env.PAYPAL_CLIENT_ID, secret = process.env.PAYPAL_SECRET
@@ -200,6 +227,7 @@ export default async (req) => {
   let payload
   try { payload = await req.json() } catch { return json({ error: 'bad_json' }, 400) }
   const { tier, clinicId } = payload || {}
+  const checkoutMode = payload?.checkoutMode === 'paid' ? 'paid' : 'trial'
   if (!PRICES[tier] || !clinicId) return json({ error: 'bad_request' }, 400)
 
   let reservation = null
@@ -213,23 +241,27 @@ export default async (req) => {
 
     const clinicRow = await loadClinic(supaUrl, headers, clinicId)
     if (!clinicRow) return json({ error: 'clinic_not_found' }, 404)
-    // Covers all trials created before the permanent email ledger was added.
-    if (clinicRow.data?.trialStartedAt || clinicRow.data?.trialUsedAt || clinicRow.data?.paypalSubscriptionId)
-      return json({ error: 'trial_already_used' }, 409)
-    if (!await reserveTrial(supaUrl, headers, { email: user.email, userId: user.id, clinicId }))
-      return json({ error: 'trial_already_used' }, 409)
-    reservation = { email: user.email, userId: user.id, clinicId, headers }
+    if (checkoutMode === 'trial') {
+      // Covers all trials created before the permanent email ledger was added.
+      if (clinicRow.data?.trialStartedAt || clinicRow.data?.trialUsedAt || clinicRow.data?.paypalSubscriptionId)
+        return json({ error: 'trial_already_used', requiresPaidCheckout: true }, 409)
+      if (!await reserveTrial(supaUrl, headers, { email: user.email, userId: user.id, clinicId }))
+        return json({ error: 'trial_already_used', requiresPaidCheckout: true }, 409)
+      reservation = { email: user.email, userId: user.id, clinicId, headers }
+    } else if (clinicRow.data?.paid && clinicRow.data?.subscriptionPaymentVerified === true) {
+      return json({ error: 'already_paid' }, 409)
+    }
 
     const tok = await token(base, id, secret)
     if (!tok.access_token) {
-      await releaseUnboundTrial(supaUrl, headers, reservation)
+      if (reservation) await releaseUnboundTrial(supaUrl, headers, reservation)
       return json({ error: 'auth_failed', message: tok.error_description || tok.error }, 400)
     }
     paypalAccessToken = tok.access_token
 
     const amount = PRICES[tier]
-    const planId = await ensurePlanId(process.env, base, tok.access_token, tier, amount)
-    const reference = `${clinicId}--${tier}--trial--${Date.now()}`
+    const planId = await ensurePlanId(process.env, base, tok.access_token, tier, amount, checkoutMode)
+    const reference = `${clinicId}--${tier}--${checkoutMode}--${Date.now()}`
     const sub = await paypalJson(`${base}/v1/billing/subscriptions`, tok.access_token, {
       plan_id: planId,
       custom_id: reference,
@@ -238,7 +270,7 @@ export default async (req) => {
         brand_name: 'DentalCloud',
         shipping_preference: 'NO_SHIPPING',
         user_action: 'SUBSCRIBE_NOW',
-        return_url: `${siteUrl}/?paypal=subscription&clinic=${encodeURIComponent(clinicId)}&tier=${encodeURIComponent(tier)}`,
+        return_url: `${siteUrl}/?paypal=subscription&clinic=${encodeURIComponent(clinicId)}&tier=${encodeURIComponent(tier)}&mode=${checkoutMode}`,
         cancel_url: `${siteUrl}/?paypal=cancel`,
       },
     }, `dc-sub-${clinicId}`)
@@ -247,15 +279,15 @@ export default async (req) => {
     paypalSubscriptionId = sub.id || ''
     if (!paypalSubscriptionId || !approve) {
       await cancelSubscription(base, tok.access_token, paypalSubscriptionId)
-      await releaseUnboundTrial(supaUrl, headers, reservation)
+      if (reservation) await releaseUnboundTrial(supaUrl, headers, reservation)
       return json({ error: 'subscription_failed', message: sub.message, details: sub.details }, 400)
     }
-    if (!await bindTrialToSubscription(supaUrl, headers, { ...reservation, subscriptionId: paypalSubscriptionId })) {
+    if (reservation && !await bindTrialToSubscription(supaUrl, headers, { ...reservation, subscriptionId: paypalSubscriptionId })) {
       await cancelSubscription(base, tok.access_token, paypalSubscriptionId)
       await releaseUnboundTrial(supaUrl, headers, reservation)
       return json({ error: 'trial_reservation_failed' }, 409)
     }
-    return json({ url: approve.href, subscriptionId: sub.id, planId })
+    return json({ url: approve.href, subscriptionId: sub.id, planId, checkoutMode })
   } catch (e) {
     if (paypalSubscriptionId && paypalAccessToken) await cancelSubscription(base, paypalAccessToken, paypalSubscriptionId)
     if (reservation) await releaseUnboundTrial(supaUrl, reservation.headers, reservation)

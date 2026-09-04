@@ -102,7 +102,7 @@ export default function Landing({ onEnter }) {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55, duration: 0.4 }}
               className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-400">
               <span className="flex items-center gap-1.5"><ShieldCheck size={15} className="text-brand-500" /> {lang === 'ar' ? 'بياناتك محمية' : 'Your data is protected'}</span>
-              <span className="flex items-center gap-1.5"><Sparkles size={15} className="text-amber-500" /> {lang === 'ar' ? 'باقة الطالب $5 لمرة واحدة — للأبد' : 'Student plan: $5 once — forever'}</span>
+              <span className="flex items-center gap-1.5"><Sparkles size={15} className="text-amber-500" /> {lang === 'ar' ? 'باقة الطالب مجانية — للأبد' : 'Student plan: free — forever'}</span>
             </motion.div>
           </div>
 

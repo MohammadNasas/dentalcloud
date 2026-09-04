@@ -1,9 +1,9 @@
 // ──────────────────────────────────────────────────────────────────────────
 //  Patient media storage.
 //
-//  Every image is cached in IndexedDB for fast/offline viewing. In cloud mode
-//  it is also stored in the private Supabase `patient-images` bucket so the
-//  same image is available on the clinic's other phones and computers.
+//  Cloud accounts store images only in the private Supabase `patient-images`
+//  bucket. IndexedDB is retained solely for explicit local/demo mode and for a
+//  one-time migration of legacy device-only images.
 // ──────────────────────────────────────────────────────────────────────────
 
 import { isCloud, supabase } from './supabaseClient'
@@ -55,6 +55,16 @@ export async function deleteImage(id) {
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
   })
+}
+
+// Remove device copies only when the patient metadata confirms that a cloud
+// object exists. Legacy photos without storagePath are preserved for migration.
+export async function purgeCloudBackedImageCache(patients = []) {
+  if (!isCloud) return
+  const ids = patients.flatMap((patient) =>
+    (patient.photos || []).filter((photo) => photo.storagePath).map((photo) => photo.id)
+  )
+  await Promise.allSettled(ids.map((id) => deleteImage(id)))
 }
 
 function safeSegment(value, label) {
@@ -143,12 +153,15 @@ async function uploadCloudImage(storagePath, dataUrl) {
 }
 
 /**
- * Save a newly selected patient image locally and, in cloud mode, remotely.
+ * Save a newly selected patient image in the account's cloud storage. Local
+ * mode retains the old IndexedDB behaviour for development/demo use only.
  * Returns the private storage path to keep in the patient's photo metadata.
  */
 export async function savePatientImage(id, dataUrl, { clinicId, patientId }) {
-  await cacheImage(id, dataUrl)
-  if (!isCloud) return null
+  if (!isCloud) {
+    await cacheImage(id, dataUrl)
+    return null
+  }
 
   const storagePath = patientImagePath({ clinicId, patientId, imageId: id })
   await uploadCloudImage(storagePath, dataUrl)
@@ -156,28 +169,26 @@ export async function savePatientImage(id, dataUrl, { clinicId, patientId }) {
 }
 
 /**
- * Load a photo from the device cache or the private cloud bucket. Legacy
- * device-only photos are uploaded automatically when opened on their original
- * device, allowing their metadata to be migrated without losing the image.
+ * Load a photo from the private cloud bucket without persisting another copy
+ * on the device. Legacy device-only photos are uploaded once, then their old
+ * IndexedDB copy is removed.
  */
 export async function loadPatientImage(photo, { clinicId, patientId }) {
-  const cached = await readCachedImage(photo.id)
-
-  if (!isCloud) return { dataUrl: cached, storagePath: null, error: null }
+  if (!isCloud) return { dataUrl: await readCachedImage(photo.id), storagePath: null, error: null }
 
   const storagePath = photo.storagePath || patientImagePath({ clinicId, patientId, imageId: photo.id })
-  if (cached) {
-    if (!photo.storagePath) {
+  if (!photo.storagePath) {
+    const legacyCopy = await readCachedImage(photo.id)
+    if (legacyCopy) {
       try {
-        await uploadCloudImage(storagePath, cached)
-        return { dataUrl: cached, storagePath, error: null }
+        await uploadCloudImage(storagePath, legacyCopy)
+        await deleteImage(photo.id)
+        return { dataUrl: legacyCopy, storagePath, error: null }
       } catch (error) {
-        // Keep showing the local copy. A later visit can retry migration after
-        // connectivity or the bucket setup is fixed.
-        return { dataUrl: cached, storagePath: null, error }
+        // Do not delete the only copy until its cloud upload succeeds.
+        return { dataUrl: legacyCopy, storagePath: null, error }
       }
     }
-    return { dataUrl: cached, storagePath: photo.storagePath, error: null }
   }
 
   const { data, error } = await withTimeout(
@@ -188,7 +199,6 @@ export async function loadPatientImage(photo, { clinicId, patientId }) {
   if (error || !data) return { dataUrl: null, storagePath: photo.storagePath || null, error: error || new Error('Image not found') }
 
   const dataUrl = await blobToDataUrl(data)
-  await cacheImage(photo.id, dataUrl)
   return { dataUrl, storagePath, error: null }
 }
 

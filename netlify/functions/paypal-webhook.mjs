@@ -89,7 +89,14 @@ async function paypalSubscription(base, accessToken, subscriptionId) {
 async function claimPaypalIdentity(supaUrl, headers, subscriptionId, subscription) {
   const payerId = String(subscription?.subscriber?.payer_id || '').trim()
   const email = normalizeEmail(subscription?.subscriber?.email_address)
-  if (!payerId && !email) return true
+  const paymentTokenId = String(
+    subscription?.subscriber?.payment_source?.card?.attributes?.vault?.id
+    || subscription?.subscriber?.payment_source?.paypal?.attributes?.vault?.id
+    || subscription?.payment_source?.card?.attributes?.vault?.id
+    || subscription?.payment_source?.paypal?.attributes?.vault?.id
+    || ''
+  ).trim()
+  if (!payerId && !email && !paymentTokenId) return false
   const url = new URL(`${supaUrl}/rest/v1/subscription_trials`)
   url.searchParams.set('paypal_subscription_id', `eq.${subscriptionId}`)
   const r = await fetch(url, {
@@ -98,6 +105,7 @@ async function claimPaypalIdentity(supaUrl, headers, subscriptionId, subscriptio
     body: JSON.stringify({
       ...(payerId ? { paypal_payer_id: payerId } : {}),
       ...(email ? { paypal_email: email } : {}),
+      ...(paymentTokenId ? { paypal_payment_token_id: paymentTokenId } : {}),
       updated_at: new Date().toISOString(),
     }),
   })

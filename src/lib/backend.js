@@ -1,8 +1,9 @@
 // ──────────────────────────────────────────────────────────────────────────
 //  Backend adapter. One interface, two implementations:
-//   • localBackend   — offline, this device only (localStorage). Always works.
+//   • localBackend   — explicit developer demo only (localStorage).
 //   • cloudBackend   — Supabase: shared online accounts, web + desktop sync.
-//  Selected automatically based on whether Supabase env config is present.
+//  Production fails closed when Supabase is missing so patient records are
+//  never silently written to the device instead of the signed-in account.
 //
 //  Interface (all async):
 //    restore()                      -> { user, clinic } | null
@@ -275,5 +276,26 @@ const cloudBackend = {
   },
 }
 
-export const backend = isCloud ? cloudBackend : localBackend
+const cloudRequiredBackend = {
+  mode: 'cloud-required',
+  genId: localGenId,
+  async restore() { return null },
+  async signIn() { return { ok: false, error: 'cloudRequired' } },
+  async signUp() { return { ok: false, error: 'cloudRequired' } },
+  async signOut() {},
+  async bootstrap() { return { clinic: null, doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [] } },
+  async save() { throw new Error('Cloud storage is not configured') },
+  async remove() { throw new Error('Cloud storage is not configured') },
+  async saveClinic() { throw new Error('Cloud storage is not configured') },
+  async resetPassword() { return { ok: false, error: 'cloudRequired' } },
+  async updatePassword() { return { ok: false, error: 'cloudRequired' } },
+  async verifyOtp() { return { ok: false, error: 'cloudRequired' } },
+  async resendOtp() { return { ok: false, error: 'cloudRequired' } },
+  onAuthEvent() { return { data: { subscription: { unsubscribe() {} } } } },
+}
+
+// Device-only persistence must be opted into explicitly for developer demos.
+// Normal web and desktop builds require Supabase and therefore account storage.
+const allowLocalMode = import.meta.env.DEV && import.meta.env.VITE_ENABLE_LOCAL_MODE === 'true'
+export const backend = isCloud ? cloudBackend : (allowLocalMode ? localBackend : cloudRequiredBackend)
 export const backendMode = backend.mode

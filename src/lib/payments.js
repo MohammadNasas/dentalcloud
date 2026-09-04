@@ -8,25 +8,25 @@ export const paymentsEnabled = isCloud
 // ── PayPal ──────────────────────────────────────────────────────────────
 const PENDING_PAYPAL_KEY = 'dentalcloud.pendingPaypalSubscription'
 
-export async function startPaypalCheckout({ tier, clinicId, coupon, email }) {
+export async function startPaypalCheckout({ tier, clinicId, coupon, email, checkoutMode = 'trial' }) {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) return { ok: false, error: 'unauthorized' }
     const r = await fetch('/api/paypal-create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-      body: JSON.stringify({ tier, clinicId, coupon, email }),
+      body: JSON.stringify({ tier, clinicId, coupon, email, checkoutMode }),
     })
     const data = await r.json().catch(() => ({}))
     if (r.ok && data.url) {
       if (data.subscriptionId) {
         try {
-          sessionStorage.setItem(PENDING_PAYPAL_KEY, JSON.stringify({ subscriptionId: data.subscriptionId, clinicId, tier }))
+          sessionStorage.setItem(PENDING_PAYPAL_KEY, JSON.stringify({ subscriptionId: data.subscriptionId, clinicId, tier, checkoutMode }))
         } catch { /* sessionStorage can be blocked; PayPal usually returns the id too */ }
       }
       return { ok: true, url: data.url, subscriptionId: data.subscriptionId }
     }
-    return { ok: false, error: data.error || 'failed', message: data.message, status: r.status }
+    return { ...data, ok: false, error: data.error || 'failed', message: data.message, status: r.status }
   } catch (e) {
     return { ok: false, error: 'network', message: String(e) }
   }
@@ -52,10 +52,12 @@ export async function notifyCouponUse({ email, tier, coupon }) {
 
 export async function capturePaypal(payment) {
   try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return { ok: false, error: 'unauthorized' }
     const payload = typeof payment === 'string' ? { orderId: payment } : payment
     const r = await fetch('/api/paypal-capture', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(payload),
     })
     const data = await r.json()
@@ -71,9 +73,11 @@ export async function capturePaypal(payment) {
 export async function syncPaypalSubscription({ subscriptionId, clinicId }) {
   if (!subscriptionId || !clinicId) return { ok: false, error: 'missing_subscription' }
   try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) return { ok: false, error: 'unauthorized' }
     const r = await fetch('/api/paypal-subscription-status', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ subscriptionId, clinicId }),
     })
     return await r.json()
@@ -96,6 +100,7 @@ export function getPaypalReturn() {
       subscriptionId,
       clinicId: p.get('clinic') || pending.clinicId,
       tier: p.get('tier') || pending.tier,
+      checkoutMode: p.get('mode') || pending.checkoutMode,
     }
   }
   if (p.get('paypal') === 'return') return { type: 'order', orderId: p.get('token') }

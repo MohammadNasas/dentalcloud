@@ -45,6 +45,8 @@ export default function Login({ initialTab = 'signin', onBack }) {
     clinicName: '', doctorName: '', email: '', password: '', specialty: '', tier: 'student',
   })
   const isCloud = mode === 'cloud'
+  const isLocal = mode === 'local'
+  const cloudRequired = mode === 'cloud-required'
   const supportWaLink = `https://wa.me/${SUPPORT_WHATSAPP.replace(/\D/g, '')}`
 
   async function doForgot(e) {
@@ -91,9 +93,9 @@ export default function Login({ initialTab = 'signin', onBack }) {
   ]
 
   const ModeChip = () => (
-    <span className={cx('chip', isCloud ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}>
+    <span className={cx('chip', isCloud ? 'bg-emerald-50 text-emerald-600' : cloudRequired ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600')}>
       {isCloud ? <Cloud size={12} /> : <WifiOff size={12} />}
-      {isCloud ? t('auth.online') : t('auth.offline')}
+      {isCloud ? t('auth.online') : cloudRequired ? t('auth.cloudUnavailable') : t('auth.offline')}
     </span>
   )
 
@@ -174,6 +176,11 @@ export default function Login({ initialTab = 'signin', onBack }) {
           {isCloud && (
             <div className="mb-4 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
               <Cloud size={16} /> {t('auth.cloudReady')}
+            </div>
+          )}
+          {cloudRequired && (
+            <div className="mb-4 flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">
+              <WifiOff size={16} /> {t('auth.cloudRequired')}
             </div>
           )}
 
@@ -259,7 +266,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
                 {busy ? <Spinner /> : <>{t('auth.signIn')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
               </button>
 
-              {!isCloud && (
+              {isLocal && (
                 <div className="rounded-xl border border-dashed border-brand-200 bg-brand-50/50 p-3 text-center text-sm">
                   <span className="font-bold text-brand-700">{t('auth.demoHint')}:</span>{' '}
                   <span className="text-ink-600">{DEMO_LOGIN.username} / {DEMO_LOGIN.password}</span>
@@ -356,7 +363,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
           </>
           )}
 
-          <p className="mt-6 text-center text-xs text-ink-400">{isCloud ? t('auth.cloudReady') : t('auth.secureLocal')}</p>
+          <p className="mt-6 text-center text-xs text-ink-400">{isCloud ? t('auth.cloudReady') : cloudRequired ? t('auth.cloudRequired') : t('auth.secureLocal')}</p>
         </div>
       </div>
     </div>

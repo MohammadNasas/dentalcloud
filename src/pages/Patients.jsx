@@ -10,7 +10,7 @@ import PageHero from '../components/PageHero'
 import WhatsAppIcon from '../components/WhatsAppIcon'
 import { money, waLink } from '../lib/utils'
 import { fmtDate, dayLabel, parseISO, isToday, isTomorrow } from '../lib/dates'
-import { exportAllPatients } from '../lib/wordExport'
+import { exportPatientsAsFiles } from '../lib/wordExport'
 
 export default function Patients() {
   const { t, lang, isRTL } = useI18n()
@@ -47,7 +47,7 @@ export default function Patients() {
 
   async function doExportAll() {
     setExporting(true)
-    try { await exportAllPatients({ patients: list, clinic, lang, getDoctor, recordsForPatient, paymentsForPatient, balanceForPatient }) }
+    try { await exportPatientsAsFiles({ patients: list, clinic, lang, getDoctor, recordsForPatient, paymentsForPatient, balanceForPatient }) }
     finally { setExporting(false) }
   }
 

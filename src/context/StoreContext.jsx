@@ -4,6 +4,7 @@ import { backend } from '../lib/backend'
 import { clearPaymentReturn, getPaypalReturn, capturePaypal, syncPaypalSubscription } from '../lib/payments'
 import { buildDemoState } from '../lib/demo'
 import { trackDailyActive } from '../lib/analytics'
+import { purgeCloudBackedImageCache } from '../lib/media'
 import { toast } from '../components/anim'
 
 const StoreContext = createContext(null)
@@ -65,6 +66,9 @@ export function StoreProvider({ children }) {
         const synced = await syncPaypalSubscription({ subscriptionId: clinic.paypalSubscriptionId, clinicId: clinic.id })
         if (synced.ok && synced.clinic) clinic = synced.clinic
       }
+      if (backend.mode === 'cloud') {
+        purgeCloudBackedImageCache(data.patients).catch((e) => console.warn('Could not clear old patient image cache', e))
+      }
       setState({
         clinic,
         currentUser: me.user,
@@ -101,12 +105,34 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     const paypalPayment = getPaypalReturn()
     if (!paypalPayment) return
+    let cancelled = false
+    let pollTimer = null
     clearPaymentReturn()
     ;(async () => {
       const res = await capturePaypal(paypalPayment)
-      if (res.ok) { await loadSession(); setPaymentResult({ ok: true, tier: res.tier, subscription: res.subscription }) }
-      else setPaymentResult({ ok: false, status: res.status, error: res.error, message: res.message })
+      if (res.ok) await loadSession()
+      // Keep checkout metadata so the result dialog can distinguish a free
+      // trial from an immediate paid subscription, or offer the paid fallback.
+      if (!cancelled) setPaymentResult(res)
+      if (res.ok && res.paymentPending && res.subscriptionId && res.clinicId) {
+        let attempts = 0
+        const pollPayment = async () => {
+          if (cancelled) return
+          attempts += 1
+          const synced = await syncPaypalSubscription({ subscriptionId: res.subscriptionId, clinicId: res.clinicId })
+          if (synced.ok && synced.paid) {
+            await loadSession()
+            if (!cancelled) setPaymentResult({ ...res, paid: true, paymentPending: false })
+            return
+          }
+          // PayPal's sale event can arrive shortly after subscription approval.
+          // Keep the account locked while checking; stop after about one minute.
+          if (attempts < 20) pollTimer = setTimeout(pollPayment, 3000)
+        }
+        pollTimer = setTimeout(pollPayment, 3000)
+      }
     })()
+    return () => { cancelled = true; if (pollTimer) clearTimeout(pollTimer) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
   const dismissPaymentResult = useCallback(() => setPaymentResult(null), [])

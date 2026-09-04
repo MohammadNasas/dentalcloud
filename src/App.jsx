@@ -4,9 +4,10 @@ import { motion } from 'framer-motion'
 import { XCircle } from 'lucide-react'
 import { useStore } from './context/StoreContext'
 import { useI18n } from './i18n/I18nContext'
-import { Modal } from './components/ui'
+import { Modal, Spinner } from './components/ui'
 import { Confetti, SuccessCheck, ToastHost } from './components/anim'
 import logo from './lib/logo'
+import { startPaypalCheckout } from './lib/payments'
 import Layout from './components/Layout'
 import PublicEntry from './pages/PublicEntry'
 import ResetPassword from './pages/ResetPassword'
@@ -67,11 +68,41 @@ function Splash() {
 
 function PaymentResultOverlay({ result, onClose }) {
   const { t } = useI18n()
-  const detail = !result.ok
+  const { clinic, currentUser } = useStore()
+  const [startingPaid, setStartingPaid] = useState(false)
+  const [startError, setStartError] = useState('')
+  const title = result.ok
+    ? (result.paymentPending
+        ? t('packages.paymentPendingTitle')
+        : result.subscription && result.trial === false
+          ? t('packages.paidSubscriptionSuccess')
+          : result.subscription ? t('packages.trialSuccess') : t('packages.paySuccess'))
+    : result.error === 'trial_already_used'
+      ? t('packages.trialAlreadyUsed')
+      : t('packages.payCancelled')
+  const detail = result.paymentPending
+    ? t('packages.paymentPending')
+    : result.requiresPaidCheckout
+      ? t('packages.paidWithoutTrialNotice')
+      : !result.ok
     ? (result.reason === 'gateway'
         ? 'declined at the payment page (card / 3-D Secure)'
         : [result.status && `status: ${result.status}`, result.error && `error: ${result.error}`, result.message].filter(Boolean).join(' · '))
     : ''
+
+  async function continuePaid() {
+    setStartingPaid(true)
+    setStartError('')
+    const res = await startPaypalCheckout({
+      tier: result.tier || 'pro',
+      clinicId: result.clinicId || clinic?.id,
+      email: currentUser?.email,
+      checkoutMode: 'paid',
+    })
+    if (res.ok && res.url) { window.location.href = res.url; return }
+    setStartingPaid(false)
+    setStartError(res.message || t('packages.payFailed'))
+  }
   return (
     <Modal open onClose={onClose} size="sm">
       {result.ok && <Confetti />}
@@ -79,9 +110,19 @@ function PaymentResultOverlay({ result, onClose }) {
         {result.ok
           ? <SuccessCheck size={56} />
           : <XCircle size={52} className="text-rose-500" />}
-        <p className="text-lg font-bold text-ink-800">{result.ok ? (result.subscription ? t('packages.trialSuccess') : t('packages.paySuccess')) : t('packages.payCancelled')}</p>
-        {detail && <p className="rounded-lg bg-ink-50 px-3 py-1.5 text-xs text-ink-500" dir="ltr">{detail}</p>}
-        <button onClick={onClose} className="btn-primary mt-2">{t('common.close')}</button>
+        <p className="text-lg font-bold text-ink-800">{title}</p>
+        {detail && <p className="rounded-lg bg-ink-50 px-3 py-2 text-sm text-ink-600">{detail}</p>}
+        {startError && <p className="text-sm font-semibold text-rose-600">{startError}</p>}
+        {result.requiresPaidCheckout ? (
+          <div className="mt-2 flex w-full flex-col gap-2">
+            <button onClick={continuePaid} disabled={startingPaid} className="btn-primary w-full">
+              {startingPaid ? <Spinner /> : t('packages.continuePaid')}
+            </button>
+            <button onClick={onClose} disabled={startingPaid} className="btn w-full bg-ink-100 text-ink-600">{t('common.close')}</button>
+          </div>
+        ) : (
+          <button onClick={onClose} className="btn-primary mt-2">{t('common.close')}</button>
+        )}
       </div>
     </Modal>
   )

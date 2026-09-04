@@ -283,15 +283,58 @@ function makeDoc(children) {
   })
 }
 
-export async function exportPatient(patient, ctx) {
-  const lang = ctx.lang || 'en'
+function safeFilePart(value, fallback) {
+  const safe = String(value || '')
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '')
+    .replace(/[. ]+$/g, '')
+    .trim()
+  return safe || fallback
+}
+
+async function patientRecordBlob(patient, ctx, lang) {
   const children = [
     ...clinicHeader(ctx, lang, lang === 'ar' ? 'سجل المريض — للإحالة إلى طبيب آخر' : 'Patient Record — for referral / transfer'),
     ...buildPatientSections(patient, ctx, lang),
   ]
-  const blob = await Packer.toBlob(makeDoc(children))
-  const safe = (patient.name || 'patient').replace(/[^\w؀-ۿ -]/g, '').trim()
+  return Packer.toBlob(makeDoc(children))
+}
+
+export async function exportPatient(patient, ctx) {
+  const lang = ctx.lang || 'en'
+  const blob = await patientRecordBlob(patient, ctx, lang)
+  const safe = safeFilePart(lang === 'ar' ? patient.nameAr || patient.name : patient.name || patient.nameAr, 'patient')
   saveAs(blob, `${safe} - record.docx`)
+}
+
+// Save a portable backup without creating a hidden local database: the archive
+// contains one complete Word document per patient, named after that patient.
+export async function exportPatientsAsFiles(ctx) {
+  const { default: JSZip } = await import('jszip')
+  const lang = ctx.lang || 'en'
+  const patients = ctx.patients || []
+  const zip = new JSZip()
+  const usedNames = new Set()
+
+  for (const patient of patients) {
+    const displayName = lang === 'ar' ? patient.nameAr || patient.name : patient.name || patient.nameAr
+    const baseName = safeFilePart(displayName, 'patient')
+    let fileName = `${baseName}.docx`
+    if (usedNames.has(fileName.toLocaleLowerCase())) {
+      const suffix = safeFilePart(patient.fileNo, patient.id || String(usedNames.size + 1))
+      fileName = `${baseName} - ${suffix}.docx`
+      let copy = 2
+      while (usedNames.has(fileName.toLocaleLowerCase())) {
+        fileName = `${baseName} - ${suffix} (${copy}).docx`
+        copy++
+      }
+    }
+    usedNames.add(fileName.toLocaleLowerCase())
+    zip.file(fileName, await patientRecordBlob(patient, ctx, lang))
+  }
+
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+  const clinicName = safeFilePart(lang === 'ar' ? ctx.clinic?.nameAr || ctx.clinic?.name : ctx.clinic?.name || ctx.clinic?.nameAr, 'clinic')
+  saveAs(blob, `${clinicName} - patient files.zip`)
 }
 
 export async function exportAllPatients(ctx) {

@@ -9,6 +9,7 @@ create table if not exists public.subscription_trials (
   paypal_subscription_id text unique,
   paypal_payer_id text,
   paypal_email text check (paypal_email is null or paypal_email = lower(btrim(paypal_email))),
+  paypal_payment_token_id text,
   trial_started_at timestamptz,
   trial_ends_at timestamptz,
   created_at timestamptz not null default now(),
@@ -21,12 +22,61 @@ create index if not exists idx_subscription_trials_clinic
 -- Existing installations may already have the table from an earlier rollout.
 alter table public.subscription_trials
   add column if not exists paypal_payer_id text,
-  add column if not exists paypal_email text;
+  add column if not exists paypal_email text,
+  add column if not exists paypal_payment_token_id text;
+
+-- If an older deployment wrote duplicate identities before the unique indexes
+-- existed, keep the earliest trial as the owner. Later rows are cleared here;
+-- authenticated status sync will then fail to reclaim the identity, cancel the
+-- duplicate PayPal subscription, and expire that clinic's free access.
+with ranked as (
+  select email,
+         row_number() over (
+           partition by paypal_payer_id
+           order by coalesce(trial_started_at, created_at), created_at, email
+         ) as rn
+  from public.subscription_trials
+  where paypal_payer_id is not null
+)
+update public.subscription_trials t
+set paypal_payer_id = null, updated_at = now()
+from ranked r
+where t.email = r.email and r.rn > 1;
+
+with ranked as (
+  select email,
+         row_number() over (
+           partition by paypal_email
+           order by coalesce(trial_started_at, created_at), created_at, email
+         ) as rn
+  from public.subscription_trials
+  where paypal_email is not null
+)
+update public.subscription_trials t
+set paypal_email = null, updated_at = now()
+from ranked r
+where t.email = r.email and r.rn > 1;
+
+with ranked as (
+  select email,
+         row_number() over (
+           partition by paypal_payment_token_id
+           order by coalesce(trial_started_at, created_at), created_at, email
+         ) as rn
+  from public.subscription_trials
+  where paypal_payment_token_id is not null
+)
+update public.subscription_trials t
+set paypal_payment_token_id = null, updated_at = now()
+from ranked r
+where t.email = r.email and r.rn > 1;
 
 create unique index if not exists idx_subscription_trials_paypal_payer
   on public.subscription_trials(paypal_payer_id) where paypal_payer_id is not null;
 create unique index if not exists idx_subscription_trials_paypal_email
   on public.subscription_trials(paypal_email) where paypal_email is not null;
+create unique index if not exists idx_subscription_trials_paypal_payment_token
+  on public.subscription_trials(paypal_payment_token_id) where paypal_payment_token_id is not null;
 
 alter table public.subscription_trials enable row level security;
 

@@ -1,15 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Check, Sparkles, Crown, GraduationCap, X, ArrowRight, Star, Landmark, Wallet, Tag } from 'lucide-react'
+import { Check, Sparkles, Crown, GraduationCap, ArrowRight, Star, Landmark, Wallet } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { Modal, Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
-import { paymentsEnabled, startPaypalCheckout, notifyCouponUse } from '../lib/payments'
+import { paymentsEnabled, startPaypalCheckout } from '../lib/payments'
 import { isInAppBrowser, openInBrowserNotice } from '../lib/inAppBrowser'
-import { lookupCoupon, applyDiscount } from '../lib/coupons'
 import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/PackagePreviews'
 import BankTransferPanel from '../components/BankTransferPanel'
 import PaymentHelp from '../components/PaymentHelp'
@@ -20,12 +19,6 @@ const ICONS = { student: GraduationCap, pro: Crown }
 const TIER_ORDER = Object.keys(TIERS)
 const tierRank = (id) => TIER_ORDER.indexOf(id)
 
-// Pre-fill the promo code when the marketing site deep-links with ?coupon=CODE.
-function initialCoupon() {
-  try { return new URLSearchParams(window.location.search).get('coupon') || '' }
-  catch { return '' }
-}
-
 export default function Packages() {
   const { t, lang, L, isRTL } = useI18n()
   const { clinic, currentUser, setTier } = useStore()
@@ -34,18 +27,9 @@ export default function Packages() {
   const [expanded, setExpanded] = useState({})
   const [processing, setProcessing] = useState(false)
   const [payError, setPayError] = useState('')
+  const [paidOnly, setPaidOnly] = useState(false)
   const [payMethod, setPayMethod] = useState('paypal')
-  const [couponInput, setCouponInput] = useState(initialCoupon)
   const current = clinic?.tier
-  const coupon = lookupCoupon(couponInput) // { code, percent } | null
-
-  // Price for a tier after applying the active coupon (paid tiers only).
-  const priceFor = (tier) => (coupon && tier.price > 0 ? applyDiscount(tier.price, coupon.percent) : tier.price)
-
-  // Privately notify the app owner the moment a valid gift code is applied.
-  useEffect(() => {
-    if (paymentsEnabled && coupon) notifyCouponUse({ email: currentUser?.email, tier: buying || current, coupon: coupon.code })
-  }, [coupon?.code]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function confirmBuy() {
     setPayError('')
@@ -62,10 +46,15 @@ export default function Packages() {
       // PayPal won't open inside in-app browsers — send them to a real browser.
       if (isInAppBrowser()) { openInBrowserNotice(true); return }
       setProcessing(true)
-      const res = await startPaypalCheckout({ tier: buying, clinicId: clinic.id, coupon: coupon?.code, customerName: clinic.name, email: currentUser?.email })
+      const res = await startPaypalCheckout({ tier: buying, clinicId: clinic.id, customerName: clinic.name, email: currentUser?.email, checkoutMode: paidOnly ? 'paid' : 'trial' })
       if (res.ok && res.url) { window.location.href = res.url; return }
       setProcessing(false)
-      setPayError(res.error === 'not_configured' ? t('packages.paymentsSoon') : (res.message || t('packages.payFailed')))
+      if (res.error === 'trial_already_used' || res.requiresPaidCheckout) {
+        setPaidOnly(true)
+        setPayError(t('packages.trialAlreadyUsed'))
+      } else {
+        setPayError(res.error === 'not_configured' ? t('packages.paymentsSoon') : (res.message || t('packages.payFailed')))
+      }
       return
     }
     // Local/demo mode → activate instantly (no real billing).
@@ -92,35 +81,6 @@ export default function Packages() {
           <PreviewCard title={lang === 'ar' ? 'تقويم المواعيد' : 'Calendar'}><CalendarPreview /></PreviewCard>
           <PreviewCard title={lang === 'ar' ? 'لوحة المعلومات' : 'Dashboard'}><DashboardPreview /></PreviewCard>
         </div>
-      </div>
-
-      {/* Promo / discount code */}
-      <div className="mx-auto max-w-md">
-        <label className="mb-1.5 flex items-center gap-1.5 text-sm font-bold text-ink-600">
-          <Tag size={15} className="text-brand-500" /> {t('packages.couponLabel')}
-        </label>
-        <div className="flex items-center gap-2">
-          <input
-            value={couponInput}
-            onChange={(e) => setCouponInput(e.target.value)}
-            placeholder={t('packages.couponPlaceholder')}
-            dir="ltr"
-            className={cx('flex-1 rounded-xl border bg-white px-4 py-2.5 font-bold tracking-wide text-ink-800 uppercase outline-none transition-colors placeholder:font-normal placeholder:normal-case placeholder:tracking-normal placeholder:text-ink-300',
-              coupon ? 'border-emerald-400 ring-1 ring-emerald-300' : couponInput.trim() ? 'border-rose-300' : 'border-ink-200 focus:border-brand-400')}
-          />
-          {couponInput.trim() && (
-            <button type="button" onClick={() => setCouponInput('')} className="rounded-xl border border-ink-200 px-3 py-2.5 text-ink-400 hover:text-ink-600" aria-label={t('common.clear')}>
-              <X size={16} />
-            </button>
-          )}
-        </div>
-        {coupon ? (
-          <p className="mt-1.5 flex items-center gap-1 text-sm font-semibold text-emerald-600">
-            <Check size={15} /> {t('packages.couponApplied').replace('{percent}', coupon.percent)}
-          </p>
-        ) : couponInput.trim() ? (
-          <p className="mt-1.5 text-sm font-semibold text-rose-500">{t('packages.couponInvalid')}</p>
-        ) : null}
       </div>
 
       {/* Pricing cards */}
@@ -159,12 +119,6 @@ export default function Packages() {
               <div className="mt-4 flex items-end gap-1">
                 {tier.price === 0 ? (
                   <span className="text-4xl font-extrabold text-ink-800">{t('packages.free')}</span>
-                ) : coupon ? (
-                  <>
-                    <span className="text-lg font-bold text-ink-300 line-through" dir="ltr">${tier.price}</span>
-                    <span className="text-4xl font-extrabold text-ink-800" dir="ltr">${priceFor(tier)}</span>
-                    <span className="mb-1 text-sm text-ink-400"> {tierPeriodLabel(tier, t)}</span>
-                  </>
                 ) : (
                   <>
                     <span className="text-4xl font-extrabold text-ink-800">${tier.price}</span>
@@ -172,11 +126,6 @@ export default function Packages() {
                   </>
                 )}
               </div>
-              {coupon && tier.price > 0 && (
-                <p className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700">
-                  <Tag size={11} /> {coupon.code} · {t('packages.couponOff').replace('{percent}', coupon.percent)}
-                </p>
-              )}
               {tier.price > 0 && (
                 <p className="mt-1 inline-flex w-fit rounded-full bg-brand-50 px-2 py-0.5 text-xs font-extrabold text-brand-700">
                   {t('packages.freeTrialBadge')}
@@ -224,7 +173,7 @@ export default function Packages() {
                   <Check size={16} /> {t('packages.includedInPlan')}
                 </button>
               ) : (
-                <button onClick={() => setBuying(tier.id)} className="btn w-full text-white" style={{ background: accent }}>
+                <button onClick={() => { setBuying(tier.id); setPaidOnly(false); setPayError('') }} className="btn w-full text-white" style={{ background: accent }}>
                   {t('packages.buyNow')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} />
                 </button>
               )}
@@ -235,7 +184,7 @@ export default function Packages() {
 
       {/* Purchase modal */}
       {buying && (
-        <Modal open onClose={() => { setActivated(false); setBuying(null); setPayError(''); setProcessing(false) }} size="lg"
+        <Modal open onClose={() => { setActivated(false); setBuying(null); setPayError(''); setPaidOnly(false); setProcessing(false) }} size="lg"
           title={`${t('packages.whatYouGet')} — ${L(TIERS[buying])}`}
           icon={<Sparkles size={18} style={{ color: PACKAGE_FEATURES[buying].accent }} />}
         >
@@ -262,6 +211,7 @@ export default function Packages() {
                 ))}
               </div>
               {payError && <p className="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{payError}</p>}
+              {paidOnly && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900">{t('packages.paidWithoutTrialNotice')}</p>}
 
               {paymentsEnabled && TIERS[buying].price > 0 && (
                 <>
@@ -276,7 +226,7 @@ export default function Packages() {
               )}
 
               {paymentsEnabled && TIERS[buying].price > 0 && payMethod === 'bank' ? (
-                <BankTransferPanel amount={priceFor(TIERS[buying])} originalAmount={TIERS[buying].price} coupon={coupon?.code} planLabel={L(TIERS[buying])} />
+                <BankTransferPanel amount={TIERS[buying].price} planLabel={L(TIERS[buying])} />
               ) : (
                 <>
                   {paymentsEnabled && TIERS[buying].price > 0 && payMethod === 'paypal' && (
@@ -290,23 +240,19 @@ export default function Packages() {
                       <p className="text-2xl font-extrabold text-ink-800">
                         {TIERS[buying].price === 0 ? t('packages.free') : paymentsEnabled && payMethod === 'paypal' ? (
                           <>
-                            <span dir="ltr">{t('packages.trialToday')}</span>
-                            <span className="text-sm font-normal text-ink-400"> · ${TIERS[buying].price} {tierPeriodLabel(TIERS[buying], t)}</span>
+                            <span dir="ltr">{paidOnly ? t('packages.payNowAmount') : t('packages.trialToday')}</span>
+                            {!paidOnly && <span className="text-sm font-normal text-ink-400"> · ${TIERS[buying].price} {tierPeriodLabel(TIERS[buying], t)}</span>}
                           </>
                         ) : (
                           <>
-                            {coupon && <span className="me-2 text-base font-bold text-ink-300 line-through" dir="ltr">${TIERS[buying].price}</span>}
-                            <span dir="ltr">${priceFor(TIERS[buying])}</span>
+                            <span dir="ltr">${TIERS[buying].price}</span>
                             <span className="text-sm font-normal text-ink-400"> {tierPeriodLabel(TIERS[buying], t)}</span>
                           </>
                         )}
                       </p>
-                      {coupon && TIERS[buying].price > 0 && !(paymentsEnabled && payMethod === 'paypal') && (
-                        <p className="mt-0.5 text-xs font-bold text-emerald-600">{coupon.code} · {t('packages.couponOff').replace('{percent}', coupon.percent)}</p>
-                      )}
                     </div>
                     <button onClick={confirmBuy} disabled={processing} className="btn-primary !py-3 !px-6" style={{ background: PACKAGE_FEATURES[buying].accent }}>
-                      {processing ? <Spinner /> : <>{TIERS[buying].price === 0 ? t('packages.buyNow') : !paymentsEnabled ? t('packages.buyNow') : payMethod === 'paypal' ? `${t('packages.startTrial')} — ${t('packages.trialToday')}` : t('packages.pay')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
+                      {processing ? <Spinner /> : <>{TIERS[buying].price === 0 ? t('packages.buyNow') : !paymentsEnabled ? t('packages.buyNow') : payMethod === 'paypal' ? (paidOnly ? t('packages.continuePaid') : `${t('packages.startTrial')} — ${t('packages.trialToday')}`) : t('packages.pay')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
                     </button>
                   </div>
                   {paymentsEnabled && TIERS[buying].price > 0 && <p className="mt-2 text-center text-xs text-ink-400">🔒 {t('packages.securePay')}</p>}
