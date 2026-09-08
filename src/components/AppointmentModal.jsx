@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { CalendarPlus, Trash2 } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { Modal, Field, Segmented } from './ui'
@@ -17,15 +18,16 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
       const dur = Math.round((new Date(appointment.end) - new Date(appointment.start)) / 60000) || 30
       setForm({
         patientId: appointment.patientId, doctorId: appointment.doctorId,
-        date: d.toISOString().slice(0, 10), time: d.toTimeString().slice(0, 5),
+        date: format(d, 'yyyy-MM-dd'), time: format(d, 'HH:mm'),
         duration: dur, reason: appointment.reason || '', step: appointment.step || '',
         status: appointment.status || 'scheduled', notes: appointment.notes || '',
       })
     } else {
-      const d = defaultDate ? new Date(defaultDate) : new Date()
+      const d = defaultDate ? (typeof defaultDate === 'string' ? parseISO(defaultDate) : new Date(defaultDate)) : new Date()
       setForm({
         patientId: defaultPatientId || patients[0]?.id || '', doctorId: currentUser?.id,
-        date: d.toISOString().slice(0, 10), time: '09:00', duration: 30,
+        // Date inputs use the selected local calendar day, not its UTC date.
+        date: format(d, 'yyyy-MM-dd'), time: '09:00', duration: 30,
         reason: '', step: '', status: 'scheduled', notes: '',
       })
     }
