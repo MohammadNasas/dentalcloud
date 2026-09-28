@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { UserPlus, Save } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
@@ -6,6 +6,8 @@ import { useStore } from '../context/StoreContext'
 import { Modal, Field, Segmented } from './ui'
 import { toast } from './anim'
 import { calcAge } from '../lib/utils'
+import { backend } from '../lib/backend'
+import { useSaveAction } from '../lib/useSaveAction'
 
 const empty = {
   name: '', fileNo: '', phone: '', gender: '', dob: '',
@@ -17,52 +19,56 @@ export default function PatientFormModal({ open, onClose, patient, onSaved }) {
   const { addPatient, updatePatient } = useStore()
   const navigate = useNavigate()
   const [form, setForm] = useState(empty)
+  const draftId = useRef(null)
+  const { saving, runSave } = useSaveAction()
 
   useEffect(() => {
     if (!open) return
+    draftId.current = patient?.id || backend.genId('patient')
     if (patient) {
       // Seed the field with the name actually shown in the current language, so
       // editing it changes what the user sees.
       const shown = lang === 'ar' ? (patient.nameAr || patient.name) : (patient.name || patient.nameAr)
       setForm({ ...empty, ...patient, name: shown || '' })
     } else setForm(empty)
-  }, [open, patient, lang])
+  }, [open, patient?.id, lang])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const age = form.dob ? calcAge(form.dob) : form.age || ''
 
-  function submit() {
+  function submit() { return runSave(async () => {
     // One name, mirrored to nameAr, so the edited name shows in every language.
-    const data = { ...form, nameAr: form.name, age }
+    const data = { ...form, id: draftId.current, nameAr: form.name, age }
     if (patient) {
-      updatePatient(patient.id, data)
+      if (!await updatePatient(patient.id, data)) return
       toast(t('common.saved'))
       onSaved?.(patient.id)
       onClose()
     } else {
-      const p = addPatient(data)
+      const p = await addPatient(data)
+      if (!p) return
       toast(t('common.saved'))
       onClose()
       if (onSaved) onSaved(p.id)
       else navigate(`/patients/${p.id}`)
     }
-  }
+  }) }
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={() => { if (!saving) onClose() }}
       size="lg"
       title={patient ? t('patient.editPatient') : t('patient.newPatient')}
       icon={<UserPlus size={18} className="text-brand-500" />}
       footer={
         <>
-          <button onClick={onClose} className="btn-ghost">{t('common.cancel')}</button>
-          <button onClick={submit} className="btn-primary" disabled={!form.name}><Save size={16} /> {t('common.save')}</button>
+          <button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button>
+          <button onClick={submit} className="btn-primary" disabled={saving || !form.name}><Save size={16} /> {saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
         </>
       }
     >
-      <div className="grid gap-4 sm:grid-cols-2">
+      <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
         <Field label={t('patient.name')} required className="sm:col-span-2">
           <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
         </Field>
@@ -94,7 +100,7 @@ export default function PatientFormModal({ open, onClose, patient, onSaved }) {
         <Field label={t('patient.complaint')} className="sm:col-span-2">
           <textarea className="input min-h-[72px] resize-y" value={form.complaint} onChange={(e) => set('complaint', e.target.value)} />
         </Field>
-      </div>
+      </fieldset>
     </Modal>
   )
 }

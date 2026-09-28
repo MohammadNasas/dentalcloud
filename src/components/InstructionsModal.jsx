@@ -7,6 +7,7 @@ import { Modal, Field } from './ui'
 import { printSheet, escapeHtml } from '../lib/print'
 import { waLink, waNumber, buildInstructionWhatsAppMessage } from '../lib/utils'
 import WhatsAppIcon from './WhatsAppIcon'
+import { useSaveAction } from '../lib/useSaveAction'
 
 // Editable, printable post-op / treatment instruction sheet. Each treatment has
 // default instructions; the dentist can add/edit/remove points before printing,
@@ -21,6 +22,7 @@ export default function InstructionsModal({ patient, treatmentKey, onClose }) {
   const [title, setTitle] = useState(base.title)
   const [points, setPoints] = useState([...base.points])
   const [phone, setPhone] = useState(patient.phone || '')
+  const { saving, runSave } = useSaveAction()
 
   const treatmentName = DENTAL_ITEMS[treatmentKey]?.[lang] || ''
   const patientName = lang === 'ar' ? patient.nameAr || patient.name : patient.name
@@ -37,11 +39,11 @@ export default function InstructionsModal({ patient, treatmentKey, onClose }) {
   function addPoint() { setPoints((p) => [...p, '']) }
   function removePoint(i) { setPoints((p) => p.filter((_, idx) => idx !== i)) }
 
-  function saveDefault() {
+  function saveDefault() { return runSave(async () => {
     const ci = { ...(clinic.customInstructions || {}) }
     ci[key] = { ...(ci[key] || {}), [lang]: { title, points: points.filter((p) => p.trim()) } }
-    updateClinic({ customInstructions: ci })
-  }
+    return await updateClinic({ customInstructions: ci })
+  }) }
 
   function doPrint() {
     const body = `
@@ -72,7 +74,7 @@ export default function InstructionsModal({ patient, treatmentKey, onClose }) {
       icon={<FileText size={18} className="text-brand-500" />}
       footer={
         <>
-          <button onClick={saveDefault} className="btn-ghost"><Save size={15} /> {t('common.save')}</button>
+          <button onClick={saveDefault} disabled={saving} className="btn-ghost"><Save size={15} /> {t('common.save')}</button>
           <button onClick={doPrint} className="btn-outline"><Printer size={16} /> {t('instructions.printGive')}</button>
           {waNumber(phone).length >= 8 ? (
             <a href={waLink(phone, whatsAppMessage)} target="_blank" rel="noopener noreferrer" onClick={rememberWhatsAppNumber}

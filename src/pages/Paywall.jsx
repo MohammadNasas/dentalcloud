@@ -6,12 +6,14 @@ import { useStore } from '../context/StoreContext'
 import { TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { startPaypalCheckout, paymentsEnabled } from '../lib/payments'
+import { paymentErrorMessage } from '../lib/paymentErrors.js'
 import { isInAppBrowser, openInBrowserNotice } from '../lib/inAppBrowser'
 import { Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
 import BankTransferPanel from '../components/BankTransferPanel'
 import PaymentHelp from '../components/PaymentHelp'
 import logo from '../lib/logo'
+import { useSaveAction } from '../lib/useSaveAction'
 
 const ICONS = { student: GraduationCap, pro: Crown }
 
@@ -24,6 +26,7 @@ export default function Paywall() {
   const [error, setError] = useState('')
   const [paidOnly, setPaidOnly] = useState(false)
   const [payMethod, setPayMethod] = useState('paypal')
+  const { saving, runSave } = useSaveAction()
   async function pay() {
     setError('')
     // PayPal won't open inside Instagram/Facebook in-app browsers — guide the
@@ -37,14 +40,14 @@ export default function Paywall() {
       setPaidOnly(true)
       setError(t('packages.trialAlreadyUsed'))
     } else {
-      setError(res.error === 'not_configured' ? t('packages.paymentsSoon') : (res.message || t('packages.payFailed')))
+      setError(paymentErrorMessage(res, lang))
     }
   }
 
-  function activateFreePlan() {
+  function activateFreePlan() { return runSave(async () => {
     setError('')
-    setTier('student')
-  }
+    await setTier('student')
+  }) }
 
   const tier = TIERS[selected]
   const feats = fullFeatures(selected)
@@ -108,7 +111,7 @@ export default function Paywall() {
 
         <div className="mx-auto mt-6 max-w-md">
           {tier.price === 0 ? (
-            <button onClick={activateFreePlan} className="btn w-full bg-white !py-3.5 text-base font-extrabold text-brand-700 hover:bg-white/90">
+            <button onClick={activateFreePlan} disabled={saving || busy} className="btn w-full bg-white !py-3.5 text-base font-extrabold text-brand-700 hover:bg-white/90">
               {t('packages.buyNow')} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} />
             </button>
           ) : (

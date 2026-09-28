@@ -71,9 +71,9 @@ function duplicateTrialFetch(subscriber = {
       writes.push({ type: 'trial-cancel', body })
       return new Response(null, { status: 204 })
     }
-    if (url.startsWith(`${ENV.SUPABASE_URL}/rest/v1/clinics`) && method === 'PATCH') {
-      writes.push({ type: 'clinic-update', body })
-      return new Response(null, { status: 204 })
+    if (url.startsWith(`${ENV.SUPABASE_URL}/rest/v1/rpc/apply_subscription_patch`) && method === 'POST') {
+      writes.push({ type: 'clinic-update', body: { data: body.p_patch } })
+      return Response.json({ id: 'clinic-2', ...body.p_patch, subscriptionRevision: 'test-revision' })
     }
     throw new Error(`Unexpected fetch: ${method} ${url}`)
   }
@@ -121,7 +121,8 @@ for (const [name, handler] of [
     assert.ok(writes.some((write) => write.type === 'paypal-cancel'))
     assert.ok(writes.some((write) => write.type === 'trial-cancel'))
     const clinicWrite = writes.find((write) => write.type === 'clinic-update')
-    assert.equal(clinicWrite.body.data.paid, false)
+    assert.notEqual(clinicWrite.body.data.paid, true)
+    assert.equal(result.clinic.paid, false)
     assert.ok(Date.parse(clinicWrite.body.data.trialEndsAt) <= Date.now())
   })
 }
@@ -173,9 +174,9 @@ function paidStatusFetch({ withPayment = false } = {}) {
         renewalPriceUpdatePending: false,
       } }])
     }
-    if (url.startsWith(`${ENV.SUPABASE_URL}/rest/v1/clinics`) && method === 'PATCH') {
-      writes.push({ type: 'clinic-update', body })
-      return new Response(null, { status: 204 })
+    if (url.startsWith(`${ENV.SUPABASE_URL}/rest/v1/rpc/apply_subscription_patch`) && method === 'POST') {
+      writes.push({ type: 'clinic-update', body: { data: body.p_patch } })
+      return Response.json({ id: 'clinic-2', ...body.p_patch, subscriptionRevision: 'test-revision' })
     }
     if (url.includes('/subscription_trials') || url.endsWith('/cancel')) {
       writes.push({ type: 'forbidden-trial-operation', url, body })
@@ -241,9 +242,9 @@ function paidCaptureFetch() {
         writes.push({ type: 'price-update', body })
         return new Response(null, { status: 204 })
       }
-      if (url.startsWith(`${ENV.SUPABASE_URL}/rest/v1/clinics`) && method === 'PATCH') {
-        writes.push({ type: 'clinic-update', body })
-        return new Response(null, { status: 204 })
+      if (url.startsWith(`${ENV.SUPABASE_URL}/rest/v1/rpc/apply_subscription_patch`) && method === 'POST') {
+        writes.push({ type: 'clinic-update', body: { data: body.p_patch } })
+        return Response.json({ id: 'clinic-2', ...body.p_patch, subscriptionRevision: 'test-revision' })
       }
       if (url.includes('/subscription_trials') || url.endsWith('/cancel')) throw new Error(`Paid capture touched trial protection: ${method} ${url}`)
       throw new Error(`Unexpected fetch: ${method} ${url}`)

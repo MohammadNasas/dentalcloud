@@ -5,6 +5,7 @@ import { useStore } from '../../context/StoreContext'
 import { Field } from '../ui'
 import { toast } from '../anim'
 import { printSheet, escapeHtml } from '../../lib/print'
+import { useSaveAction } from '../../lib/useSaveAction'
 
 // Editable, printable treatment-consent sheet. Auto-fills patient/clinic/doctor,
 // the doctor types the treatment plan, then prints a clean A4 form with two
@@ -34,13 +35,14 @@ export default function ConsentForm({ patient }) {
     plan: c.plan || '',
   })
   const [saved, setSaved] = useState(false)
+  const { saving, runSave } = useSaveAction()
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
-  function save() {
-    updatePatient(patient.id, { consent: form })
+  function save() { return runSave(async () => {
+    if (!await updatePatient(patient.id, { consent: form })) return
     setSaved(true); setTimeout(() => setSaved(false), 1500)
     toast(L('تم الحفظ', 'Saved'))
-  }
+  }) }
 
   function print() {
     const planHtml = form.plan.trim()
@@ -97,7 +99,7 @@ export default function ConsentForm({ patient }) {
 
       <div className="flex flex-wrap gap-2">
         <button onClick={print} className="btn-primary"><Printer size={16} /> {L('طباعة', 'Print')}</button>
-        <button onClick={save} className="btn-outline">{saved ? <><Check size={16} /> {L('تم الحفظ', 'Saved')}</> : <><Save size={16} /> {L('حفظ', 'Save')}</>}</button>
+        <button onClick={save} disabled={saving} className="btn-outline">{saved ? <><Check size={16} /> {L('تم الحفظ', 'Saved')}</> : <><Save size={16} /> {L('حفظ', 'Save')}</>}</button>
       </div>
     </div>
   )

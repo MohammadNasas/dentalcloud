@@ -13,6 +13,8 @@ import { money, cx, waLink, waNumber, buildLabOrderWhatsAppMessage } from '../li
 import { genId } from '../lib/db'
 import { chartRows } from '../lib/teeth'
 import WhatsAppIcon from '../components/WhatsAppIcon'
+import { backend } from '../lib/backend'
+import { useSaveAction } from '../lib/useSaveAction'
 
 const WORK_TYPES = [
   { key: 'crown',       en: 'Crown',               ar: 'تاج' },
@@ -190,11 +192,7 @@ function LabContent() {
           order={editingId ? labOrders.find((o) => o.id === editingId) : null}
           currency={currency} lang={lang} clinic={clinic} labs={labs}
           onManageLabs={() => { setAddOpen(false); setEditingId(null); setLabsOpen(true) }}
-          onSave={(data) => {
-            if (editingId) updateLabOrder(editingId, data)
-            else addLabOrder(data)
-            setAddOpen(false); setEditingId(null)
-          }}
+          onSave={(data) => editingId ? updateLabOrder(editingId, data) : addLabOrder(data)}
           onClose={() => { setAddOpen(false); setEditingId(null) }}
         />
       )}
@@ -202,7 +200,7 @@ function LabContent() {
       {labsOpen && (
         <LabsDirectoryModal
           labs={labs} lang={lang}
-          onSave={(nextLabs) => { updateClinic({ labs: nextLabs }); setLabsOpen(false) }}
+          onSave={(nextLabs) => updateClinic({ labs: nextLabs })}
           onClose={() => setLabsOpen(false)}
         />
       )}
@@ -342,6 +340,8 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
 }
 
 function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSave, onClose }) {
+  const [draftId] = useState(() => order?.id || backend.genId('labOrder'))
+  const { saving, runSave } = useSaveAction()
   const matchedLab = order && (labs.find((lab) => lab.id === order.labId) || labs.find((lab) => lab.name === order.labName))
   const [form, setForm] = useState(order ? {
     labId: matchedLab?.id || '',
@@ -381,6 +381,7 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
   function buildData(statusOverride) {
     return {
       ...form,
+      id: draftId,
       status: statusOverride || form.status,
       patientId: undefined,
       patientName: undefined,
@@ -390,8 +391,13 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
     }
   }
 
-  function submit(sendWhatsApp = false) {
+  function submit(sendWhatsApp = false) { return runSave(async () => {
     const data = buildData(sendWhatsApp ? 'sent' : undefined)
+    // Reserve the user-initiated tab before awaiting so mobile browsers allow it.
+    const chat = sendWhatsApp && waNumber(data.labPhone).length >= 8 ? window.open('about:blank', '_blank') : null
+    if (chat) chat.opener = null
+    const saved = await onSave(data)
+    if (!saved) { chat?.close(); return }
     if (sendWhatsApp && waNumber(data.labPhone).length >= 8) {
       const wt = WORK_TYPES.find((item) => item.key === data.workType)
       const remaining = Math.max(0, data.price - data.paid)
@@ -409,19 +415,20 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
         paid: data.paid > 0 ? money(data.paid, currency) : '',
         remaining: remaining > 0 ? money(remaining, currency) : '',
       })
-      window.open(waLink(data.labPhone, message), '_blank', 'noopener,noreferrer')
+      if (chat) chat.location.replace(waLink(data.labPhone, message))
+      else window.open(waLink(data.labPhone, message), '_blank', 'noopener,noreferrer')
     }
-    onSave(data)
-  }
+    onClose()
+  }) }
 
   return (
-    <Modal open onClose={onClose} size="xl"
+    <Modal open onClose={() => { if (!saving) onClose() }} size="xl"
       title={order ? (lang === 'ar' ? 'تعديل طلب مختبر' : 'Edit Lab Order') : (lang === 'ar' ? 'طلب مختبر جديد' : 'New Lab Order')}
       icon={<FlaskConical size={18} className="text-violet-500" />}
       footer={<>
-        <button onClick={onClose} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-        <button onClick={() => submit(false)} disabled={!form.labId} className="btn-outline"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
-        <button onClick={() => submit(true)} disabled={!form.labId || waNumber(form.labPhone).length < 8}
+        <button onClick={onClose} disabled={saving} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+        <button onClick={() => submit(false)} disabled={saving || !form.labId} className="btn-outline"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
+        <button onClick={() => submit(true)} disabled={saving || !form.labId || waNumber(form.labPhone).length < 8}
           className="btn bg-emerald-500 text-white hover:bg-emerald-600"><WhatsAppIcon size={16} /> {lang === 'ar' ? 'حفظ وإرسال واتساب' : 'Save & send WhatsApp'}</button>
       </>}
     >
@@ -433,7 +440,7 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
               <option value="">{lang === 'ar' ? '— اختر مختبراً —' : '— Select lab —'}</option>
               {labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name} · {lab.phone}</option>)}
             </select>
-            <button type="button" onClick={onManageLabs} className="btn-outline shrink-0 !px-3" title={lang === 'ar' ? 'إدارة المختبرات' : 'Manage labs'}><Plus size={16} /></button>
+            <button type="button" onClick={onManageLabs} disabled={saving} className="btn-outline shrink-0 !px-3" title={lang === 'ar' ? 'إدارة المختبرات' : 'Manage labs'}><Plus size={16} /></button>
           </div>
           {labs.length === 0 && <button type="button" onClick={onManageLabs} className="mt-2 text-xs font-bold text-violet-600 hover:underline">{lang === 'ar' ? 'أضف مختبراً ورقم واتسابه أولًا' : 'Add a lab and its WhatsApp number first'}</button>}
         </Field>
@@ -551,6 +558,7 @@ function LabsDirectoryModal({ labs, lang, onSave, onClose }) {
     ? labs.map((lab) => ({ ...lab }))
     : [{ id: genId('lab'), name: '', phone: '' }])
   const [error, setError] = useState('')
+  const { saving, runSave } = useSaveAction()
 
   function updateRow(id, patch) {
     setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)))
@@ -562,7 +570,7 @@ function LabsDirectoryModal({ labs, lang, onSave, onClose }) {
     setRows((current) => current.filter((item) => item.id !== row.id))
   }
 
-  function save() {
+  function save() { return runSave(async () => {
     const entered = rows.filter((row) => row.name.trim() || row.phone.trim())
     const incomplete = entered.some((row) => !row.name.trim() || waNumber(row.phone).length < 8)
     if (incomplete) {
@@ -571,16 +579,16 @@ function LabsDirectoryModal({ labs, lang, onSave, onClose }) {
         : 'Enter a name and valid WhatsApp number with country code for every lab.')
       return
     }
-    onSave(entered.map((row) => ({ id: row.id || genId('lab'), name: row.name.trim(), phone: row.phone.trim() })))
-  }
+    if (await onSave(entered.map((row) => ({ id: row.id || genId('lab'), name: row.name.trim(), phone: row.phone.trim() })))) onClose()
+  }) }
 
   return (
-    <Modal open onClose={onClose} size="lg"
+    <Modal open onClose={() => { if (!saving) onClose() }} size="lg"
       title={lang === 'ar' ? 'دليل المختبرات' : 'Labs Directory'}
       icon={<BookUser size={18} className="text-violet-500" />}
       footer={<>
-        <button onClick={onClose} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-        <button onClick={save} className="btn-primary"><Save size={16} /> {lang === 'ar' ? 'حفظ المختبرات' : 'Save labs'}</button>
+        <button onClick={onClose} disabled={saving} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
+        <button onClick={save} disabled={saving} className="btn-primary"><Save size={16} /> {lang === 'ar' ? 'حفظ المختبرات' : 'Save labs'}</button>
       </>}
     >
       <p className="mb-4 text-sm text-ink-500">

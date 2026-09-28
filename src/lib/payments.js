@@ -1,6 +1,9 @@
 // Client helpers for the PayPal payment flow. Calls the serverless payment
 // functions at /api/* — works on Cloudflare Pages (native) and Netlify (redirect).
 import { isCloud, supabase } from './supabaseClient'
+import { paymentApiUrl } from './apiUrl.js'
+
+const api = (path) => paymentApiUrl(path, window.location.protocol, import.meta.env.VITE_API_BASE_URL || undefined)
 
 // Real payments only run in cloud mode (the serverless functions need the host).
 export const paymentsEnabled = isCloud
@@ -12,7 +15,7 @@ export async function startPaypalCheckout({ tier, clinicId, coupon, email, check
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) return { ok: false, error: 'unauthorized' }
-    const r = await fetch('/api/paypal-create', {
+    const r = await fetch(api('/api/paypal-create'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ tier, clinicId, coupon, email, checkoutMode }),
@@ -55,7 +58,7 @@ export async function capturePaypal(payment) {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) return { ok: false, error: 'unauthorized' }
     const payload = typeof payment === 'string' ? { orderId: payment } : payment
-    const r = await fetch('/api/paypal-capture', {
+    const r = await fetch(api('/api/paypal-capture'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify(payload),
@@ -75,7 +78,7 @@ export async function syncPaypalSubscription({ subscriptionId, clinicId }) {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) return { ok: false, error: 'unauthorized' }
-    const r = await fetch('/api/paypal-subscription-status', {
+    const r = await fetch(api('/api/paypal-subscription-status'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
       body: JSON.stringify({ subscriptionId, clinicId }),

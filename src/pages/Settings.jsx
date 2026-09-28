@@ -12,6 +12,8 @@ import FeatureLock from '../components/FeatureLock'
 import { Modal, Field, Segmented, Avatar, Badge } from '../components/ui'
 import { cx, CURRENCIES } from '../lib/utils'
 import { useReduceMotion } from '../lib/motionPref'
+import { useSaveAction } from '../lib/useSaveAction'
+import { backend } from '../lib/backend'
 
 const SECTIONS = [
   { id: 'clinic', icon: Building2, key: 'clinic' },
@@ -57,11 +59,12 @@ function ClinicSection() {
   const [nameAr, setNameAr] = useState(clinic?.nameAr || '')
   const [currency, setCurrency] = useState(clinic?.settings?.currency || 'JOD')
   const [saved, setSaved] = useState(false)
+  const { saving, runSave } = useSaveAction()
 
-  function save() {
-    updateClinic({ name, nameAr, settings: { ...clinic.settings, currency } })
+  function save() { return runSave(async () => {
+    if (!await updateClinic({ name, nameAr, settings: { ...clinic.settings, currency } })) return
     setSaved(true); setTimeout(() => setSaved(false), 1500)
-  }
+  }) }
 
   return (
     <div className="card max-w-2xl p-6">
@@ -80,7 +83,7 @@ function ClinicSection() {
           <Segmented value={lang} onChange={setLang} options={[{ value: 'ar', label: 'العربية' }, { value: 'en', label: 'English' }]} />
         </Field>
       </div>
-      <button onClick={save} className="btn-primary mt-5">{saved ? <><Check size={16} /> {t('common.saved')}</> : <><Save size={16} /> {t('common.save')}</>}</button>
+      <button onClick={save} disabled={saving} className="btn-primary mt-5">{saved ? <><Check size={16} /> {t('common.saved')}</> : <><Save size={16} /> {t('common.save')}</>}</button>
     </div>
   )
 }
@@ -117,19 +120,20 @@ function DoctorsSection() {
   const { t, lang } = useI18n()
   const { doctors, addUser, deleteUser, currentUser, can } = useStore()
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ name: '', username: '', password: '', specialty: '', role: 'doctor', color: DOCTOR_COLORS[2] })
+  const [form, setForm] = useState(() => ({ id: backend.genId('doctor'), name: '', username: '', password: '', specialty: '', role: 'doctor', color: DOCTOR_COLORS[2] }))
   const [error, setError] = useState('')
+  const { saving, runSave } = useSaveAction()
 
   const multiAllowed = can('multiDoctor')
 
-  function submit() {
+  function submit() { return runSave(async () => {
     setError('')
     if (!form.name || !form.username || !form.password) { setError(t('auth.fillAll')); return }
-    const res = addUser(form)
-    if (!res.ok) { setError(t(`auth.${res.error}`)); return }
+    const res = await addUser(form)
+    if (!res.ok) { if (res.error === 'userExists') setError(t(`auth.${res.error}`)); return }
     setOpen(false)
-    setForm({ name: '', username: '', password: '', specialty: '', role: 'doctor', color: DOCTOR_COLORS[doctors.length + 1] || DOCTOR_COLORS[0] })
-  }
+    setForm({ id: backend.genId('doctor'), name: '', username: '', password: '', specialty: '', role: 'doctor', color: DOCTOR_COLORS[doctors.length + 1] || DOCTOR_COLORS[0] })
+  }) }
 
   return (
     <div className="space-y-4">
@@ -161,8 +165,8 @@ function DoctorsSection() {
 
       <p className="text-xs text-ink-400">{t('auth.anyDevice')}</p>
 
-      <Modal open={open} onClose={() => setOpen(false)} size="md" title={t('settings.addDoctor')} icon={<UserCog size={18} className="text-brand-500" />}
-        footer={<><button onClick={() => setOpen(false)} className="btn-ghost">{t('common.cancel')}</button><button onClick={submit} className="btn-primary">{t('common.save')}</button></>}>
+      <Modal open={open} onClose={() => { if (!saving) setOpen(false) }} size="md" title={t('settings.addDoctor')} icon={<UserCog size={18} className="text-brand-500" />}
+        footer={<><button onClick={() => setOpen(false)} disabled={saving} className="btn-ghost">{t('common.cancel')}</button><button onClick={submit} disabled={saving} className="btn-primary">{t('common.save')}</button></>}>
         <div className="space-y-3">
           <Field label={t('auth.doctorName')} required><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
@@ -195,6 +199,7 @@ function PricesSection() {
   const { clinic, updateClinic, can } = useStore()
   const [rows, setRows] = useState(clinic?.prices?.length ? clinic.prices : DEFAULT_PRICES.map((p) => ({ ...p })))
   const [saved, setSaved] = useState(false)
+  const { saving, runSave } = useSaveAction()
   const currency = clinic?.settings?.currency || 'JOD'
 
   if (!can('priceCatalog')) return <FeatureLock feature="priceCatalog" />
@@ -202,7 +207,10 @@ function PricesSection() {
   const setRow = (i, patch) => setRows((rs) => rs.map((r, idx) => idx === i ? { ...r, ...patch } : r))
   const addRow = () => setRows((rs) => [...rs, { key: 'custom_' + Date.now(), en: '', ar: '', price: 0 }])
   const removeRow = (i) => setRows((rs) => rs.filter((_, idx) => idx !== i))
-  function save() { updateClinic({ prices: rows }); setSaved(true); setTimeout(() => setSaved(false), 1500) }
+  function save() { return runSave(async () => {
+    if (!await updateClinic({ prices: rows })) return
+    setSaved(true); setTimeout(() => setSaved(false), 1500)
+  }) }
 
   return (
     <div className="card max-w-3xl p-6">
@@ -222,7 +230,7 @@ function PricesSection() {
       </div>
       <div className="mt-4 flex gap-2">
         <button onClick={addRow} className="btn-outline"><Plus size={16} /> {t('common.add')}</button>
-        <button onClick={save} className="btn-primary">{saved ? <><Check size={16} /> {t('common.saved')}</> : <><Save size={16} /> {t('common.save')}</>}</button>
+        <button onClick={save} disabled={saving} className="btn-primary">{saved ? <><Check size={16} /> {t('common.saved')}</> : <><Save size={16} /> {t('common.save')}</>}</button>
       </div>
     </div>
   )
@@ -251,25 +259,29 @@ function InstructionsSection() {
           )
         })}
       </div>
-      {editing && <InstructionEditor instrKey={editing} onClose={() => setEditing(null)} />}
+      {editing && <InstructionEditor instrKey={editing} clinic={clinic} updateClinic={updateClinic} onClose={() => setEditing(null)} />}
     </div>
   )
 
-  function InstructionEditor({ instrKey, onClose }) {
+}
+
+  function InstructionEditor({ instrKey, clinic, updateClinic, onClose }) {
+    const { t, lang } = useI18n()
     const custom = clinic?.customInstructions?.[instrKey]?.[lang]
     const base = custom || INSTRUCTIONS[instrKey][lang]
     const [title, setTitle] = useState(base.title)
     const [points, setPoints] = useState([...base.points])
+    const { saving, runSave } = useSaveAction()
 
-    function save() {
+    function save() { return runSave(async () => {
       const ci = { ...(clinic.customInstructions || {}) }
       ci[instrKey] = { ...(ci[instrKey] || {}), [lang]: { title, points: points.filter((p) => p.trim()) } }
-      updateClinic({ customInstructions: ci }); onClose()
-    }
+      if (await updateClinic({ customInstructions: ci })) onClose()
+    }) }
 
     return (
-      <Modal open onClose={onClose} size="lg" title={t('settings.editInstructions')} icon={<FileText size={18} className="text-brand-500" />}
-        footer={<><button onClick={onClose} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} className="btn-primary"><Save size={16} /> {t('common.save')}</button></>}>
+      <Modal open onClose={() => { if (!saving) onClose() }} size="lg" title={t('settings.editInstructions')} icon={<FileText size={18} className="text-brand-500" />}
+        footer={<><button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} disabled={saving} className="btn-primary"><Save size={16} /> {t('common.save')}</button></>}>
         <input className="input mb-3 font-bold" value={title} onChange={(e) => setTitle(e.target.value)} />
         <div className="space-y-2">
           {points.map((p, i) => (
@@ -284,26 +296,28 @@ function InstructionsSection() {
       </Modal>
     )
   }
-}
-
 function SuggestionsSection() {
   const { t, lang } = useI18n()
   const { addSuggestion, suggestions } = useStore()
   const [text, setText] = useState('')
   const [thanks, setThanks] = useState(false)
+  const [draftId, setDraftId] = useState(() => backend.genId('suggestion'))
+  const { saving, runSave } = useSaveAction()
   const mine = suggestions || []
 
-  function send() {
+  function send() { return runSave(async () => {
     if (!text.trim()) return
-    addSuggestion(text.trim()); setText(''); setThanks(true); setTimeout(() => setThanks(false), 2500)
-  }
+    if (!await addSuggestion(text.trim(), draftId)) return
+    setDraftId(backend.genId('suggestion'))
+    setText(''); setThanks(true); setTimeout(() => setThanks(false), 2500)
+  }) }
 
   return (
     <div className="card max-w-2xl p-6">
       <h3 className="mb-2 flex items-center gap-2 text-lg font-bold text-ink-800"><Lightbulb size={20} className="text-amber-500" /> {t('settings.suggestions')}</h3>
       <p className="mb-4 text-sm text-ink-400">{lang === 'ar' ? 'فكرتك تساعدنا على تحسين التطبيق' : 'Your idea helps us improve the app'}</p>
-      <textarea className="input min-h-[120px] resize-y" placeholder={t('settings.suggestionPlaceholder')} value={text} onChange={(e) => setText(e.target.value)} />
-      <button onClick={send} className="btn-primary mt-3"><Lightbulb size={16} /> {t('settings.sendSuggestion')}</button>
+      <textarea disabled={saving} className="input min-h-[120px] resize-y" placeholder={t('settings.suggestionPlaceholder')} value={text} onChange={(e) => setText(e.target.value)} />
+      <button onClick={send} disabled={saving || !text.trim()} className="btn-primary mt-3"><Lightbulb size={16} /> {t('settings.sendSuggestion')}</button>
       {thanks && <p className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-600">{t('settings.thanksSuggestion')}</p>}
 
       {mine.length > 0 && (

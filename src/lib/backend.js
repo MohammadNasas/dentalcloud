@@ -18,15 +18,11 @@
 //    genId()                        -> new id (uuid in cloud)
 // ──────────────────────────────────────────────────────────────────────────
 import { isCloud, supabase } from './supabaseClient'
+import { createCloudWrites } from './cloudWrites.js'
 import {
   getOrInitDB, saveDB, genId as localGenId, hashPassword, DOCTOR_COLORS,
 } from './db'
 
-// logical table -> Supabase table name
-const SB = {
-  patients: 'patients', toothRecords: 'tooth_records', appointments: 'appointments',
-  payments: 'payments', suggestions: 'suggestions', doctors: 'doctors', lab_orders: 'lab_orders',
-}
 // logical table -> local db collection name
 const LOCAL = {
   patients: 'patients', toothRecords: 'toothRecords', appointments: 'appointments',
@@ -119,7 +115,7 @@ const localBackend = {
     const i = db[col].findIndex((x) => x.id === obj.id)
     if (i >= 0) db[col][i] = obj
     else db[col].push(obj)
-    saveDB(db)
+    if (!saveDB(db)) throw new Error('Could not save on this device')
     return obj
   },
 
@@ -132,14 +128,15 @@ const localBackend = {
       db.appointments = db.appointments.filter((a) => a.patientId !== id)
       db.payments = db.payments.filter((p) => p.patientId !== id)
     }
-    saveDB(db)
+    if (!saveDB(db)) throw new Error('Could not save on this device')
+    return true
   },
 
   async saveClinic(clinic) {
     const db = getOrInitDB()
     const i = db.clinics.findIndex((c) => c.id === clinic.id)
     if (i >= 0) db.clinics[i] = clinic
-    saveDB(db)
+    if (!saveDB(db)) throw new Error('Could not save on this device')
     return clinic
   },
 
@@ -153,9 +150,11 @@ const localBackend = {
 // ── CLOUD (Supabase) ─────────────────────────────────────────────────────
 async function loadMe(uid) {
   const d = await supabase.from('doctors').select('*').eq('id', uid).maybeSingle()
+  if (d.error) throw d.error
   if (!d.data) return null
   const user = { ...d.data.data, id: d.data.id, clinicId: d.data.clinic_id }
   const c = await supabase.from('clinics').select('*').eq('id', user.clinicId).maybeSingle()
+  if (c.error) throw c.error
   const clinic = c.data ? { ...c.data.data, id: c.data.id } : null
   return { user, clinic }
 }
@@ -221,44 +220,31 @@ const cloudBackend = {
 
   async signOut() { await supabase.auth.signOut() },
 
-  async bootstrap() {
+  async bootstrap(clinicId) {
     const out = { clinic: null, doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [] }
-    const cl = await supabase.from('clinics').select('*').limit(1).maybeSingle()
+    const cl = await supabase.from('clinics').select('*').eq('id', clinicId).single()
+    if (cl.error) throw cl.error
     if (cl.data) out.clinic = { ...cl.data.data, id: cl.data.id }
     const pairs = [['doctors', 'doctors'], ['patients', 'patients'], ['tooth_records', 'toothRecords'],
       ['appointments', 'appointments'], ['payments', 'payments'], ['suggestions', 'suggestions'],
       ['lab_orders', 'labOrders']]
     for (const [sb, key] of pairs) {
-      const r = await supabase.from(sb).select('*').maybeSingle ? await supabase.from(sb).select('*') : { data: [] }
-      // lab_orders table may not exist yet — skip gracefully
-      if (r.error) { console.warn(`bootstrap: table ${sb} not ready`, r.error.message); continue }
-      out[key] = (r.data || []).map((row) => ({ ...row.data, id: row.id, clinicId: row.clinic_id }))
+      // Supabase caps result pages. Never present a truncated or failed load
+      // as an empty clinic that the doctor can unknowingly overwrite.
+      for (let offset = 0; ; offset += 500) {
+        let query = supabase.from(sb).select('*')
+        // The app owner's existing RLS policy permits the global inbox.
+        if (sb !== 'suggestions') query = query.eq('clinic_id', clinicId)
+        const r = await query.order('id').range(offset, offset + 499)
+        if (r.error) throw r.error
+        out[key].push(...(r.data || []).map((row) => ({ ...row.data, id: row.id, clinicId: row.clinic_id })))
+        if ((r.data || []).length < 500) break
+      }
     }
     return out
   },
 
-  async save(table, obj) {
-    const r = await supabase.from(SB[table]).upsert({ id: obj.id, clinic_id: obj.clinicId, data: obj })
-    if (r.error) console.error('cloud save', table, r.error.message)
-    return obj
-  },
-
-  async remove(table, id) {
-    // Deleting a patient cascades to its tooth records, appointments & payments.
-    if (table === 'patients') {
-      for (const child of ['tooth_records', 'appointments', 'payments']) {
-        await supabase.from(child).delete().eq('data->>patientId', id)
-      }
-    }
-    const r = await supabase.from(SB[table]).delete().eq('id', id)
-    if (r.error) console.error('cloud remove', table, r.error.message)
-  },
-
-  async saveClinic(clinic) {
-    const r = await supabase.from('clinics').update({ data: clinic }).eq('id', clinic.id)
-    if (r.error) console.error('cloud saveClinic', r.error.message)
-    return clinic
-  },
+  ...createCloudWrites(supabase),
 
   // Sends a reset link to the account's registered email (identity = inbox).
   async resetPassword(email) {

@@ -8,6 +8,9 @@ import { Modal, Field, Segmented, Badge, EmptyState } from '../ui'
 import InstructionsModal from '../InstructionsModal'
 import { fmtDate } from '../../lib/dates'
 import { money, cx } from '../../lib/utils'
+import { backend } from '../../lib/backend'
+import { useSaveAction } from '../../lib/useSaveAction'
+import { format, parseISO } from 'date-fns'
 
 export default function TreatmentsPanel({ patient }) {
   const { t, lang } = useI18n()
@@ -110,7 +113,9 @@ function AddProcedureModal({ patient, onClose }) {
   const [toothId, setToothId] = useState('0')
   const [dentition, setDentition] = useState('permanent')
   const [status, setStatus] = useState('done')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [draftId] = useState(() => backend.genId('record'))
+  const { saving, runSave } = useSaveAction()
   const [doctorId, setDoctorId] = useState(currentUser?.id)
   const [price, setPrice] = useState(String(catalog[0]?.price ?? 0))
   const [notes, setNotes] = useState('')
@@ -123,24 +128,26 @@ function AddProcedureModal({ patient, onClose }) {
     if (item) setPrice(String(item.price))
   }
 
-  function save() {
+  function save() { return runSave(async () => {
+    if (!date) return
     const item = catalog.find((c) => c.key === priceKey)
     // itemKey is a chartable key when possible, else keep catalog key + label
     const itemKey = DENTAL_ITEMS[priceKey] ? priceKey : (priceKey === 'surgical_ext' ? 'extraction' : priceKey)
-    addToothRecord({
+    const saved = await addToothRecord({
+      id: draftId,
       patientId: patient.id, toothId, dentition,
       itemKey, kind: 'treatment',
       label: item ? { en: item.en, ar: item.ar } : undefined,
-      surfaces: [], status, date: new Date(date).toISOString(),
+      surfaces: [], status, date: parseISO(date).toISOString(),
       doctorId, price: Number(price) || 0, notes,
     })
-    onClose()
-  }
+    if (saved) onClose()
+  }) }
 
   return (
-    <Modal open onClose={onClose} size="md" title={t('patient.treatments')} icon={<Plus size={18} className="text-brand-500" />}
-      footer={<><button onClick={onClose} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} className="btn-primary">{t('common.save')}</button></>}>
-      <div className="space-y-3">
+    <Modal open onClose={() => { if (!saving) onClose() }} size="md" title={t('patient.treatments')} icon={<Plus size={18} className="text-brand-500" />}
+      footer={<><button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} disabled={saving || !date} className="btn-primary">{t('common.save')}</button></>}>
+      <fieldset disabled={saving} className="space-y-3">
         <Field label={t('settings.treatment')}>
           <select className="input" value={priceKey} onChange={(e) => pick(e.target.value)}>
             {catalog.map((c) => <option key={c.key} value={c.key}>{lang === 'ar' ? c.ar : c.en}</option>)}
@@ -186,7 +193,7 @@ function AddProcedureModal({ patient, onClose }) {
         <Field label={t('common.notes')}>
           <input className="input" value={notes} onChange={(e) => setNotes(e.target.value)} />
         </Field>
-      </div>
+      </fieldset>
     </Modal>
   )
 }

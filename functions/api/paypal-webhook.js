@@ -1,17 +1,19 @@
+import { saveSubscription } from '../../src/lib/saveSubscription.js'
 // Cloudflare Pages Function: PayPal subscription webhooks.
 // Route: POST /api/paypal-webhook
 // Configure this URL in PayPal and set PAYPAL_WEBHOOK_ID for signature verification.
+import { paidEntitlementPatch, revokePaymentPatch, savedVerifiedPayment } from '../../src/lib/entitlement.js'
 const PRO_PRICE = 50
 // Activating a subscription only starts its free trial. Payment is granted
 // exclusively by a signed, completed $50 PayPal sale event.
 const PAID_EVENTS = new Set(['PAYMENT.SALE.COMPLETED'])
 const ACTIVATION_EVENTS = new Set(['BILLING.SUBSCRIPTION.ACTIVATED'])
+const REVOCATION_EVENTS = new Set(['PAYMENT.SALE.REVERSED', 'PAYMENT.SALE.REFUNDED'])
 const STOP_EVENTS = new Set([
   'BILLING.SUBSCRIPTION.PAYMENT.FAILED',
   'BILLING.SUBSCRIPTION.SUSPENDED',
   'BILLING.SUBSCRIPTION.CANCELLED',
   'BILLING.SUBSCRIPTION.EXPIRED',
-  'PAYMENT.SALE.REVERSED',
 ])
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
 
@@ -67,8 +69,35 @@ function verifiedPaymentFrom(event) {
   const amount = Number(r.amount?.total ?? r.amount?.value ?? r.transaction_info?.transaction_amount?.value)
   const currency = String(r.amount?.currency || r.amount?.currency_code || r.transaction_info?.transaction_amount?.currency_code || '').toUpperCase()
   const state = String(r.state || r.status || 'COMPLETED').toUpperCase()
-  if (state !== 'COMPLETED' || !Number.isFinite(amount) || Math.abs(amount - PRO_PRICE) > 0.01 || currency !== 'USD') return null
-  return { amount, currency, id: r.id || null, time: event.create_time || r.create_time || null }
+  if (state !== 'COMPLETED' || !Number.isFinite(amount) || amount !== PRO_PRICE || currency !== 'USD') return null
+  return { amount, currency, id: r.id || null, time: r.create_time || event.create_time || null, source: 'verified_webhook' }
+}
+
+function originalSaleId(event) {
+  const resource = event.resource || {}
+  if (event.event_type === 'PAYMENT.SALE.REVERSED') return resource.sale_id || resource.id || null
+  const saleLink = (resource.links || []).find((link) => link.rel === 'sale')?.href
+  return resource.sale_id || (saleLink ? saleLink.split('/').pop() : null)
+    || (event.resource_type === 'sale' ? resource.id : null)
+}
+
+async function originalSale(base, accessToken, saleId) {
+  const r = await fetch(`${base}/v1/payments/sale/${encodeURIComponent(saleId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  })
+  if (!r.ok) throw new Error('original_sale_lookup_failed')
+  return r.json()
+}
+
+async function findClinicByPayment(supaUrl, headers, saleId) {
+  if (!saleId) return null
+  const url = new URL(`${supaUrl}/rest/v1/clinics`)
+  url.searchParams.set('select', 'id,data')
+  url.searchParams.set('data->>subscriptionVerifiedPaymentId', `eq.${saleId}`)
+  const r = await fetch(url, { headers })
+  if (!r.ok) throw new Error('payment_clinic_lookup_failed')
+  const rows = await r.json()
+  return Array.isArray(rows) ? rows[0] || null : null
 }
 
 async function findClinicBySubscription(supaUrl, headers, subscriptionId) {
@@ -146,13 +175,7 @@ async function cancelTrialReservation(supaUrl, headers, subscriptionId) {
 }
 
 async function updateClinic(supaUrl, headers, clinic, patch) {
-  const nextData = { ...clinic.data, ...patch }
-  const upR = await fetch(`${supaUrl}/rest/v1/clinics?id=eq.${clinic.id}`, {
-    method: 'PATCH',
-    headers: { ...headers, Prefer: 'return=minimal' },
-    body: JSON.stringify({ data: nextData }),
-  })
-  if (!upR.ok) throw new Error(await upR.text())
+  await saveSubscription(supaUrl, headers, clinic.id, clinic.data, { ...clinic.data, ...patch })
 }
 
 export const onRequestPost = async ({ request, env }) => {
@@ -172,10 +195,10 @@ export const onRequestPost = async ({ request, env }) => {
     if (!verified) return json({ ok: false, error: 'bad_signature' }, 401)
 
     const eventType = event.event_type
-    if (!PAID_EVENTS.has(eventType) && !STOP_EVENTS.has(eventType) && !ACTIVATION_EVENTS.has(eventType)) return json({ ok: true, ignored: eventType })
+    if (!PAID_EVENTS.has(eventType) && !STOP_EVENTS.has(eventType) && !ACTIVATION_EVENTS.has(eventType) && !REVOCATION_EVENTS.has(eventType)) return json({ ok: true, ignored: eventType })
 
-    const subscriptionId = subscriptionIdFrom(event)
-    if (!subscriptionId) return json({ ok: true, ignored: 'no_subscription_id' })
+    let subscriptionId = subscriptionIdFrom(event)
+    if (!subscriptionId && !REVOCATION_EVENTS.has(eventType)) return json({ ok: true, ignored: 'no_subscription_id' })
 
     const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' }
     // Bind the trial to PayPal as soon as it becomes active. This catches a
@@ -193,54 +216,67 @@ export const onRequestPost = async ({ request, env }) => {
       return json({ ok: true, trialIdentityClaimed: true, subscriptionId })
     }
 
-    const clinic = await findClinicBySubscription(supaUrl, headers, subscriptionId)
+    const saleId = REVOCATION_EVENTS.has(eventType) ? originalSaleId(event) : null
+    let sale = event.event_type === 'PAYMENT.SALE.REVERSED' ? event.resource : null
+    if (REVOCATION_EVENTS.has(eventType) && saleId && (!subscriptionId || !sale?.create_time)) {
+      sale = await originalSale(base, tok.access_token, saleId)
+      subscriptionId = subscriptionId || sale.billing_agreement_id || ''
+    }
+    const clinic = (subscriptionId ? await findClinicBySubscription(supaUrl, headers, subscriptionId) : null)
+      || (REVOCATION_EVENTS.has(eventType) ? await findClinicByPayment(supaUrl, headers, saleId) : null)
     if (!clinic) return json({ ok: true, ignored: 'clinic_not_found_for_subscription' })
 
     const now = new Date().toISOString()
+    if (REVOCATION_EVENTS.has(eventType)) {
+      if (!saleId) return json({ ok: true, ignored: 'no_original_sale_id' })
+      const payment = savedVerifiedPayment(clinic.data)
+      const resource = event.resource || {}
+      const refundAmount = Number(resource.amount?.total ?? resource.amount?.value)
+      const fullRefund = eventType === 'PAYMENT.SALE.REVERSED'
+        || (String(sale?.state || '').toUpperCase() === 'REFUNDED')
+        || (Number.isFinite(refundAmount) && refundAmount >= PRO_PRICE - 0.01
+          && String(resource.amount?.currency || resource.amount?.currency_code || '').toUpperCase() === 'USD')
+      // A partial refund is a business decision: flag it for review instead of
+      // silently taking away the entire purchased year.
+      if (!fullRefund) {
+        await updateClinic(supaUrl, headers, clinic, { subscriptionRefundReview: { saleId, eventId: event.id, receivedAt: now, amount: refundAmount || null } })
+        return json({ ok: true, refundReviewRequired: true })
+      }
+      const revoked = revokePaymentPatch(clinic.data, {
+        id: saleId,
+        time: payment?.id === saleId ? payment.time : sale?.create_time || null,
+        eventId: event.id,
+        revokedAt: event.create_time || now,
+      })
+      await updateClinic(supaUrl, headers, clinic, { ...revoked, subscriptionLastEvent: eventType })
+      return json({ ok: true, paid: revoked.paid, paymentRevoked: true })
+    }
     if (STOP_EVENTS.has(eventType)) {
+      const eventTime = Date.parse(event.create_time || '')
+      const previousTime = Date.parse(clinic.data.subscriptionStatusUpdatedAt || '')
+      if (Number.isFinite(previousTime) && (!Number.isFinite(eventTime) || eventTime < previousTime))
+        return json({ ok: true, ignored: 'stale_subscription_event' })
       await updateClinic(supaUrl, headers, clinic, {
-        paid: false,
-        paidAt: null,
-        subscriptionPaymentVerified: false,
-        subscriptionVerifiedAmount: null,
-        subscriptionVerifiedCurrency: null,
-        subscriptionVerifiedPaymentId: null,
-        subscriptionPaymentVerificationSource: null,
+        ...paidEntitlementPatch(clinic.data),
         subscriptionStatus: eventType.replace('BILLING.SUBSCRIPTION.', '').replace('PAYMENT.SALE.', ''),
+        subscriptionStatusUpdatedAt: event.create_time || now,
         subscriptionStoppedAt: now,
         subscriptionLastEvent: eventType,
       })
-      return json({ ok: true, paid: false, subscriptionId })
+      return json({ ok: true, paid: paidEntitlementPatch(clinic.data).paid, subscriptionId })
     }
 
     const payment = verifiedPaymentFrom(event)
     if (!payment) {
-      await updateClinic(supaUrl, headers, clinic, {
-        paid: false,
-        paidAt: null,
-        subscriptionPaymentVerified: false,
-        subscriptionVerifiedAmount: null,
-        subscriptionVerifiedCurrency: null,
-        subscriptionVerifiedPaymentId: null,
-        subscriptionPaymentVerificationSource: null,
-        subscriptionLastEvent: eventType,
-      })
-      return json({ ok: true, paid: false, ignored: 'payment_not_50_usd', subscriptionId })
+      return json({ ok: true, ignored: 'payment_not_50_usd', subscriptionId })
     }
 
+    const entitlement = paidEntitlementPatch(clinic.data, payment)
     await updateClinic(supaUrl, headers, clinic, {
-      paid: true,
-      paidAt: payment.time || now,
-      subscriptionStatus: 'ACTIVE',
-      subscriptionPaymentVerified: true,
-      subscriptionVerifiedAmount: payment.amount,
-      subscriptionVerifiedCurrency: payment.currency,
-      subscriptionVerifiedPaymentId: payment.id,
-      subscriptionPaymentVerificationSource: 'verified_webhook',
-      subscriptionLastPaidAt: payment.time || now,
+      ...entitlement,
       subscriptionLastEvent: eventType,
     })
-    return json({ ok: true, paid: true, subscriptionId })
+    return json({ ok: true, paid: entitlement.paid, paidThrough: entitlement.paidThrough, subscriptionId })
   } catch (e) {
     return json({ ok: false, error: 'server_error', message: String(e.message || e) }, 500)
   }

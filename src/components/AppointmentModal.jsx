@@ -1,18 +1,23 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { CalendarPlus, Trash2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { Modal, Field, Segmented } from './ui'
+import { backend } from '../lib/backend'
+import { useSaveAction } from '../lib/useSaveAction'
 
 export default function AppointmentModal({ open, onClose, appointment, defaultDate, defaultPatientId }) {
   const { t, lang } = useI18n()
   const { patients, doctors, addAppointment, updateAppointment, deleteAppointment, currentUser, can } = useStore()
 
   const [form, setForm] = useState({})
+  const draftId = useRef(null)
+  const { saving, runSave } = useSaveAction()
 
   useEffect(() => {
     if (!open) return
+    draftId.current = appointment?.id || backend.genId('appointment')
     if (appointment) {
       const d = new Date(appointment.start)
       const dur = Math.round((new Date(appointment.end) - new Date(appointment.start)) / 60000) || 30
@@ -31,42 +36,41 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
         reason: '', step: '', status: 'scheduled', notes: '',
       })
     }
-  }, [open, appointment, defaultDate, defaultPatientId])
+  }, [open, appointment?.id, defaultDate, defaultPatientId])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
-  function save() {
-    if (!form.patientId) return
+  function save() { return runSave(async () => {
+    if (!form.patientId || !form.date || !form.time) return
     const start = new Date(`${form.date}T${form.time}`)
     const end = new Date(start.getTime() + (Number(form.duration) || 30) * 60000)
     const data = {
+      id: draftId.current,
       patientId: form.patientId, doctorId: form.doctorId,
       start: start.toISOString(), end: end.toISOString(),
       reason: form.reason, step: form.step, status: form.status, notes: form.notes,
     }
-    if (appointment) updateAppointment(appointment.id, data)
-    else addAppointment(data)
-    onClose()
-  }
+    const saved = appointment ? await updateAppointment(appointment.id, data) : await addAppointment(data)
+    if (saved) onClose()
+  }) }
 
-  function remove() {
-    deleteAppointment(appointment.id)
-    onClose()
-  }
+  function remove() { return runSave(async () => {
+    if (await deleteAppointment(appointment.id)) onClose()
+  }) }
 
   return (
-    <Modal open={open} onClose={onClose} size="md"
+    <Modal open={open} onClose={() => { if (!saving) onClose() }} size="md"
       title={appointment ? t('appt.edit') : t('appt.new')}
       icon={<CalendarPlus size={18} className="text-brand-500" />}
       footer={
         <>
-          {appointment && <button onClick={remove} className="btn-ghost me-auto text-rose-500 hover:bg-rose-50"><Trash2 size={15} /> {t('common.delete')}</button>}
-          <button onClick={onClose} className="btn-ghost">{t('common.cancel')}</button>
-          <button onClick={save} className="btn-primary">{t('common.save')}</button>
+          {appointment && <button onClick={remove} disabled={saving} className="btn-ghost me-auto text-rose-500 hover:bg-rose-50"><Trash2 size={15} /> {t('common.delete')}</button>}
+          <button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button>
+          <button onClick={save} disabled={saving || !form.patientId || !form.date || !form.time} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
         </>
       }
     >
-      <div className="space-y-3">
+      <fieldset disabled={saving} className="space-y-3">
         <Field label={t('appt.selectPatient')}>
           <select className="input" value={form.patientId} onChange={(e) => set('patientId', e.target.value)}>
             {patients.map((p) => <option key={p.id} value={p.id}>{lang === 'ar' ? p.nameAr || p.name : p.name} — #{p.fileNo}</option>)}
@@ -117,7 +121,7 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
           </Field>
           <Field label={t('common.notes')}><input className="input" value={form.notes} onChange={(e) => set('notes', e.target.value)} /></Field>
         </div>
-      </div>
+      </fieldset>
     </Modal>
   )
 }

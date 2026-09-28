@@ -8,6 +8,9 @@ import { Modal, Spinner } from './components/ui'
 import { Confetti, SuccessCheck, ToastHost } from './components/anim'
 import logo from './lib/logo'
 import { startPaypalCheckout } from './lib/payments'
+import { hasVerifiedPaidAccess, getPaidThrough } from './lib/entitlement.js'
+import { paymentErrorMessage } from './lib/paymentErrors.js'
+import SaveStatus from './components/SaveStatus'
 import Layout from './components/Layout'
 import PublicEntry from './pages/PublicEntry'
 import ResetPassword from './pages/ResetPassword'
@@ -67,7 +70,7 @@ function Splash() {
 }
 
 function PaymentResultOverlay({ result, onClose }) {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const { clinic, currentUser } = useStore()
   const [startingPaid, setStartingPaid] = useState(false)
   const [startError, setStartError] = useState('')
@@ -85,9 +88,7 @@ function PaymentResultOverlay({ result, onClose }) {
     : result.requiresPaidCheckout
       ? t('packages.paidWithoutTrialNotice')
       : !result.ok
-    ? (result.reason === 'gateway'
-        ? 'declined at the payment page (card / 3-D Secure)'
-        : [result.status && `status: ${result.status}`, result.error && `error: ${result.error}`, result.message].filter(Boolean).join(' · '))
+    ? paymentErrorMessage(result, lang)
     : ''
 
   async function continuePaid() {
@@ -101,7 +102,7 @@ function PaymentResultOverlay({ result, onClose }) {
     })
     if (res.ok && res.url) { window.location.href = res.url; return }
     setStartingPaid(false)
-    setStartError(res.message || t('packages.payFailed'))
+    setStartError(paymentErrorMessage(res, lang))
   }
   return (
     <Modal open onClose={onClose} size="sm">
@@ -128,17 +129,9 @@ function PaymentResultOverlay({ result, onClose }) {
   )
 }
 
-function hasVerifiedPaidAccess(clinic) {
-  if (!clinic?.paid) return false
-  if (clinic.subscriptionProvider !== 'paypal') return true
-  const amount = Number(clinic.subscriptionVerifiedAmount)
-  const currency = String(clinic.subscriptionVerifiedCurrency || '').toUpperCase()
-  return clinic.subscriptionPaymentVerified === true && Number.isFinite(amount) && Math.abs(amount - 50) <= 0.01 && currency === 'USD'
-}
-
 export default function App() {
-  const { booting, currentUser, recovery, paymentResult, dismissPaymentResult, mode, clinic } = useStore()
-  const verifiedPaidAccess = hasVerifiedPaidAccess(clinic)
+  const { booting, loadError, retryLoad, currentUser, recovery, paymentResult, dismissPaymentResult, mode, clinic } = useStore()
+  const { lang } = useI18n()
 
   // Keep the splash on screen long enough for the logo reveal to actually be
   // seen, even when boot finishes instantly.
@@ -148,34 +141,40 @@ export default function App() {
     return () => clearTimeout(id)
   }, [])
 
-  // A PayPal trial grants temporary Pro access, but it is deliberately not a
-  // payment. Re-evaluate at the exact expiry time so an open app is locked as
-  // soon as the free month ends unless a verified $50 payment set paid=true.
+  // Re-evaluate both trial and paid expiry while the app remains open.
   const [accessClock, setAccessClock] = useState(Date.now())
+  const verifiedPaidAccess = hasVerifiedPaidAccess(clinic, Math.max(accessClock, Date.now()))
   useEffect(() => {
-    if (verifiedPaidAccess || !clinic?.trialEndsAt) return
-    const trialEnd = Date.parse(clinic.trialEndsAt)
-    if (!Number.isFinite(trialEnd)) return
-    const remaining = trialEnd - Date.now()
-    if (remaining <= 0) {
-      if (accessClock < trialEnd) setAccessClock(Date.now())
-      return
-    }
+    const now = Date.now()
+    const ends = [clinic?.trialEndsAt, getPaidThrough(clinic)].map(Date.parse).filter((end) => Number.isFinite(end) && end > now)
+    if (!ends.length) return
+    const remaining = Math.min(...ends) - now
     // Browsers cap setTimeout at a little under 25 days; reschedule if needed.
     const id = setTimeout(() => setAccessClock(Date.now()), Math.min(remaining + 100, 2_000_000_000))
     return () => clearTimeout(id)
-  }, [verifiedPaidAccess, clinic?.trialEndsAt, accessClock])
+  }, [clinic, accessClock])
+
+  useEffect(() => {
+    const tick = () => setAccessClock(Date.now())
+    window.addEventListener('focus', tick)
+    document.addEventListener('visibilitychange', tick)
+    return () => { window.removeEventListener('focus', tick); document.removeEventListener('visibilitychange', tick) }
+  }, [])
 
   const overlay = paymentResult ? <PaymentResultOverlay result={paymentResult} onClose={dismissPaymentResult} /> : null
 
   if (booting || minSplash) return <Splash />
+  if (loadError) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+    <p>{lang === 'ar' ? 'تعذّر تحميل بيانات العيادة. تحقق من الاتصال وأعد المحاولة.' : 'Could not load your clinic. Check your connection and retry.'}</p>
+    <button onClick={retryLoad} className="btn-primary">{lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button>
+  </div>
   if (recovery) return <ResetPassword />
   if (!currentUser) return <>{<PublicEntry />}{overlay}<ToastHost /></>
   const trialEnd = Date.parse(clinic?.trialEndsAt || '')
-  const trialActive = Number.isFinite(trialEnd) && accessClock < trialEnd
+  const trialActive = Number.isFinite(trialEnd) && Math.max(accessClock, Date.now()) < trialEnd
   // Pro access is allowed during the free month or after a verified payment.
   // Merely having an ACTIVE PayPal agreement never counts as paid access.
-  if (mode === 'cloud' && clinic && !verifiedPaidAccess && !trialActive && clinic.tier !== 'student') return <>{<Paywall />}{overlay}<ToastHost /></>
+  if (mode === 'cloud' && clinic && !verifiedPaidAccess && !trialActive && clinic.tier !== 'student') return <>{<Paywall />}{overlay}<SaveStatus /><ToastHost /></>
 
   return (
     <>
@@ -197,6 +196,7 @@ export default function App() {
         </Route>
       </Routes>
       {overlay}
+      <SaveStatus />
       <ToastHost />
     </>
   )

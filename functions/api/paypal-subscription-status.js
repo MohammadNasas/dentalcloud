@@ -1,5 +1,7 @@
+import { saveSubscription } from '../../src/lib/saveSubscription.js'
 // Cloudflare Pages Function: sync a clinic's PayPal subscription status.
 // Route: POST /api/paypal-subscription-status
+import { paidEntitlementPatch, paymentFromSubscription } from '../../src/lib/entitlement.js'
 const ACTIVE_STATUSES = new Set(['ACTIVE'])
 const PRO_PRICE = 50
 
@@ -62,21 +64,6 @@ async function updateSubscriptionPrice(base, accessToken, subscriptionId, sequen
     }]),
   })
   return r.ok
-}
-
-function verifiedPaymentFromSubscription(sub) {
-  const last = sub?.billing_info?.last_payment
-  const amount = Number(last?.amount?.value ?? last?.amount?.total)
-  const currency = String(last?.amount?.currency_code || last?.amount?.currency || '').toUpperCase()
-  if (!Number.isFinite(amount) || Math.abs(amount - PRO_PRICE) > 0.01 || currency !== 'USD') return null
-  return { amount, currency, time: last.time || null, source: 'paypal_subscription' }
-}
-
-function verifiedPaymentFromWebhook(clinic) {
-  const amount = Number(clinic?.subscriptionVerifiedAmount)
-  const currency = String(clinic?.subscriptionVerifiedCurrency || '').toUpperCase()
-  if (clinic?.subscriptionPaymentVerified !== true || !Number.isFinite(amount) || Math.abs(amount - PRO_PRICE) > 0.01 || currency !== 'USD') return null
-  return { amount, currency, time: clinic.subscriptionLastPaidAt || clinic.paidAt || null, source: 'verified_webhook' }
 }
 
 async function getTrialBySubscription(supaUrl, headers, subscriptionId) {
@@ -165,13 +152,9 @@ async function cancelTrialReservation(supaUrl, headers, subscriptionId) {
   if (!r.ok) throw new Error(`trial_cancel_failed: ${await r.text()}`)
 }
 
-async function saveClinic(supaUrl, headers, clinicId, data) {
-  const r = await fetch(`${supaUrl}/rest/v1/clinics?id=eq.${clinicId}`, {
-    method: 'PATCH',
-    headers: { ...headers, Prefer: 'return=minimal' },
-    body: JSON.stringify({ data }),
-  })
-  if (!r.ok) throw new Error(`clinic_update_failed: ${await r.text()}`)
+async function saveClinic(supaUrl, headers, clinicId, data, previous) {
+  const saved = await saveSubscription(supaUrl, headers, clinicId, previous, data)
+  Object.assign(data, saved)
 }
 
 export const onRequestPost = async ({ request, env }) => {
@@ -217,9 +200,11 @@ export const onRequestPost = async ({ request, env }) => {
       return json({ ok: false, error: 'subscription_not_current' }, 409)
     // ACTIVE also describes the free trial. It must never be treated as proof
     // of payment. Only an exact $50 USD payment reported by PayPal unlocks paid.
-    const verifiedPayment = verifiedPaymentFromSubscription(sub) || verifiedPaymentFromWebhook(clinic)
-    const paid = ACTIVE_STATUSES.has(sub.status) && Boolean(verifiedPayment)
-    if (checkoutMode === 'trial' && ACTIVE_STATUSES.has(sub.status) && !paid) {
+    const entitlement = paidEntitlementPatch(clinic, paymentFromSubscription(sub))
+    const paid = entitlement.paid
+    // A completed paid period never becomes a new/duplicate free trial.
+    if (checkoutMode === 'trial' && ACTIVE_STATUSES.has(sub.status) && !entitlement.subscriptionPaymentVerified
+      && !clinic.subscriptionLastPaidAt && !clinic.subscriptionRevokedPayments?.length) {
       const trial = await ensureTrial(supaUrl, headers, { user, clinicId, subscriptionId, clinic })
       const identityAccepted = trial && await claimPaypalIdentity(supaUrl, headers, subscriptionId, sub)
       if (!identityAccepted) {
@@ -240,34 +225,29 @@ export const onRequestPost = async ({ request, env }) => {
           subscriptionStoppedAt: now,
           duplicateTrialBlockedAt: now,
         }
-        await saveClinic(supaUrl, headers, clinicId, blockedData)
+        await saveClinic(supaUrl, headers, clinicId, blockedData, clinic)
         return json({ ok: true, status: blockedData.subscriptionStatus, paid: false, error: 'trial_already_used', requiresPaidCheckout: true, duplicateTrialBlocked: true, clinic: { ...blockedData, id: clinicId } })
       }
     }
     let priceUpdated = Number(clinic.renewalPrice) === PRO_PRICE && !clinic.renewalPriceUpdatePending
-    if (paid && !priceUpdated) priceUpdated = await updateSubscriptionPrice(base, tok.access_token, subscriptionId, checkoutMode === 'paid' ? 1 : 2)
+    if (paid && ACTIVE_STATUSES.has(sub.status) && !priceUpdated) priceUpdated = await updateSubscriptionPrice(base, tok.access_token, subscriptionId, checkoutMode === 'paid' ? 1 : 2)
     const now = new Date().toISOString()
     const nextData = {
       ...clinic,
+      ...entitlement,
       tier: clinic.tier === 'economy' ? 'pro' : clinic.tier,
-      paid,
       subscriptionProvider: 'paypal',
       paypalSubscriptionId: subscriptionId,
       subscriptionStatus: sub.status,
+      subscriptionStatusUpdatedAt: sub.status_update_time || now,
       subscriptionSyncedAt: now,
-      subscriptionPaymentVerified: paid,
-      subscriptionVerifiedAmount: paid ? verifiedPayment.amount : null,
-      subscriptionVerifiedCurrency: paid ? verifiedPayment.currency : null,
-      subscriptionPaymentVerificationSource: paid ? verifiedPayment.source : null,
-      subscriptionLastPaidAt: paid ? (verifiedPayment.time || clinic.subscriptionLastPaidAt || now) : null,
-      paidAt: paid ? (verifiedPayment.time || clinic.paidAt || now) : null,
       nextBillingTime: sub.billing_info?.next_billing_time || clinic.nextBillingTime,
       ...(priceUpdated ? { renewalPrice: PRO_PRICE, renewalCurrency: 'USD', renewalPriceUpdatedAt: now } : {}),
       renewalPriceUpdatePending: paid && !priceUpdated,
       ...(ACTIVE_STATUSES.has(sub.status) ? { subscriptionStoppedAt: null } : { subscriptionStoppedAt: now }),
     }
-    await saveClinic(supaUrl, headers, clinicId, nextData)
-    return json({ ok: true, status: sub.status, paid, paymentVerified: paid, checkoutMode, paymentPending: checkoutMode === 'paid' && ACTIVE_STATUSES.has(sub.status) && !paid, clinic: { ...nextData, id: clinicId } })
+    await saveClinic(supaUrl, headers, clinicId, nextData, clinic)
+    return json({ ok: true, status: sub.status, paid, paymentVerified: entitlement.subscriptionPaymentVerified, checkoutMode, paymentPending: checkoutMode === 'paid' && ACTIVE_STATUSES.has(sub.status) && !paid, clinic: { ...nextData, id: clinicId } })
   } catch (e) {
     return json({ ok: false, error: 'server_error', message: String(e.message || e) }, 500)
   }

@@ -4,6 +4,7 @@
 // Env vars: PAYPAL_CLIENT_ID, PAYPAL_SECRET, SUPABASE_URL,
 // SUPABASE_SERVICE_ROLE_KEY, PAYPAL_BASE (optional), SITE_URL (optional)
 // Optional: PAYPAL_PRODUCT_ID, PAYPAL_PRO_TRIAL_PLAN_ID, PAYPAL_PRO_PAID_PLAN_ID
+import { hasVerifiedPaidAccess } from '../../src/lib/entitlement.js'
 const PRICES = { pro: 50 }
 const LABELS = { pro: 'Pro' }
 
@@ -216,6 +217,53 @@ async function releaseUnboundTrial(supaUrl, headers, { email, userId, clinicId }
   await fetch(url, { method: 'DELETE', headers })
 }
 
+async function pendingTrial(supaUrl, headers, { email, userId, clinicId }) {
+  const url = new URL(`${supaUrl}/rest/v1/subscription_trials`)
+  url.searchParams.set('select', 'email,user_id,clinic_id,status,paypal_subscription_id,trial_started_at')
+  url.searchParams.set('email', `eq.${email}`)
+  const r = await fetch(url, { headers })
+  if (!r.ok) throw new Error('trial_lookup_failed')
+  const rows = await r.json()
+  const trial = Array.isArray(rows) ? rows[0] : null
+  if (!trial || trial.user_id !== userId || trial.clinic_id !== clinicId) return null
+  return trial
+}
+
+async function resumeTrial({ base, accessToken, trial, clinicId, tier, siteUrl }) {
+  // The email reservation is the creation lock. A simultaneous request must
+  // wait, not create another agreement or mark the free month as consumed.
+  if (trial.status !== 'pending' || trial.trial_started_at)
+    return json({ error: 'trial_already_used', requiresPaidCheckout: true }, 409)
+  if (!trial.paypal_subscription_id)
+    return json({ error: 'checkout_in_progress', retryable: true }, 409)
+  const subscriptionId = trial.paypal_subscription_id
+  const r = await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+  })
+  if (!r.ok) return json({ error: 'checkout_resume_failed', retryable: true }, 503)
+  const sub = await r.json()
+  const [referenceClinic, referenceTier, referenceMode] = String(sub.custom_id || '').split('--')
+  if (referenceClinic !== clinicId || referenceTier !== tier || referenceMode !== 'trial')
+    return json({ error: 'subscription_clinic_mismatch' }, 409)
+  if (sub.status === 'ACTIVE') {
+    // Approval may have succeeded while the original return page was closed.
+    // Reuse the authenticated finalize flow; never create/charge a second sub.
+    const url = new URL(siteUrl)
+    url.searchParams.set('paypal', 'subscription')
+    url.searchParams.set('subscription_id', subscriptionId)
+    url.searchParams.set('clinic', clinicId)
+    url.searchParams.set('tier', tier)
+    url.searchParams.set('mode', 'trial')
+    return json({ url: url.href, subscriptionId, checkoutMode: 'trial', resumed: true })
+  }
+  const approve = (sub.links || []).find((link) => link.rel === 'approve')
+  if (sub.status === 'APPROVAL_PENDING' && approve?.href)
+    return json({ url: approve.href, subscriptionId, checkoutMode: 'trial', resumed: true })
+  // Do not silently replace a cancelled/expired/ambiguous agreement; support
+  // must establish that no approval/payment occurred before releasing it.
+  return json({ error: sub.status === 'APPROVED' ? 'checkout_in_progress' : 'checkout_resume_unavailable', retryable: sub.status === 'APPROVED' }, 409)
+}
+
 async function cancelSubscription(base, accessToken, subscriptionId) {
   if (!subscriptionId) return
   await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
@@ -242,6 +290,7 @@ export const onRequestPost = async ({ request, env }) => {
   let reservation = null
   let paypalAccessToken = ''
   let paypalSubscriptionId = ''
+  let creatingSubscription = false
   try {
     const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' }
     const user = await authenticatedUser(supaUrl, serviceKey, request)
@@ -250,14 +299,18 @@ export const onRequestPost = async ({ request, env }) => {
 
     const clinicRow = await loadClinic(supaUrl, headers, clinicId)
     if (!clinicRow) return json({ error: 'clinic_not_found' }, 404)
+    let resumableTrial = null
     if (checkoutMode === 'trial') {
       // Covers all trials created before the permanent email ledger was added.
       if (clinicRow.data?.trialStartedAt || clinicRow.data?.trialUsedAt || clinicRow.data?.paypalSubscriptionId)
         return json({ error: 'trial_already_used', requiresPaidCheckout: true }, 409)
-      if (!await reserveTrial(supaUrl, headers, { email: user.email, userId: user.id, clinicId }))
-        return json({ error: 'trial_already_used', requiresPaidCheckout: true }, 409)
-      reservation = { email: user.email, userId: user.id, clinicId, headers }
-    } else if (clinicRow.data?.paid && clinicRow.data?.subscriptionPaymentVerified === true) {
+      if (!await reserveTrial(supaUrl, headers, { email: user.email, userId: user.id, clinicId })) {
+        resumableTrial = await pendingTrial(supaUrl, headers, { email: user.email, userId: user.id, clinicId })
+        if (!resumableTrial) return json({ error: 'trial_already_used', requiresPaidCheckout: true }, 409)
+      } else {
+        reservation = { email: user.email, userId: user.id, clinicId, headers }
+      }
+    } else if (hasVerifiedPaidAccess(clinicRow.data)) {
       return json({ error: 'already_paid' }, 409)
     }
 
@@ -267,10 +320,12 @@ export const onRequestPost = async ({ request, env }) => {
       return json({ error: 'auth_failed', message: tok.error_description || tok.error }, 400)
     }
     paypalAccessToken = tok.access_token
+    if (resumableTrial) return await resumeTrial({ base, accessToken: tok.access_token, trial: resumableTrial, clinicId, tier, siteUrl })
 
     const amount = PRICES[tier]
     const planId = await ensurePlanId(env, base, tok.access_token, tier, amount, checkoutMode)
     const reference = `${clinicId}--${tier}--${checkoutMode}--${Date.now()}`
+    creatingSubscription = true
     const sub = await paypalJson(`${base}/v1/billing/subscriptions`, tok.access_token, {
       plan_id: planId,
       custom_id: reference,
@@ -287,19 +342,20 @@ export const onRequestPost = async ({ request, env }) => {
     const approve = (sub.links || []).find((l) => l.rel === 'approve')
     paypalSubscriptionId = sub.id || ''
     if (!paypalSubscriptionId || !approve) {
-      await cancelSubscription(base, tok.access_token, paypalSubscriptionId)
-      if (reservation) await releaseUnboundTrial(supaUrl, headers, reservation)
+      // Keep the lock if PayPal may have created an agreement. Releasing after
+      // an ambiguous response would permit a duplicate subscription.
+      if (reservation && !paypalSubscriptionId) return json({ error: 'checkout_resume_failed', retryable: true }, 503)
+      if (reservation && paypalSubscriptionId) await bindTrialToSubscription(supaUrl, headers, { ...reservation, subscriptionId: paypalSubscriptionId })
       return json({ error: 'subscription_failed', message: sub.message, details: sub.details }, 400)
     }
     if (reservation && !await bindTrialToSubscription(supaUrl, headers, { ...reservation, subscriptionId: paypalSubscriptionId })) {
-      await cancelSubscription(base, tok.access_token, paypalSubscriptionId)
-      await releaseUnboundTrial(supaUrl, headers, reservation)
-      return json({ error: 'trial_reservation_failed' }, 409)
+      return json({ error: 'checkout_in_progress', retryable: true }, 409)
     }
     return json({ url: approve.href, subscriptionId: sub.id, planId, checkoutMode })
   } catch (e) {
-    if (paypalSubscriptionId && paypalAccessToken) await cancelSubscription(base, paypalAccessToken, paypalSubscriptionId)
-    if (reservation) await releaseUnboundTrial(supaUrl, reservation.headers, reservation)
+    // A network timeout is not proof PayPal failed to create the agreement.
+    // Only release before creation was attempted; a bound checkout is resumable.
+    if (reservation && !creatingSubscription) await releaseUnboundTrial(supaUrl, reservation.headers, reservation)
     return json({ error: 'request_failed', message: String(e.message || e), details: e.details }, e.status || 500)
   }
 }

@@ -6,6 +6,7 @@ import { buildDemoState } from '../lib/demo'
 import { trackDailyActive } from '../lib/analytics'
 import { purgeCloudBackedImageCache } from '../lib/media'
 import { toast } from '../components/anim'
+import { createWriteQueue } from '../lib/writeQueue.js'
 
 const StoreContext = createContext(null)
 
@@ -32,9 +33,27 @@ export function StoreProvider({ children }) {
   const [pendingOtp, setPendingOtp] = useState(null) // { email, pending } when email confirmation is on
   const [paymentResult, setPaymentResult] = useState(null) // result after returning from PayPal
   const [isOwner, setIsOwner] = useState(false) // app owner → sees the global suggestions inbox
-  const [state, setState] = useState(EMPTY)
+  const [loadError, setLoadError] = useState(false)
+  const [saveStatus, setSaveStatus] = useState({ pending: 0, failed: 0 })
+  const queueRef = useRef(null)
+  if (!queueRef.current) queueRef.current = createWriteQueue(setSaveStatus)
+  const [state, setStateValue] = useState(EMPTY)
   const stateRef = useRef(state)
-  useEffect(() => { stateRef.current = state }, [state])
+  const setState = useCallback((update) => {
+    const next = typeof update === 'function' ? update(stateRef.current) : update
+    stateRef.current = next
+    setStateValue(next)
+  }, [])
+
+  useEffect(() => {
+    const warn = (event) => {
+      if (!queueRef.current.hasUnsaved()) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [])
 
   // Read-only showcase mode: reached via ?demo=1 → loads in-memory example data
   // and blocks every write so visitors can browse but never change anything.
@@ -47,37 +66,42 @@ export function StoreProvider({ children }) {
 
   // ── Boot: restore existing session ─────────────────────────────────────
   const loadSession = useCallback(async () => {
-    const me = await backend.restore()
-    if (me && me.clinic) {
-      const data = await backend.bootstrap(me.clinic.id)
-      let clinic = data.clinic || me.clinic
-      // Economy was retired in July 2026. Upgrade legacy accounts in place so
-      // they immediately receive the complete Pro feature set.
-      if (clinic?.tier === 'economy') {
-        clinic = { ...clinic, tier: 'pro' }
-        await backend.saveClinic(clinic)
+    setLoadError(false)
+    try {
+      const me = await backend.restore()
+      if (me && me.clinic) {
+        const data = await backend.bootstrap(me.clinic.id)
+        let clinic = data.clinic || me.clinic
+        // Economy was retired in July 2026. Upgrade legacy accounts in place so
+        // they immediately receive the complete Pro feature set.
+        if (clinic?.tier === 'economy') {
+          clinic = { ...clinic, tier: 'pro' }
+          clinic = await backend.saveClinic(clinic)
+        }
+        // Complimentary accounts → free Pro (skip the paywall).
+        if (backend.mode === 'cloud' && (!clinic.paid || clinic.tier !== 'pro') && await isComplimentary(me.user?.email)) {
+          clinic = { ...clinic, tier: 'pro', paid: true }
+          clinic = await backend.saveClinic(clinic)
+        }
+        if (backend.mode === 'cloud' && clinic?.paypalSubscriptionId) {
+          const synced = await syncPaypalSubscription({ subscriptionId: clinic.paypalSubscriptionId, clinicId: clinic.id })
+          if (synced.ok && synced.clinic) clinic = synced.clinic
+        }
+        if (backend.mode === 'cloud') {
+          purgeCloudBackedImageCache(data.patients).catch((e) => console.warn('Could not clear old patient image cache', e))
+        }
+        setState({
+          clinic,
+          currentUser: me.user,
+          doctors: data.doctors, patients: data.patients, toothRecords: data.toothRecords,
+          appointments: data.appointments, payments: data.payments, suggestions: data.suggestions,
+          labOrders: data.labOrders || [],
+        })
+      } else {
+        setState(EMPTY)
       }
-      // Complimentary accounts → free Pro (skip the paywall).
-      if (backend.mode === 'cloud' && (!clinic.paid || clinic.tier !== 'pro') && await isComplimentary(me.user?.email)) {
-        clinic = { ...clinic, tier: 'pro', paid: true }
-        backend.saveClinic(clinic).catch((e) => console.error(e))
-      }
-      if (backend.mode === 'cloud' && clinic?.paypalSubscriptionId) {
-        const synced = await syncPaypalSubscription({ subscriptionId: clinic.paypalSubscriptionId, clinicId: clinic.id })
-        if (synced.ok && synced.clinic) clinic = synced.clinic
-      }
-      if (backend.mode === 'cloud') {
-        purgeCloudBackedImageCache(data.patients).catch((e) => console.warn('Could not clear old patient image cache', e))
-      }
-      setState({
-        clinic,
-        currentUser: me.user,
-        doctors: data.doctors, patients: data.patients, toothRecords: data.toothRecords,
-        appointments: data.appointments, payments: data.payments, suggestions: data.suggestions,
-        labOrders: data.labOrders || [],
-      })
-    } else {
-      setState(EMPTY)
+    } catch {
+      setLoadError(true)
     }
   }, [])
 
@@ -87,11 +111,17 @@ export function StoreProvider({ children }) {
       try {
         if (isDemo) { setState(buildDemoState()); return }
         await loadSession()
-      } catch (e) { console.error('restore failed', e) }
+      } catch { setLoadError(true) }
       finally { if (active) setBooting(false) }
     })()
     return () => { active = false }
   }, [loadSession, isDemo])
+
+  const retryLoad = useCallback(async () => {
+    setBooting(true)
+    try { await loadSession() } catch { setLoadError(true) }
+    finally { setBooting(false) }
+  }, [loadSession])
 
   // Detect the password-recovery link (user clicked the reset email).
   useEffect(() => {
@@ -184,7 +214,7 @@ export function StoreProvider({ children }) {
       const latest = stateRef.current.clinic
       if (!latest?.paypalSubscriptionId) return
       const res = await syncPaypalSubscription({ subscriptionId: latest.paypalSubscriptionId, clinicId: latest.id })
-      if (!stopped && res.ok && res.clinic) setState((s) => ({ ...s, clinic: res.clinic }))
+      if (!stopped && res.ok && res.clinic && !queueRef.current.hasUnsaved()) setState((s) => ({ ...s, clinic: res.clinic }))
     }
     const timer = setInterval(sync, 10 * 60 * 1000)
     return () => {
@@ -224,24 +254,32 @@ export function StoreProvider({ children }) {
   const cancelOtp = useCallback(() => setPendingOtp(null), [])
 
   const logout = useCallback(() => {
+    if (queueRef.current.hasUnsaved()) {
+      toast('يوجد تعديلات لم تُحفظ. أعد المحاولة قبل تسجيل الخروج. / Please retry unsaved changes before signing out.')
+      return
+    }
+    queueRef.current.reset()
     setState(EMPTY)
     backend.signOut().catch((e) => console.error(e))
   }, [])
 
-  // ── Optimistic write helpers ─────────────────────────────────────────────
+  // Drafts update immediately for typing. Success is reported only after the
+  // server confirms; failed drafts remain visible with an explicit retry.
   const upsert = useCallback((key, table, obj) => {
-    if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return }
-    setState((s) => {
-      const exists = s[key].some((x) => x.id === obj.id)
-      return { ...s, [key]: exists ? s[key].map((x) => (x.id === obj.id ? obj : x)) : [...s[key], obj] }
+    if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
+    const apply = (saved) => setState((s) => {
+      const exists = s[key].some((x) => x.id === saved.id)
+      return { ...s, [key]: exists ? s[key].map((x) => (x.id === saved.id ? saved : x)) : [...s[key], saved] }
     })
-    backend.save(table, obj).catch((e) => console.error('save', table, e))
+    apply(obj)
+    return queueRef.current.enqueue(`${table}:${obj.id}`, () => backend.save(table, obj), apply)
   }, [isDemo])
 
   const drop = useCallback((key, table, id, extra) => {
-    if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return }
-    setState((s) => ({ ...s, [key]: s[key].filter((x) => x.id !== id), ...(extra ? extra(s) : {}) }))
-    backend.remove(table, id).catch((e) => console.error('remove', table, e))
+    if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
+    return queueRef.current.enqueue(`${table}:${id}`, () => backend.remove(table, id), () => {
+      setState((s) => ({ ...s, [key]: s[key].filter((x) => x.id !== id), ...(extra ? extra(s) : {}) }))
+    })
   }, [isDemo])
 
   // ── Selectors ─────────────────────────────────────────────────────────────
@@ -256,10 +294,10 @@ export function StoreProvider({ children }) {
     return { fees, paid, debt: Math.max(0, fees - paid), raw: fees - paid }
   }, [recordsForPatient, paymentsForPatient])
 
-  // ── Mutations (optimistic local state + background sync) ──────────────────
+  // ── Mutations (draft state + confirmed result) ───────────────────────────
   const addPatient = useCallback((data) => {
     const patient = {
-      id: backend.genId(), clinicId: clinic.id,
+      id: data.id || backend.genId(), clinicId: clinic.id,
       fileNo: data.fileNo || String(1000 + state.patients.length + 1),
       name: data.name || '', nameAr: data.nameAr || data.name || '',
       phone: data.phone || '', gender: data.gender || '', dob: data.dob || '',
@@ -269,8 +307,7 @@ export function StoreProvider({ children }) {
       exam: data.exam || {}, orthodontics: data.orthodontics || {}, perio: data.perio || {}, plaque: data.plaque || {}, photos: [],
       createdBy: currentUser?.id, createdAt: new Date().toISOString(),
     }
-    upsert('patients', 'patients', patient)
-    return patient
+    return upsert('patients', 'patients', patient)
   }, [clinic, currentUser, state.patients.length, upsert])
 
   const updatePatient = useCallback((id, patch) => {
@@ -278,14 +315,19 @@ export function StoreProvider({ children }) {
     if (!old) return
     const resolvedPatch = typeof patch === 'function' ? patch(old) : patch
     if (!resolvedPatch) return
-    upsert('patients', 'patients', { ...old, ...resolvedPatch })
+    return upsert('patients', 'patients', { ...old, ...resolvedPatch })
   }, [upsert])
 
   const deletePatient = useCallback((id) => {
-    drop('patients', 'patients', id, (s) => ({
+    if (queueRef.current.hasUnsaved()) {
+      toast('احفظ التعديلات المعلّقة قبل حذف المريض. / Save pending changes before deleting the patient.')
+      return Promise.resolve(null)
+    }
+    return drop('patients', 'patients', id, (s) => ({
       toothRecords: s.toothRecords.filter((t) => t.patientId !== id),
       appointments: s.appointments.filter((a) => a.patientId !== id),
       payments: s.payments.filter((p) => p.patientId !== id),
+      labOrders: s.labOrders.filter((p) => p.patientId !== id),
     }))
   }, [drop])
 
@@ -294,68 +336,65 @@ export function StoreProvider({ children }) {
       id: backend.genId(), clinicId: clinic.id, doctorId: data.doctorId || currentUser?.id,
       date: data.date || new Date().toISOString(), status: 'planned', surfaces: [], price: 0, notes: '', ...data,
     }
-    upsert('toothRecords', 'toothRecords', rec)
-    return rec
+    return upsert('toothRecords', 'toothRecords', rec)
   }, [clinic, currentUser, upsert])
   const updateToothRecord = useCallback((id, patch) => {
     const old = stateRef.current.toothRecords.find((t) => t.id === id)
-    if (old) upsert('toothRecords', 'toothRecords', { ...old, ...patch })
+    if (old) return upsert('toothRecords', 'toothRecords', { ...old, ...patch })
   }, [upsert])
   const deleteToothRecord = useCallback((id) => drop('toothRecords', 'toothRecords', id), [drop])
 
   const addAppointment = useCallback((data) => {
     const ap = { id: backend.genId(), clinicId: clinic.id, status: 'scheduled', notes: '', step: '', ...data }
-    upsert('appointments', 'appointments', ap)
-    return ap
+    return upsert('appointments', 'appointments', ap)
   }, [clinic, upsert])
   const updateAppointment = useCallback((id, patch) => {
     const old = stateRef.current.appointments.find((a) => a.id === id)
-    if (old) upsert('appointments', 'appointments', { ...old, ...patch })
+    if (old) return upsert('appointments', 'appointments', { ...old, ...patch })
   }, [upsert])
   const deleteAppointment = useCallback((id) => drop('appointments', 'appointments', id), [drop])
 
   const addPayment = useCallback((data) => {
     const pay = { id: backend.genId(), clinicId: clinic.id, doctorId: data.doctorId || currentUser?.id, date: data.date || new Date().toISOString(), note: '', methods: [], ...data }
-    upsert('payments', 'payments', pay)
-    return pay
+    return upsert('payments', 'payments', pay)
   }, [clinic, currentUser, upsert])
   const deletePayment = useCallback((id) => drop('payments', 'payments', id), [drop])
 
   const updateClinic = useCallback((patch) => {
-    if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return }
+    if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
     const next = { ...stateRef.current.clinic, ...patch }
     setState((s) => ({ ...s, clinic: next }))
-    backend.saveClinic(next).catch((e) => console.error(e))
+    return queueRef.current.enqueue(`clinics:${next.id}`, () => backend.saveClinic(next),
+      (saved) => setState((s) => ({ ...s, clinic: saved })))
   }, [isDemo])
   const setTier = useCallback((newTier) => updateClinic({ tier: newTier }), [updateClinic])
 
-  const addUser = useCallback((data) => {
+  const addUser = useCallback(async (data) => {
     const used = stateRef.current.doctors.map((d) => d.color)
     const color = DOCTOR_COLORS.find((c) => !used.includes(c)) || DOCTOR_COLORS[stateRef.current.doctors.length % DOCTOR_COLORS.length]
-    if (stateRef.current.doctors.some((u) => (u.username || u.email || '').toLowerCase() === (data.username || '').toLowerCase()))
+    if (stateRef.current.doctors.some((u) => u.id !== data.id && (u.username || u.email || '').toLowerCase() === (data.username || '').toLowerCase()))
       return { ok: false, error: 'userExists' }
     const user = {
-      id: backend.genId(), clinicId: clinic.id, username: data.username, email: data.username,
+      id: data.id || backend.genId(), clinicId: clinic.id, username: data.username, email: data.username,
       passwordHash: hashPassword(data.password || '1234'), name: data.name, nameAr: data.name,
       role: data.role || 'doctor', color: data.color || color, specialty: data.specialty || '', isOwner: false,
     }
-    upsert('doctors', 'doctors', user)
-    return { ok: true, user }
+    const saved = await upsert('doctors', 'doctors', user)
+    return saved ? { ok: true, user: saved } : { ok: false, error: 'saveFailed' }
   }, [clinic, upsert])
   const updateUser = useCallback((id, patch) => {
     const old = stateRef.current.doctors.find((u) => u.id === id)
-    if (old) upsert('doctors', 'doctors', { ...old, ...patch })
+    if (old) return upsert('doctors', 'doctors', { ...old, ...patch })
   }, [upsert])
   const deleteUser = useCallback((id) => drop('doctors', 'doctors', id), [drop])
 
-  const addSuggestion = useCallback((text) => {
+  const addSuggestion = useCallback((text, id) => {
     const s = {
-      id: backend.genId(), clinicId: clinic.id, clinicName: clinic.name, tier: clinic.tier,
+      id: id || backend.genId(), clinicId: clinic.id, clinicName: clinic.name, tier: clinic.tier,
       userId: currentUser?.id, userName: currentUser?.name, userEmail: currentUser?.email,
       text, date: new Date().toISOString(),
     }
-    upsert('suggestions', 'suggestions', s)
-    return s
+    return upsert('suggestions', 'suggestions', s)
   }, [clinic, currentUser, upsert])
 
   const addLabOrder = useCallback((data) => {
@@ -363,12 +402,11 @@ export function StoreProvider({ children }) {
       id: backend.genId(), clinicId: clinic.id, createdBy: currentUser?.id,
       createdAt: new Date().toISOString(), status: 'sent', toothIds: [], pieces: 1, ...data,
     }
-    upsert('labOrders', 'lab_orders', order)
-    return order
+    return upsert('labOrders', 'lab_orders', order)
   }, [clinic, currentUser, upsert])
   const updateLabOrder = useCallback((id, patch) => {
     const old = stateRef.current.labOrders.find((o) => o.id === id)
-    if (old) upsert('labOrders', 'lab_orders', { ...old, ...patch })
+    if (old) return upsert('labOrders', 'lab_orders', { ...old, ...patch })
   }, [upsert])
   const deleteLabOrder = useCallback((id) => drop('labOrders', 'lab_orders', id), [drop])
 
@@ -381,7 +419,8 @@ export function StoreProvider({ children }) {
   }, [logout, loadSession])
 
   const value = {
-    booting, recovery, mode: backend.mode,
+    booting, loadError, retryLoad, recovery, mode: backend.mode,
+    saveStatus, retrySaves: queueRef.current.retry,
     otpEmail: pendingOtp?.email || null, verifyOtp, resendOtp, cancelOtp,
     paymentResult, dismissPaymentResult,
     clinic, currentUser, tier, can, isOwner, readOnly: isDemo,

@@ -1,3 +1,5 @@
+import { backend } from '../../lib/backend'
+import { useSaveAction } from '../../lib/useSaveAction'
 import { useMemo, useRef, useState } from 'react'
 import { Plus, Trash2, Printer, Stethoscope, Layers, Eye, ClipboardList, CheckCircle2, Pencil, Save } from 'lucide-react'
 import { useI18n } from '../../i18n/I18nContext'
@@ -169,6 +171,8 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
   const customInputRef = useRef(null)
+  const draftId = useRef(backend.genId('toothRecord'))
+  const { saving, runSave } = useSaveAction()
   const [itemKey, setItemKey] = useState('caries')
   const [customLabel, setCustomLabel] = useState('')
   const [surfaces, setSurfaces] = useState([])
@@ -215,52 +219,41 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
     setCariesClass('')
   }
 
-  function save() {
+  function save() { return runSave(async () => {
+    if (!date) return
+    let details
     if (isCustomPrice) {
       const priceItem = customPrices.find((p) => p.key === itemKey)
       if (!priceItem) return
-      addToothRecord({
-        patientId: patient.id, toothId, dentition,
-        itemKey: 'other', kind: 'treatment',
-        label: { en: priceItem.en || priceItem.ar, ar: priceItem.ar || priceItem.en },
-        surfaces: [], status, date: new Date(date).toISOString(),
-        doctorId, price: Number(price) || 0, notes,
-      })
-      setNotes(''); setSurfaces([]); setCariesClass(''); setCustomLabel(''); setPrice('')
-      return
-    }
-    if (isOther) {
+      details = { itemKey: 'other', kind: 'treatment', surfaces: [],
+        label: { en: priceItem.en || priceItem.ar, ar: priceItem.ar || priceItem.en }, price: Number(price) || 0 }
+    } else if (isOther) {
       if (!customLabel.trim()) return
       const kind = itemKey === 'otherTreatment' ? 'treatment' : 'condition'
-      addToothRecord({
-        patientId: patient.id, toothId, dentition,
-        itemKey: 'other', kind, label: { en: customLabel, ar: customLabel },
-        surfaces: [], status, date: new Date(date).toISOString(),
-        doctorId, price: kind === 'treatment' ? Number(price) || 0 : 0, notes,
-      })
-      setCustomLabel('')
-      setTimeout(() => customInputRef.current?.focus(), 30)
-      return
+      details = { itemKey: 'other', kind, surfaces: [], label: { en: customLabel, ar: customLabel },
+        price: kind === 'treatment' ? Number(price) || 0 : 0 }
     } else {
-      addToothRecord({
-        patientId: patient.id, toothId, dentition,
-        itemKey, kind: item.kind, surfaces: needsSurfaces ? surfaces : [],
-        cariesClass: cariesClass || undefined, status, date: new Date(date).toISOString(),
-        doctorId, price: item.kind === 'treatment' ? Number(price) || 0 : 0, notes,
-      })
+      details = { itemKey, kind: item.kind, surfaces: needsSurfaces ? surfaces : [],
+        cariesClass: cariesClass || undefined, price: item.kind === 'treatment' ? Number(price) || 0 : 0 }
     }
+    const saved = await addToothRecord({ id: draftId.current, patientId: patient.id, toothId, dentition,
+      status, date: new Date(date + 'T12:00:00').toISOString(), doctorId, notes, ...details })
+    if (!saved) return
+    draftId.current = backend.genId('toothRecord')
     setNotes(''); setSurfaces([]); setCariesClass(''); setCustomLabel('')
-  }
+    if (isCustomPrice) setPrice('')
+    if (isOther) setTimeout(() => customInputRef.current?.focus(), 30)
+  }) }
 
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={() => { if (!saving) onClose() }}
       size="lg"
       title={`${t('chart.tooth')} ${toothLabel(tooth, numbering)} — ${bilingual(tooth?.names, lang)}`}
       icon={<span className="text-lg">🦷</span>}
     >
-      <div className="grid gap-5 md:grid-cols-2">
+      <fieldset disabled={saving} className="grid gap-5 md:grid-cols-2">
         {/* History */}
         <div>
           <p className="mb-2 text-xs font-bold text-ink-500">{t('chart.toothHistory')}</p>
@@ -384,7 +377,7 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
 
           <button onClick={save} className="btn-primary w-full"><Plus size={16} /> {t('chart.saveRecord')}</button>
         </div>
-      </div>
+      </fieldset>
 
       {instrFor && (
         <InstructionsModal patient={patient} treatmentKey={instrFor} onClose={() => setInstrFor(null)} />

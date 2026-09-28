@@ -8,10 +8,12 @@ import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { Modal, Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
 import { paymentsEnabled, startPaypalCheckout } from '../lib/payments'
+import { paymentErrorMessage } from '../lib/paymentErrors.js'
 import { isInAppBrowser, openInBrowserNotice } from '../lib/inAppBrowser'
 import { ChartPreview, CalendarPreview, DashboardPreview } from '../components/PackagePreviews'
 import BankTransferPanel from '../components/BankTransferPanel'
 import PaymentHelp from '../components/PaymentHelp'
+import { useSaveAction } from '../lib/useSaveAction'
 
 const ICONS = { student: GraduationCap, pro: Crown }
 
@@ -29,15 +31,16 @@ export default function Packages() {
   const [payError, setPayError] = useState('')
   const [paidOnly, setPaidOnly] = useState(false)
   const [payMethod, setPayMethod] = useState('paypal')
+  const { saving, runSave } = useSaveAction()
   const current = clinic?.tier
 
-  async function confirmBuy() {
+  function confirmBuy() { return runSave(async () => {
     setPayError('')
     // Never let a paid clinic downgrade to a lower (e.g. free Student) plan.
     if (current && tierRank(buying) < tierRank(current)) { setBuying(null); return }
     // The Student plan is free — activate it instantly, no payment.
     if (TIERS[buying].price === 0) {
-      setTier(buying)
+      if (!await setTier(buying)) return
       setActivated(true)
       setTimeout(() => { setBuying(null); setActivated(false) }, 1600)
       return
@@ -53,15 +56,15 @@ export default function Packages() {
         setPaidOnly(true)
         setPayError(t('packages.trialAlreadyUsed'))
       } else {
-        setPayError(res.error === 'not_configured' ? t('packages.paymentsSoon') : (res.message || t('packages.payFailed')))
+        setPayError(paymentErrorMessage(res, lang))
       }
       return
     }
     // Local/demo mode → activate instantly (no real billing).
-    setTier(buying)
+    if (!await setTier(buying)) return
     setActivated(true)
     setTimeout(() => { setBuying(null); setActivated(false) }, 1600)
-  }
+  }) }
 
   return (
     <div className="space-y-8">
@@ -251,7 +254,7 @@ export default function Packages() {
                         )}
                       </p>
                     </div>
-                    <button onClick={confirmBuy} disabled={processing} className="btn-primary !py-3 !px-6" style={{ background: PACKAGE_FEATURES[buying].accent }}>
+                    <button onClick={confirmBuy} disabled={processing || saving} className="btn-primary !py-3 !px-6" style={{ background: PACKAGE_FEATURES[buying].accent }}>
                       {processing ? <Spinner /> : <>{TIERS[buying].price === 0 ? t('packages.buyNow') : !paymentsEnabled ? t('packages.buyNow') : payMethod === 'paypal' ? (paidOnly ? t('packages.continuePaid') : `${t('packages.startTrial')} — ${t('packages.trialToday')}`) : t('packages.pay')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} /></>}
                     </button>
                   </div>

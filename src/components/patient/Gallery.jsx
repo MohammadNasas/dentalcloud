@@ -33,6 +33,7 @@ export default function Gallery({ patient }) {
   const [uploadError, setUploadError] = useState('')
   const attemptedRef = useRef(new Set())
   const fileRef = useRef()
+  const busyRef = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -85,14 +86,15 @@ export default function Gallery({ patient }) {
   }, [patient.id])
 
   async function onFiles(files) {
+    if (busyRef.current) return
     const images = files.filter((f) => f.type.startsWith('image/'))
     if (!images.length) return
+    busyRef.current = true
     setBusy(true)
     setUploadError('')
     setProgress({ done: 0, total: images.length })
     try {
-      const currentPhotos = patient.photos || []
-      const next = [...currentPhotos]
+      const next = []
       let added = 0
       for (const file of images) {
         try {
@@ -112,13 +114,13 @@ export default function Gallery({ patient }) {
         setProgress((p) => ({ ...p, done: p.done + 1 }))
       }
       if (added > 0) {
-        updatePatient(patient.id, { photos: next })
-        toast(lang === 'ar' ? `تم رفع ${added} صورة` : `Uploaded ${added} image${added > 1 ? 's' : ''}`)
+        const saved = await updatePatient(patient.id, (latest) => ({ photos: [...(latest.photos || []), ...next] }))
+        if (saved) toast(lang === 'ar' ? `تم رفع ${added} صورة` : `Uploaded ${added} image${added > 1 ? 's' : ''}`)
       }
     } catch (err) {
       console.error('Gallery upload error:', err)
       setUploadError(lang === 'ar' ? 'حدث خطأ أثناء الرفع' : 'Upload error, please try again')
-    } finally { setBusy(false); setProgress({ done: 0, total: 0 }) }
+    } finally { busyRef.current = false; setBusy(false); setProgress({ done: 0, total: 0 }) }
   }
 
   function onDrop(e) {
@@ -128,15 +130,21 @@ export default function Gallery({ patient }) {
   }
 
   async function remove(photo) {
+    if (busyRef.current) return
+    busyRef.current = true
+    setBusy(true)
     try {
+      // Keep the stored image intact until its removal from the patient record
+      // is confirmed; a failed metadata save must not leave a broken image.
+      const saved = await updatePatient(patient.id, (latest) => ({ photos: (latest.photos || []).filter((p) => p.id !== photo.id) }))
+      if (!saved) return
       await deletePatientImage(photo, { clinicId: clinic?.id, patientId: patient.id })
       setUrls((u) => { const next = { ...u }; delete next[photo.id]; return next })
       attemptedRef.current.delete(photo.id)
-      updatePatient(patient.id, (latest) => ({ photos: (latest.photos || []).filter((p) => p.id !== photo.id) }))
     } catch (error) {
       console.error('Failed to delete patient image:', error)
       setUploadError(lang === 'ar' ? 'تعذر حذف الصورة، حاول مرة أخرى.' : 'Could not delete the image. Please try again.')
-    }
+    } finally { busyRef.current = false; setBusy(false) }
   }
 
   function retryLoad(id) {

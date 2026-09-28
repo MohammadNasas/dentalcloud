@@ -24,6 +24,7 @@ import { money, waLink } from '../lib/utils'
 import { dayLabel, parseISO } from '../lib/dates'
 import { exportPatient } from '../lib/wordExport'
 import WhatsAppIcon from '../components/WhatsAppIcon'
+import { useSaveAction } from '../lib/useSaveAction'
 
 const TABS = [
   { id: 'overview', icon: ClipboardList, key: 'overview' },
@@ -47,6 +48,7 @@ export default function PatientProfile() {
   const [tab, setTab] = useState('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const { saving: deleting, runSave } = useSaveAction()
 
   const patient = getPatient(id)
   const Back = isRTL ? ArrowRight : ArrowLeft
@@ -76,9 +78,9 @@ export default function PatientProfile() {
     finally { setExporting(false) }
   }
 
-  function doDelete() {
-    if (confirm(t('patient.deleteConfirm'))) { deletePatient(patient.id); navigate('/patients') }
-  }
+  function doDelete() { return runSave(async () => {
+    if (confirm(t('patient.deleteConfirm')) && await deletePatient(patient.id)) navigate('/patients')
+  }) }
 
   return (
     <div className="space-y-5">
@@ -121,7 +123,7 @@ export default function PatientProfile() {
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setEditOpen(true)} className="btn-outline !py-2"><Pencil size={15} /> {t('common.edit')}</button>
             <button onClick={doExport} disabled={exporting} className="btn-outline !py-2"><FileDown size={15} /> Word</button>
-            <button onClick={doDelete} className="btn-ghost !py-2 text-rose-500 hover:bg-rose-50"><Trash2 size={15} /></button>
+            <button onClick={doDelete} disabled={deleting} className="btn-ghost !py-2 text-rose-500 hover:bg-rose-50"><Trash2 size={15} /></button>
           </div>
         </div>
 

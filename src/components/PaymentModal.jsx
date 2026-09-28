@@ -4,6 +4,9 @@ import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { Modal, Field } from './ui'
 import { money, PAYMENT_METHODS, cx } from '../lib/utils'
+import { format, parseISO } from 'date-fns'
+import { backend } from '../lib/backend'
+import { useSaveAction } from '../lib/useSaveAction'
 
 // Shared "record payment" modal used from a patient's payments tab and the
 // clinic-wide Payments page. Pro supports both single-method and split payments.
@@ -15,7 +18,9 @@ export default function PaymentModal({ patient, onClose }) {
 
   const [amount, setAmount] = useState(debt > 0 ? String(debt) : '')
   const [note, setNote] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [draftId] = useState(() => backend.genId('payment'))
+  const { saving, runSave } = useSaveAction()
   const [split, setSplit] = useState(false)
   const [single, setSingle] = useState('cash')
   const [rows, setRows] = useState([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }])
@@ -23,7 +28,7 @@ export default function PaymentModal({ patient, onClose }) {
   const supportsMethods = can('paymentMethods')
   const supportsSplit = can('splitPayments')
 
-  function save() {
+  function save() { return runSave(async () => {
     let methods = []
     let total = Number(amount) || 0
     if (supportsMethods && split && supportsSplit) {
@@ -32,17 +37,17 @@ export default function PaymentModal({ patient, onClose }) {
     } else if (supportsMethods) {
       methods = [{ method: single, amount: total }]
     }
-    if (total <= 0) return
-    addPayment({ patientId: patient.id, amount: total, methods, note, date: new Date(date).toISOString() })
-    onClose()
-  }
+    if (total <= 0 || !date) return
+    const saved = await addPayment({ id: draftId, patientId: patient.id, amount: total, methods, note, date: parseISO(date).toISOString() })
+    if (saved) onClose()
+  }) }
 
   return (
-    <Modal open onClose={onClose} size="md"
+    <Modal open onClose={() => { if (!saving) onClose() }} size="md"
       title={`${t('pay.record')} — ${lang === 'ar' ? patient.nameAr || patient.name : patient.name}`}
       icon={<Wallet size={18} className="text-brand-500" />}
-      footer={<><button onClick={onClose} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} className="btn-primary">{t('common.save')}</button></>}>
-      <div className="space-y-3">
+      footer={<><button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} disabled={saving || !date} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button></>}>
+      <fieldset disabled={saving} className="space-y-3">
         {debt > 0 && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{t('pay.debt')}: {money(debt, currency)}</p>}
 
         {!(supportsMethods && split) && (
@@ -89,7 +94,7 @@ export default function PaymentModal({ patient, onClose }) {
           <Field label={t('common.date')}><input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           <Field label={t('common.notes')}><input className="input" value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         </div>
-      </div>
+      </fieldset>
     </Modal>
   )
 }

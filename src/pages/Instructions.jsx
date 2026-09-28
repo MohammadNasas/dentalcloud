@@ -10,6 +10,7 @@ import FeatureLock from '../components/FeatureLock'
 import { cx, waLink, waNumber, buildInstructionWhatsAppMessage } from '../lib/utils'
 import { printSheet, escapeHtml } from '../lib/print'
 import WhatsAppIcon from '../components/WhatsAppIcon'
+import { useSaveAction } from '../lib/useSaveAction'
 
 // On the free Student plan only these 3 sheets are open; the rest are locked.
 const FREE_SHEETS = ['extraction', 'rct', 'scaling']
@@ -103,7 +104,7 @@ export default function Instructions() {
         </div>
       </div>
 
-      {editing && <SheetEditor editing={editing} onClose={() => setEditing(null)} />}
+      {editing && <SheetEditor editing={editing} clinic={clinic} updateClinic={updateClinic} onClose={() => setEditing(null)} />}
       {sendingSheet && (
         <InstructionWhatsAppModal
           sheet={sendingSheet} patients={patients} clinic={clinic} lang={lang}
@@ -113,7 +114,12 @@ export default function Instructions() {
     </div>
   )
 
-  function SheetEditor({ editing, onClose }) {
+}
+
+function SheetEditor({ editing, clinic, updateClinic, onClose }) {
+    const { t, lang } = useI18n()
+    const customSheets = clinic?.customSheets || []
+    const defaultSheet = (key) => clinic?.customInstructions?.[key]?.[lang] || INSTRUCTIONS[key][lang]
     const isCustom = editing.type === 'custom'
     const existingCustom = isCustom && editing.id ? customSheets.find((s) => s.id === editing.id) : null
     const base = isCustom
@@ -121,25 +127,28 @@ export default function Instructions() {
       : defaultSheet(editing.key)
     const [title, setTitle] = useState(base.title)
     const [points, setPoints] = useState(base.points.length ? [...base.points] : [''])
+    const [draftId] = useState(() => editing.id || genId('sheet'))
+    const { saving, runSave } = useSaveAction()
 
-    function save() {
+    function save() { return runSave(async () => {
       const cleaned = points.filter((p) => p.trim())
+      let saved
       if (isCustom) {
-        const id = editing.id || genId('sheet')
+        const id = draftId
         const sheet = { id, title: title || (lang === 'ar' ? 'ورقة تعليمات' : 'Instruction sheet'), points: cleaned }
-        const next = editing.id ? customSheets.map((s) => (s.id === id ? sheet : s)) : [...customSheets, sheet]
-        updateClinic({ customSheets: next })
+        const next = customSheets.some((s) => s.id === id) ? customSheets.map((s) => (s.id === id ? sheet : s)) : [...customSheets, sheet]
+        saved = await updateClinic({ customSheets: next })
       } else {
         const ci = { ...(clinic.customInstructions || {}) }
         ci[editing.key] = { ...(ci[editing.key] || {}), [lang]: { title, points: cleaned } }
-        updateClinic({ customInstructions: ci })
+        saved = await updateClinic({ customInstructions: ci })
       }
-      onClose()
-    }
+      if (saved) onClose()
+    }) }
 
     return (
-      <Modal open onClose={onClose} size="lg" title={t('settings.editInstructions')} icon={<FileText size={18} className="text-brand-500" />}
-        footer={<><button onClick={onClose} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} className="btn-primary"><Save size={16} /> {t('common.save')}</button></>}>
+      <Modal open onClose={() => { if (!saving) onClose() }} size="lg" title={t('settings.editInstructions')} icon={<FileText size={18} className="text-brand-500" />}
+        footer={<><button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} disabled={saving} className="btn-primary"><Save size={16} /> {t('common.save')}</button></>}>
         <Field label={lang === 'ar' ? 'اسم الورقة / العنوان' : 'Sheet name / title'}>
           <input className="input font-bold" value={title} autoFocus onChange={(e) => setTitle(e.target.value)} placeholder={lang === 'ar' ? 'مثال: تعليمات بعد التبييض' : 'e.g. After whitening'} />
         </Field>
@@ -157,7 +166,6 @@ export default function Instructions() {
         <button onClick={() => setPoints((p) => [...p, ''])} className="btn-ghost mt-2 text-brand-600"><Plus size={15} /> {t('instructions.addPoint')}</button>
       </Modal>
     )
-  }
 }
 
 function InstructionWhatsAppModal({ sheet, patients, clinic, lang, updatePatient, onClose }) {
