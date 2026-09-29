@@ -194,7 +194,7 @@ export function DashboardPreview({ small }) {
           <p className="mb-2 text-[8px] font-bold text-ink-400">Monthly Revenue</p>
           <div className="flex items-end gap-0.5 h-12">
             {BAR_DATA.map((h, i) => (
-              <div key={i} className="flex flex-1 flex-col items-center justify-end gap-0.5">
+              <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-0.5">
                 <motion.div
                   className="w-full rounded-t"
                   initial={{ height: 0 }}
