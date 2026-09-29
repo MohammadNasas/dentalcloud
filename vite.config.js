@@ -57,7 +57,8 @@ export default defineConfig(({ mode }) => ({
       apply: 'build',
       include: ['src/**/*.js', 'src/**/*.jsx'],
       exclude: [/node_modules/],
-      options: mode === 'electron' ? HEAVY : LIGHT,
+      // Keep import paths literal so Vite can discover and emit lazy chunks.
+      options: { ...(mode === 'electron' ? HEAVY : LIGHT), ignoreImports: true },
     }),
   ],
   base: './', // relative asset paths — required so the packaged Electron app loads via file://

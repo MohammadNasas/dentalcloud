@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { lazy, useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { XCircle } from 'lucide-react'
@@ -11,22 +11,24 @@ import { startPaypalCheckout } from './lib/payments'
 import { hasVerifiedPaidAccess, getPaidThrough } from './lib/entitlement.js'
 import { paymentErrorMessage } from './lib/paymentErrors.js'
 import SaveStatus from './components/SaveStatus'
+import PageLoader from './components/PageLoader'
 import Layout from './components/Layout'
 import PublicEntry from './pages/PublicEntry'
-import ResetPassword from './pages/ResetPassword'
-import Paywall from './pages/Paywall'
-import Dashboard from './pages/Dashboard'
-import Patients from './pages/Patients'
-import PatientProfile from './pages/PatientProfile'
-import Appointments from './pages/Appointments'
-import Payments from './pages/Payments'
-import Reports from './pages/Reports'
-import Instructions from './pages/Instructions'
-import Download from './pages/Download'
-import Packages from './pages/Packages'
-import Settings from './pages/Settings'
-import Lab from './pages/Lab'
-import Inbox from './pages/Inbox'
+
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Paywall = lazy(() => import('./pages/Paywall'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Patients = lazy(() => import('./pages/Patients'))
+const PatientProfile = lazy(() => import('./pages/PatientProfile'))
+const Appointments = lazy(() => import('./pages/Appointments'))
+const Payments = lazy(() => import('./pages/Payments'))
+const Reports = lazy(() => import('./pages/Reports'))
+const Instructions = lazy(() => import('./pages/Instructions'))
+const Download = lazy(() => import('./pages/Download'))
+const Packages = lazy(() => import('./pages/Packages'))
+const Settings = lazy(() => import('./pages/Settings'))
+const Lab = lazy(() => import('./pages/Lab'))
+const Inbox = lazy(() => import('./pages/Inbox'))
 
 function Splash() {
   return (
@@ -133,14 +135,6 @@ export default function App() {
   const { booting, loadError, retryLoad, currentUser, recovery, paymentResult, dismissPaymentResult, mode, clinic } = useStore()
   const { lang } = useI18n()
 
-  // Keep the splash on screen long enough for the logo reveal to actually be
-  // seen, even when boot finishes instantly.
-  const [minSplash, setMinSplash] = useState(true)
-  useEffect(() => {
-    const id = setTimeout(() => setMinSplash(false), 1600)
-    return () => clearTimeout(id)
-  }, [])
-
   // Re-evaluate both trial and paid expiry while the app remains open.
   const [accessClock, setAccessClock] = useState(Date.now())
   const verifiedPaidAccess = hasVerifiedPaidAccess(clinic, Math.max(accessClock, Date.now()))
@@ -163,18 +157,18 @@ export default function App() {
 
   const overlay = paymentResult ? <PaymentResultOverlay result={paymentResult} onClose={dismissPaymentResult} /> : null
 
-  if (booting || minSplash) return <Splash />
+  if (booting) return <Splash />
   if (loadError) return <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
     <p>{lang === 'ar' ? 'تعذّر تحميل بيانات العيادة. تحقق من الاتصال وأعد المحاولة.' : 'Could not load your clinic. Check your connection and retry.'}</p>
     <button onClick={retryLoad} className="btn-primary">{lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button>
   </div>
-  if (recovery) return <ResetPassword />
+  if (recovery) return <PageLoader><ResetPassword /></PageLoader>
   if (!currentUser) return <>{<PublicEntry />}{overlay}<ToastHost /></>
   const trialEnd = Date.parse(clinic?.trialEndsAt || '')
   const trialActive = Number.isFinite(trialEnd) && Math.max(accessClock, Date.now()) < trialEnd
   // Pro access is allowed during the free month or after a verified payment.
   // Merely having an ACTIVE PayPal agreement never counts as paid access.
-  if (mode === 'cloud' && clinic && !verifiedPaidAccess && !trialActive && clinic.tier !== 'student') return <>{<Paywall />}{overlay}<SaveStatus /><ToastHost /></>
+  if (mode === 'cloud' && clinic && !verifiedPaidAccess && !trialActive && clinic.tier !== 'student') return <><PageLoader><Paywall /></PageLoader>{overlay}<SaveStatus /><ToastHost /></>
 
   return (
     <>

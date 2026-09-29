@@ -3,20 +3,23 @@ import { CalendarPlus, Trash2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { Modal, Field, Segmented } from './ui'
+import { Modal, Field } from './ui'
+import { appointmentConflicts } from '../lib/appointmentConflicts.js'
 import { backend } from '../lib/backend'
 import { useSaveAction } from '../lib/useSaveAction'
 
 export default function AppointmentModal({ open, onClose, appointment, defaultDate, defaultPatientId }) {
   const { t, lang } = useI18n()
-  const { patients, doctors, addAppointment, updateAppointment, deleteAppointment, currentUser, can } = useStore()
+  const { patients, doctors, appointments, addAppointment, updateAppointment, deleteAppointment, currentUser, can } = useStore()
 
   const [form, setForm] = useState({})
+  const [acceptedConflict, setAcceptedConflict] = useState(null)
   const draftId = useRef(null)
   const { saving, runSave } = useSaveAction()
 
   useEffect(() => {
     if (!open) return
+    setAcceptedConflict(null)
     draftId.current = appointment?.id || backend.genId('appointment')
     if (appointment) {
       const d = new Date(appointment.start)
@@ -38,10 +41,26 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
     }
   }, [open, appointment?.id, defaultDate, defaultPatientId])
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
+  const set = (k, v) => {
+    if (['date', 'time', 'duration', 'doctorId', 'patientId', 'status'].includes(k)) setAcceptedConflict(null)
+    setForm((f) => ({ ...f, [k]: v }))
+  }
+
+  const startMs = new Date(`${form.date}T${form.time}`).getTime()
+  const endMs = startMs + (Number(form.duration) || 30) * 60000
+  const validTime = Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
+  const candidate = {
+    id: draftId.current, patientId: form.patientId, doctorId: form.doctorId, status: form.status,
+    start: validTime ? new Date(startMs).toISOString() : '',
+    end: validTime ? new Date(endMs).toISOString() : '',
+  }
+  const conflicts = appointmentConflicts(candidate, appointments)
+  // A changed time, person, or conflicting appointment requires fresh consent.
+  const conflictKey = JSON.stringify([candidate, conflicts.map(({ id, start, end, doctorId, patientId, status }) => ({ id, start, end, doctorId, patientId, status }))])
+  const needsConfirmation = conflicts.length > 0 && acceptedConflict !== conflictKey
 
   function save() { return runSave(async () => {
-    if (!form.patientId || !form.date || !form.time) return
+    if (!form.patientId || !validTime || needsConfirmation) return
     const start = new Date(`${form.date}T${form.time}`)
     const end = new Date(start.getTime() + (Number(form.duration) || 30) * 60000)
     const data = {
@@ -66,7 +85,7 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
         <>
           {appointment && <button onClick={remove} disabled={saving} className="btn-ghost me-auto text-rose-500 hover:bg-rose-50"><Trash2 size={15} /> {t('common.delete')}</button>}
           <button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button>
-          <button onClick={save} disabled={saving || !form.patientId || !form.date || !form.time} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
+          <button onClick={save} disabled={saving || !form.patientId || !validTime || needsConfirmation} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
         </>
       }
     >
@@ -101,6 +120,29 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
             </select>
           </Field>
         </div>
+
+        {conflicts.length > 0 && <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+          <div role="alert">
+            <p className="font-bold">{lang === 'ar' ? 'تنبيه: يوجد تعارض بالمواعيد' : 'Warning: overlapping appointments'}</p>
+            <p className="mt-1">{lang === 'ar' ? 'للطبيب أو المريض موعد آخر بنفس الفترة. عدّل الوقت أو أكّد الحجز رغم التعارض.' : 'This doctor or patient has another appointment during this time. Change the time or confirm the overlap.'}</p>
+            <ul className="my-2 space-y-1">
+              {conflicts.slice(0, 3).map((item) => {
+                const patient = patients.find((p) => p.id === item.patientId)
+                const doctor = doctors.find((d) => d.id === item.doctorId)
+                return <li key={item.id}>
+                  <span dir="ltr">{format(new Date(item.start), 'yyyy-MM-dd HH:mm')} – {format(new Date(item.end), 'HH:mm')}</span>
+                  {' · '}{(lang === 'ar' ? patient?.nameAr || patient?.name : patient?.name) || (lang === 'ar' ? 'مريض' : 'Patient')}
+                  {doctor && <> · {lang === 'ar' ? doctor.nameAr || doctor.name : doctor.name}</>}
+                </li>
+              })}
+            </ul>
+            {conflicts.length > 3 && <p>{lang === 'ar' ? `و${conflicts.length - 3} مواعيد أخرى` : `And ${conflicts.length - 3} more appointments`}</p>}
+          </div>
+          <label className="mt-2 flex cursor-pointer items-center gap-2 font-semibold">
+            <input type="checkbox" checked={!needsConfirmation} onChange={(e) => setAcceptedConflict(e.target.checked ? conflictKey : null)} />
+            {lang === 'ar' ? 'أريد حفظ الموعد رغم التعارض' : 'Save this appointment despite the overlap'}
+          </label>
+        </div>}
 
         <Field label={t('appt.reason')}><input className="input" value={form.reason} onChange={(e) => set('reason', e.target.value)} /></Field>
 

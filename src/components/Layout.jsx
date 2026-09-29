@@ -14,6 +14,7 @@ import { isToday, parseISO, fmtTime } from '../lib/dates'
 import { Avatar } from './ui'
 import { PingDot, AnimatedBell } from './anim'
 import logo from '../lib/logo'
+import PageLoader from './PageLoader'
 
 const NAV_CONTAINER = {
   hidden: {},
@@ -268,7 +269,7 @@ export default function Layout() {
             transition={{ duration: 0.2, ease: 'easeOut' }}
             className="mx-auto max-w-7xl px-4 pt-5 pb-28 sm:px-6 sm:pt-6 lg:pb-6"
           >
-            <Outlet />
+            <PageLoader><Outlet /></PageLoader>
           </motion.div>
         </main>
       </div>

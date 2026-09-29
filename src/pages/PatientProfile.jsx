@@ -22,7 +22,6 @@ import Timeline from '../components/patient/Timeline'
 import Overview from '../components/patient/Overview'
 import { money, waLink } from '../lib/utils'
 import { dayLabel, parseISO } from '../lib/dates'
-import { exportPatient } from '../lib/wordExport'
 import WhatsAppIcon from '../components/WhatsAppIcon'
 import { useSaveAction } from '../lib/useSaveAction'
 
@@ -74,7 +73,7 @@ export default function PatientProfile() {
 
   async function doExport() {
     setExporting(true)
-    try { await exportPatient(patient, { clinic, lang, getDoctor: store.getDoctor, recordsForPatient, paymentsForPatient, balanceForPatient }) }
+    try { const { exportPatient } = await import('../lib/wordExport'); await exportPatient(patient, { clinic, lang, getDoctor: store.getDoctor, recordsForPatient, paymentsForPatient, balanceForPatient }) }
     finally { setExporting(false) }
   }
 
