@@ -8,6 +8,7 @@ import { toast } from './anim'
 import { calcAge } from '../lib/utils'
 import { backend } from '../lib/backend'
 import { useSaveAction } from '../lib/useSaveAction'
+import BirthDatePicker from './BirthDatePicker'
 
 const empty = {
   name: '', fileNo: '', phone: '', gender: '', dob: '',
@@ -89,7 +90,7 @@ export default function PatientFormModal({ open, onClose, patient, onSaved }) {
           />
         </Field>
         <Field label={`${t('patient.dob')} ${age !== '' ? `· ${t('patient.age')}: ${age}` : ''}`}>
-          <input className="input" type="date" value={form.dob} onChange={(e) => set('dob', e.target.value)} />
+          <BirthDatePicker value={form.dob} onChange={(value) => set('dob', value)} disabled={saving} />
         </Field>
         <Field label={t('patient.occupation')}>
           <input className="input" value={form.occupation} onChange={(e) => set('occupation', e.target.value)} />
