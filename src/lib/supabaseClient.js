@@ -36,7 +36,7 @@ export const supabase = isCloud
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true, // parse password-recovery tokens from the URL
-        flowType: 'implicit', // tokens in the hash — reliable with HashRouter
+        flowType: 'implicit', // auth tokens stay in the hash, separate from web page paths
         storage: rememberStorage,
       },
     })

@@ -1,3 +1,4 @@
+import { passwordResetRedirect } from './routing'
 // ──────────────────────────────────────────────────────────────────────────
 //  Backend adapter. One interface, two implementations:
 //   • localBackend   — explicit developer demo only (localStorage).
@@ -248,7 +249,7 @@ const cloudBackend = {
 
   // Sends a reset link to the account's registered email (identity = inbox).
   async resetPassword(email) {
-    const redirectTo = window.location.origin + window.location.pathname
+    const redirectTo = passwordResetRedirect(window.location)
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo })
     return { ok: !error, error: error?.message }
   },

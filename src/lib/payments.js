@@ -114,5 +114,5 @@ export function getPaypalReturn() {
 export function clearPaymentReturn() {
   const url = new URL(window.location.href)
   url.search = ''
-  window.history.replaceState({}, '', url.toString())
+  window.history.replaceState(window.history.state, '', url.toString())
 }

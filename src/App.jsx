@@ -1,5 +1,5 @@
 import { lazy, useState, useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { XCircle } from 'lucide-react'
 import { useStore } from './context/StoreContext'
@@ -14,6 +14,7 @@ import SaveStatus from './components/SaveStatus'
 import PageLoader from './components/PageLoader'
 import Layout from './components/Layout'
 import PublicEntry from './pages/PublicEntry'
+import { postLoginPath } from './lib/routing'
 
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Paywall = lazy(() => import('./pages/Paywall'))
@@ -132,6 +133,7 @@ function PaymentResultOverlay({ result, onClose }) {
 }
 
 export default function App() {
+  const location = useLocation()
   const { booting, loadError, retryLoad, currentUser, recovery, paymentResult, dismissPaymentResult, mode, clinic } = useStore()
   const { lang } = useI18n()
 
@@ -173,6 +175,8 @@ export default function App() {
   return (
     <>
       <Routes>
+        <Route path="/login" element={<Navigate to={postLoginPath(location.state?.from)} replace />} />
+        <Route path="/register" element={<Navigate to={postLoginPath(location.state?.from)} replace />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/patients" element={<Patients />} />

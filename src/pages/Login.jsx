@@ -14,7 +14,7 @@ import logo from '../lib/logo'
 import { SUPPORT_EMAIL, SUPPORT_WHATSAPP } from '../lib/billing'
 import WhatsAppIcon from '../components/WhatsAppIcon'
 
-export default function Login({ initialTab = 'signin', onBack }) {
+export default function Login({ initialTab = 'signin', onBack, onTabChange }) {
   const { t, L, lang, toggleLang, isRTL } = useI18n()
   const { login, register, resetPassword, mode, otpEmail, verifyOtp, resendOtp, cancelOtp } = useStore()
   const [tab, setTab] = useState(initialTab)
@@ -232,7 +232,7 @@ export default function Login({ initialTab = 'signin', onBack }) {
           {/* Tabs */}
           <div className="mb-6 inline-flex w-full rounded-xl bg-ink-100 p-1">
             {['signin', 'register'].map((m) => (
-              <button key={m} onClick={() => { setTab(m); setError('') }}
+              <button key={m} onClick={() => { setTab(m); setError(''); onTabChange?.(m) }}
                 className={cx('relative flex-1 rounded-lg py-2.5 text-sm font-bold transition-colors', tab === m ? 'text-brand-700' : 'text-ink-500')}>
                 {tab === m && <motion.span layoutId="authtab" className="absolute inset-0 rounded-lg bg-white shadow-soft" />}
                 <span className="relative">{m === 'signin' ? t('auth.signIn') : t('auth.register')}</span>

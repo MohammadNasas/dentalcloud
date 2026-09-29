@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Globe, ArrowRight, Check, CalendarDays, Wallet, Sparkles, Crown, GraduationCap, Users, Monitor, Smartphone, Activity, FileText, Images, Languages } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
@@ -12,7 +13,7 @@ import logo from '../lib/logo'
 import './Landing.css'
 
 const TIER_ICON = { student: GraduationCap, pro: Crown }
-export default function Landing({ onEnter }) {
+export default function Landing() {
   const { t, lang, L, toggleLang, isRTL } = useI18n()
   const ar = lang === 'ar'
   const reduced = useReducedMotion()
@@ -34,8 +35,8 @@ export default function Landing({ onEnter }) {
         </nav>
         <div className="ms-auto flex items-center gap-1 sm:gap-2">
           <button onClick={toggleLang} aria-label={ar ? 'Switch to English' : 'التبديل إلى العربية'} className="btn-ghost !px-2 !py-2"><Globe size={15}/><span className="text-xs">{ar ? 'EN' : 'ع'}</span></button>
-          <button onClick={()=>onEnter('signin')} className="btn-ghost !px-2 !py-2 text-xs">{t('auth.signIn')}</button>
-          <button onClick={()=>onEnter('register')} className="btn-primary hidden !py-2 text-xs sm:inline-flex">{ar?'ابدأ الآن':'Get started'}</button>
+          <Link to="/login" className="btn-ghost !px-2 !py-2 text-xs">{t('auth.signIn')}</Link>
+          <Link to="/register" className="btn-primary hidden !py-2 text-xs sm:inline-flex">{ar?'ابدأ الآن':'Get started'}</Link>
         </div>
       </div>
     </header>
@@ -45,7 +46,7 @@ export default function Landing({ onEnter }) {
           <span className="chip bg-brand-100/60 text-brand-700"><Sparkles size={13}/>{ar?'لعيادة أكثر تنظيماً':'A more organised clinic'}</span>
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.4] tracking-tight text-ink-900 sm:text-5xl xl:text-[56px]">{ar?'عيادتك مرتّبة.':'Your clinic, in order.'}<br/><span className="text-brand-600">{ar?'وقتك لمرضاك.':'Your time, for patients.'}</span></h1>
           <p className="mt-5 max-w-md text-base leading-8 text-ink-500 sm:text-lg">{ar?'المرضى، المواعيد والمدفوعات — كل تفاصيل عيادتك في مكان واحد، بالعربي والإنجليزي.':'Patients, appointments and payments — your entire clinic in one place, in Arabic and English.'}</p>
-          <div className="mt-7 flex flex-wrap gap-3"><button onClick={()=>onEnter('register')} className="btn-primary !rounded-xl !px-6 !py-3.5">{ar?'ابدأ شهرك المجاني':'Start your free month'}<ArrowRight size={17} className={isRTL?'rotate-180':''}/></button><button onClick={()=>scrollTo('landing-showcase')} className="btn-outline !rounded-xl !px-6 !py-3.5">{ar?'اكتشف المزايا':'Explore the features'}</button></div>
+          <div className="mt-7 flex flex-wrap gap-3"><Link to="/register" className="btn-primary !rounded-xl !px-6 !py-3.5">{ar?'ابدأ شهرك المجاني':'Start your free month'}<ArrowRight size={17} className={isRTL?'rotate-180':''}/></Link><button onClick={()=>scrollTo('landing-showcase')} className="btn-outline !rounded-xl !px-6 !py-3.5">{ar?'اكتشف المزايا':'Explore the features'}</button></div>
           <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-ink-400"><Monitor size={16}/><Smartphone size={14}/><span>{ar?'على الكمبيوتر والموبايل':'On desktop and mobile'}</span><span className="mx-1 h-1 w-1 rounded-full bg-brand-300"/><span>{ar?'باقة الطالب مجانية':'Free Student plan'}</span></div>
         </motion.div>
         <HeroPreview/>
@@ -75,12 +76,12 @@ export default function Landing({ onEnter }) {
           {tier.price>0&&<p className="mt-2 text-xs font-bold text-brand-600">{t('packages.freeTrialBadge')}</p>}
           <ul className="mb-4 mt-6 space-y-3">{inherits&&<li className="flex gap-2 text-sm font-semibold text-brand-700"><Check size={16}/>{t('packages.everythingIn')} «{L(TIERS[inherits])}»</li>}{own.slice(0,4).map((f,i)=><li key={i} className="flex items-start gap-2 text-sm text-ink-500"><Check size={16} className="mt-0.5 shrink-0 text-brand-500"/>{L(f)}</li>)}</ul>
           {own.length>4&&<details className="mb-6 text-sm text-ink-500"><summary className="cursor-pointer font-bold text-brand-700">{ar?'عرض كل المزايا':'See all features'}</summary><ul className="mt-3 space-y-2">{own.slice(4).map((f,i)=><li key={i} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-brand-500"/>{L(f)}</li>)}</ul></details>}
-          <button onClick={()=>onEnter('register')} className={cx('mt-auto w-full !rounded-xl !py-3',popular?'btn-primary':'btn-outline')}>{popular?(ar?'جرّب الآن':'Try it now'):(ar?'ابدأ مجاناً':'Start free')}</button>
+          <Link to="/register" className={cx('mt-auto w-full !rounded-xl !py-3',popular?'btn-primary':'btn-outline')}>{popular?(ar?'جرّب الآن':'Try it now'):(ar?'ابدأ مجاناً':'Start free')}</Link>
         </motion.article>
       })}</div>
     </section>
     <LandingFAQ ar={ar}/>
-    <section className="px-4 pb-8 sm:px-6"><div className="landing-closing relative mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 overflow-hidden rounded-3xl px-7 py-10 text-center text-white sm:flex-row sm:text-start sm:px-12"><div className="relative z-10"><h2 className="text-2xl font-extrabold sm:text-3xl">{ar?'جاهز ترتّب يومك؟':'Ready for a clearer day?'}</h2><p className="mt-2 text-sm text-white/65">{ar?'ابدأ مع DentalCloud، وخلي تركيزك لمرضاك.':'Start with DentalCloud. Keep your focus on patients.'}</p></div><button onClick={()=>onEnter('register')} className="btn relative z-10 bg-white !px-6 !py-3.5 font-bold text-brand-700 hover:bg-brand-50">{ar?'ابدأ مع DentalCloud':'Start with DentalCloud'}<ArrowRight size={17} className={isRTL?'rotate-180':''}/></button><FloatingTooth outline className="absolute -bottom-8 start-[40%] !w-36 text-teal-300/10"/></div></section>
+    <section className="px-4 pb-8 sm:px-6"><div className="landing-closing relative mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 overflow-hidden rounded-3xl px-7 py-10 text-center text-white sm:flex-row sm:text-start sm:px-12"><div className="relative z-10"><h2 className="text-2xl font-extrabold sm:text-3xl">{ar?'جاهز ترتّب يومك؟':'Ready for a clearer day?'}</h2><p className="mt-2 text-sm text-white/65">{ar?'ابدأ مع DentalCloud، وخلي تركيزك لمرضاك.':'Start with DentalCloud. Keep your focus on patients.'}</p></div><Link to="/register" className="btn relative z-10 bg-white !px-6 !py-3.5 font-bold text-brand-700 hover:bg-brand-50">{ar?'ابدأ مع DentalCloud':'Start with DentalCloud'}<ArrowRight size={17} className={isRTL?'rotate-180':''}/></Link><FloatingTooth outline className="absolute -bottom-8 start-[40%] !w-36 text-teal-300/10"/></div></section>
     <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 pb-7 text-xs text-ink-400"><span className="font-bold text-ink-700">© {new Date().getFullYear()} DentalCloud</span><div className="flex flex-wrap gap-5">{[['pricing',ar?'الأسعار':'Pricing'],['terms',ar?'الشروط':'Terms'],['privacy',ar?'الخصوصية':'Privacy'],['refund',ar?'الاسترجاع':'Refund']].map(([path,label])=><a key={path} href={`/${path}.html`} className="hover:text-brand-600">{label}</a>)}</div></footer>
   </div>
 }

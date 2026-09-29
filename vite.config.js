@@ -61,7 +61,7 @@ export default defineConfig(({ mode }) => ({
       options: { ...(mode === 'electron' ? HEAVY : LIGHT), ignoreImports: true },
     }),
   ],
-  base: './', // relative asset paths — required so the packaged Electron app loads via file://
+  base: mode === 'electron' ? './' : '/', // deep web links need origin-relative assets
   server: {
     host: true, // expose on LAN so the app opens from any device on the same network
     port: 5173,
