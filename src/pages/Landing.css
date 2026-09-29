@@ -43,3 +43,19 @@
 @media(prefers-reduced-motion:reduce) { .landing .landing-float { animation:none!important; }.landing-feature { transition:none; }.landing-feature:hover { transform:none; } }
 html.reduce-motion .landing-float { animation:none!important; }
 html.reduce-motion .landing-feature:hover { transform:none; }
+.landing-faq-panel { display:grid; grid-template-columns:minmax(0,.7fr) minmax(0,1.5fr); gap:40px; padding:40px; border:1px solid #e1eeea; border-radius:30px; background:radial-gradient(ellipse at 100% 0%,#e5f6f0,transparent 65%),#f7fbfa; }
+.landing-faq-intro { padding-top:8px; }
+.landing-faq-symbol { display:grid; place-items:center; width:54px; height:54px; border:1px solid #cde8df; border-radius:17px; background:#fff; color:#0f766e; }
+.landing-faq-intro-line { width:48px; height:3px; margin-top:26px; border-radius:3px; background:#37b5a0; }
+.landing-faq-card { overflow:hidden; border:1px solid #e2ebe8; border-radius:17px; background:#fff; transition:border-color .2s,box-shadow .2s; }
+.landing-faq-card[data-open="true"] { border-color:#83caba; box-shadow:0 8px 25px -18px #126e59aa; }
+.landing-faq-trigger { display:flex; align-items:center; gap:14px; width:100%; padding:20px; text-align:start; font-size:14px; font-weight:700; line-height:1.8; color:#243e49; }
+.landing-faq-trigger:hover { background:#f6fcfa; }
+.landing-faq-trigger:focus-visible { outline:2px solid #0d9488; outline-offset:-4px; border-radius:14px; }
+.landing-faq-number { color:#527970; font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
+.landing-faq-toggle { display:grid; place-items:center; flex-shrink:0; width:28px; height:28px; border-radius:50%; color:#28786a; background:#edf7f3; transition:transform .2s,background .2s; }
+.landing-faq-card[data-open="true"] .landing-faq-toggle { transform:rotate(45deg); color:#fff; background:#0f8b78; }
+.landing-faq-answer { margin-inline:48px 20px; padding-block:0 22px; color:#526772; font-size:14px; line-height:2; }
+@media(max-width:767px) { .landing-faq-panel { grid-template-columns:minmax(0,1fr); padding:24px 16px; gap:24px; }.landing-faq-intro { padding:0 4px; }.landing-faq-intro-line { display:none; }.landing-faq-trigger { padding:16px 14px; gap:10px; }.landing-faq-answer { margin-inline:36px 14px; padding-bottom:18px; } }
+@media(prefers-reduced-motion:reduce) { .landing-faq-card,.landing-faq-toggle { transition:none; } }
+html.reduce-motion .landing-faq-card,html.reduce-motion .landing-faq-toggle { transition:none; }

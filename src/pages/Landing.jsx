@@ -6,7 +6,7 @@ import { PACKAGE_FEATURES } from '../lib/packages'
 import { useReduceMotion } from '../lib/motionPref'
 import { CalendarPreview, AppShowcase } from '../components/PackagePreviews'
 import { FloatScene, FloatingTooth, HeroPreview, PatientPreview } from '../components/LandingVisuals'
-import { Accordion } from '../components/anim'
+import LandingFAQ from '../components/LandingFAQ'
 import { cx } from '../lib/utils'
 import logo from '../lib/logo'
 import './Landing.css'
@@ -79,15 +79,7 @@ export default function Landing({ onEnter }) {
         </motion.article>
       })}</div>
     </section>
-    <section className="mx-auto max-w-2xl px-4 pb-14"><h2 className="mb-6 text-center text-xl font-extrabold text-ink-800">{ar?'أسئلة شائعة':'Frequently asked questions'}</h2><Accordion items={ar?[
-      {q:'بشتغل على الموبايل وسطح المكتب؟',a:'أكيد — حسابك واحد يشتغل على الموقع وعلى تطبيق سطح المكتب، وبياناتك متاحة على أجهزتك عند الاتصال.'},
-      {q:'هل في عربي وإنجليزي؟',a:'نعم، بتقدر تبدّل بين العربي والإنجليزي بضغطة زر.'},
-      {q:'كيف بقدر أبدأ؟',a:'أنشئ حساب عيادتك، واختر الباقة المناسبة، وابدأ بإضافة مرضاك.'},
-    ]:[
-      {q:'Does it work on mobile and desktop?',a:'Yes. Use one account on the web and desktop app, with your clinic data available on your connected devices.'},
-      {q:'Is it available in Arabic and English?',a:'Yes. Switch between Arabic and English with one tap.'},
-      {q:'How do I get started?',a:'Create your clinic account, choose a plan and start adding your patients.'},
-    ]}/></section>
+    <LandingFAQ ar={ar}/>
     <section className="px-4 pb-8 sm:px-6"><div className="landing-closing relative mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 overflow-hidden rounded-3xl px-7 py-10 text-center text-white sm:flex-row sm:text-start sm:px-12"><div className="relative z-10"><h2 className="text-2xl font-extrabold sm:text-3xl">{ar?'جاهز ترتّب يومك؟':'Ready for a clearer day?'}</h2><p className="mt-2 text-sm text-white/65">{ar?'ابدأ مع DentalCloud، وخلي تركيزك لمرضاك.':'Start with DentalCloud. Keep your focus on patients.'}</p></div><button onClick={()=>onEnter('register')} className="btn relative z-10 bg-white !px-6 !py-3.5 font-bold text-brand-700 hover:bg-brand-50">{ar?'ابدأ مع DentalCloud':'Start with DentalCloud'}<ArrowRight size={17} className={isRTL?'rotate-180':''}/></button><FloatingTooth outline className="absolute -bottom-8 start-[40%] !w-36 text-teal-300/10"/></div></section>
     <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-5 pb-7 text-xs text-ink-400"><span className="font-bold text-ink-700">© {new Date().getFullYear()} DentalCloud</span><div className="flex flex-wrap gap-5">{[['pricing',ar?'الأسعار':'Pricing'],['terms',ar?'الشروط':'Terms'],['privacy',ar?'الخصوصية':'Privacy'],['refund',ar?'الاسترجاع':'Refund']].map(([path,label])=><a key={path} href={`/${path}.html`} className="hover:text-brand-600">{label}</a>)}</div></footer>
   </div>
