@@ -9,6 +9,7 @@ import PatientFormModal from '../components/PatientFormModal'
 import PageHero from '../components/PageHero'
 import WhatsAppIcon from '../components/WhatsAppIcon'
 import { money, waLink } from '../lib/utils'
+import { createPatientMatcher } from '../lib/patientSearch'
 import { fmtDate, dayLabel, parseISO, isToday, isTomorrow } from '../lib/dates'
 
 export default function Patients() {
@@ -32,15 +33,8 @@ export default function Patients() {
   }, [appointments])
 
   const list = useMemo(() => {
-    const term = q.trim().toLowerCase()
     return patients
-      .filter((p) =>
-        !term ||
-        p.name?.toLowerCase().includes(term) ||
-        p.nameAr?.toLowerCase().includes(term) ||
-        p.fileNo?.toLowerCase().includes(term) ||
-        p.phone?.includes(term)
-      )
+      .filter(createPatientMatcher(q))
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   }, [patients, q])
 
