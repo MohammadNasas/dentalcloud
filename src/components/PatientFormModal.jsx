@@ -1,3 +1,5 @@
+import { useFormDraft } from '../lib/useFormDraft'
+import DraftNotice from './DraftNotice'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { UserPlus, Save } from 'lucide-react'
@@ -19,35 +21,32 @@ export default function PatientFormModal({ open, onClose, patient, onSaved }) {
   const { t, lang } = useI18n()
   const { addPatient, updatePatient } = useStore()
   const navigate = useNavigate()
-  const [form, setForm] = useState(empty)
-  const draftId = useRef(null)
+  const draft = useFormDraft('patient:' + (patient?.id || 'new'), () => ({
+    ...empty,
+    ...Object.fromEntries(Object.keys(empty).map((key) => [key, patient?.[key] ?? empty[key]])),
+    id: patient?.id || backend.genId('patient'),
+    name: patient ? (lang === 'ar' ? patient.nameAr || patient.name : patient.name || patient.nameAr) : '',
+  }), open)
+  const form = draft.value
+  const setForm = draft.set
   const { saving, runSave } = useSaveAction()
-
-  useEffect(() => {
-    if (!open) return
-    draftId.current = patient?.id || backend.genId('patient')
-    if (patient) {
-      // Seed the field with the name actually shown in the current language, so
-      // editing it changes what the user sees.
-      const shown = lang === 'ar' ? (patient.nameAr || patient.name) : (patient.name || patient.nameAr)
-      setForm({ ...empty, ...patient, name: shown || '' })
-    } else setForm(empty)
-  }, [open, patient?.id, lang])
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
   const age = form.dob ? calcAge(form.dob) : form.age || ''
 
   function submit() { return runSave(async () => {
     // One name, mirrored to nameAr, so the edited name shows in every language.
-    const data = { ...form, id: draftId.current, nameAr: form.name, age }
+    const data = { ...form, id: form.id, nameAr: form.name, age }
     if (patient) {
       if (!await updatePatient(patient.id, data)) return
+      await draft.clear()
       toast(t('common.saved'))
       onSaved?.(patient.id)
       onClose()
     } else {
       const p = await addPatient(data)
       if (!p) return
+      await draft.clear()
       toast(t('common.saved'))
       onClose()
       if (onSaved) onSaved(p.id)
@@ -65,11 +64,12 @@ export default function PatientFormModal({ open, onClose, patient, onSaved }) {
       footer={
         <>
           <button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button>
-          <button onClick={submit} className="btn-primary" disabled={saving || !form.name}><Save size={16} /> {saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
+          <button onClick={submit} className="btn-primary" disabled={saving || draft.blocked || !form.name}><Save size={16} /> {saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
         </>
       }
     >
-      <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
+      <DraftNotice draft={draft} />
+      <fieldset disabled={saving || draft.blocked} className="grid gap-4 sm:grid-cols-2">
         <Field label={t('patient.name')} required className="sm:col-span-2">
           <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
         </Field>

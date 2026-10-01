@@ -1,3 +1,5 @@
+import { useFormDraft } from '../../lib/useFormDraft'
+import DraftNotice from '../DraftNotice'
 import { backend } from '../../lib/backend'
 import { useSaveAction } from '../../lib/useSaveAction'
 import { useMemo, useRef, useState } from 'react'
@@ -171,17 +173,39 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
     .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
   const customInputRef = useRef(null)
-  const draftId = useRef(backend.genId('toothRecord'))
+  const draft = useFormDraft('tooth:' + patient.id + ':' + dentition + ':' + toothId, () => ({
+    draftId: backend.genId('toothRecord'),
+    itemKey: 'caries',
+    customLabel: '',
+    surfaces: [],
+    cariesClass: '',
+    status: 'done',
+    date: new Date().toISOString().slice(0, 10),
+    doctorId: currentUser?.id,
+    price: '',
+    notes: ''
+  }))
+  const draftId = draft.value.draftId
+  const setDraftId = (value) => draft.setField('draftId', value)
+  const itemKey = draft.value.itemKey
+  const setItemKey = (value) => draft.setField('itemKey', value)
+  const customLabel = draft.value.customLabel
+  const setCustomLabel = (value) => draft.setField('customLabel', value)
+  const surfaces = draft.value.surfaces
+  const setSurfaces = (value) => draft.setField('surfaces', value)
+  const cariesClass = draft.value.cariesClass
+  const setCariesClass = (value) => draft.setField('cariesClass', value)
+  const status = draft.value.status
+  const setStatus = (value) => draft.setField('status', value)
+  const date = draft.value.date
+  const setDate = (value) => draft.setField('date', value)
+  const doctorId = draft.value.doctorId
+  const setDoctorId = (value) => draft.setField('doctorId', value)
+  const price = draft.value.price
+  const setPrice = (value) => draft.setField('price', value)
+  const notes = draft.value.notes
+  const setNotes = (value) => draft.setField('notes', value)
   const { saving, runSave } = useSaveAction()
-  const [itemKey, setItemKey] = useState('caries')
-  const [customLabel, setCustomLabel] = useState('')
-  const [surfaces, setSurfaces] = useState([])
-  const [cariesClass, setCariesClass] = useState('')
-  const [status, setStatus] = useState('done')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [doctorId, setDoctorId] = useState(currentUser?.id)
-  const [price, setPrice] = useState('')
-  const [notes, setNotes] = useState('')
   const [instrFor, setInstrFor] = useState(null)
 
   const customPrices = (clinic?.prices || []).filter((p) => p.key.startsWith('custom_'))
@@ -196,7 +220,7 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
     const it = DENTAL_ITEMS[k]
     if (it.kind === 'treatment') {
       const pr = (clinic?.prices || []).find((p) => p.key === k)
-      setPrice(pr ? String(pr.price) : '')
+      setPrice(can('priceCatalog') && pr ? String(pr.price) : '')
     } else setPrice('')
     if (it.scope !== 'surface') { setSurfaces([]); setCariesClass('') }
   }
@@ -236,12 +260,13 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
       details = { itemKey, kind: item.kind, surfaces: needsSurfaces ? surfaces : [],
         cariesClass: cariesClass || undefined, price: item.kind === 'treatment' ? Number(price) || 0 : 0 }
     }
-    const saved = await addToothRecord({ id: draftId.current, patientId: patient.id, toothId, dentition,
+    const saved = await addToothRecord({ id: draftId, patientId: patient.id, toothId, dentition,
       status, date: new Date(date + 'T12:00:00').toISOString(), doctorId, notes, ...details })
     if (!saved) return
-    draftId.current = backend.genId('toothRecord')
+    setDraftId(backend.genId('toothRecord'))
     setNotes(''); setSurfaces([]); setCariesClass(''); setCustomLabel('')
     if (isCustomPrice) setPrice('')
+    await draft.clear()
     if (isOther) setTimeout(() => customInputRef.current?.focus(), 30)
   }) }
 
@@ -253,7 +278,8 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
       title={`${t('chart.tooth')} ${toothLabel(tooth, numbering)} — ${bilingual(tooth?.names, lang)}`}
       icon={<span className="text-lg">🦷</span>}
     >
-      <fieldset disabled={saving} className="grid gap-5 md:grid-cols-2">
+      <DraftNotice draft={draft} />
+      <fieldset disabled={saving || draft.blocked} className="grid gap-5 md:grid-cols-2">
         {/* History */}
         <div>
           <p className="mb-2 text-xs font-bold text-ink-500">{t('chart.toothHistory')}</p>

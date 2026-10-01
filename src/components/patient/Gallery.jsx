@@ -20,7 +20,7 @@ const CATEGORIES = {
 
 export default function Gallery({ patient }) {
   const { t, lang, L } = useI18n()
-  const { updatePatient, can, clinic, mode } = useStore()
+  const { updatePatient, can, clinic, mode, readOnly } = useStore()
   const fullGallery = can('photos') // Pro: before/during/after/x-ray. Else: a single X-ray box.
   const photos = patient.photos || []
   const [urls, setUrls] = useState({})
@@ -86,6 +86,7 @@ export default function Gallery({ patient }) {
   }, [patient.id])
 
   async function onFiles(files) {
+    if (readOnly) return
     if (busyRef.current) return
     const images = files.filter((f) => f.type.startsWith('image/'))
     if (!images.length) return
@@ -130,6 +131,7 @@ export default function Gallery({ patient }) {
   }
 
   async function remove(photo) {
+    if (readOnly) return
     if (busyRef.current) return
     busyRef.current = true
     setBusy(true)

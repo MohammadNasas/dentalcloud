@@ -170,7 +170,7 @@ export default function App() {
   const trialActive = Number.isFinite(trialEnd) && Math.max(accessClock, Date.now()) < trialEnd
   // Pro access is allowed during the free month or after a verified payment.
   // Merely having an ACTIVE PayPal agreement never counts as paid access.
-  if (mode === 'cloud' && clinic && !verifiedPaidAccess && !trialActive && clinic.tier !== 'student') return <><PageLoader><Paywall /></PageLoader>{overlay}<SaveStatus /><ToastHost /></>
+  const expired = mode === 'cloud' && clinic && !verifiedPaidAccess && !trialActive && clinic.tier !== 'student'
 
   return (
     <>
@@ -186,7 +186,7 @@ export default function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/instructions" element={<Instructions />} />
           <Route path="/download" element={<Download />} />
-          <Route path="/packages" element={<Packages />} />
+          <Route path="/packages" element={expired ? <Paywall /> : <Packages />} />
           <Route path="/lab" element={<Lab />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/inbox" element={<Inbox />} />

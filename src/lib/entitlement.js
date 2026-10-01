@@ -58,7 +58,7 @@ export function getPaidThrough(clinic) {
 
 export function hasVerifiedPaidAccess(clinic, now = Date.now()) {
   if (!clinic?.paid) return false
-  if (clinic.subscriptionProvider !== 'paypal') return true
+  if (clinic.subscriptionProvider !== 'paypal') return !clinic.paidThrough || timeOf(clinic.paidThrough) > now
   const payment = savedVerifiedPayment(clinic)
   return Boolean(validPayment(payment, now) && !paymentIsRevoked(clinic, payment)
     && timeOf(getPaidThrough(clinic)) > now)

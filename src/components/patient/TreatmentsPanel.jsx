@@ -1,3 +1,5 @@
+import { useFormDraft } from '../../lib/useFormDraft'
+import DraftNotice from '../DraftNotice'
 import { useState } from 'react'
 import { Plus, Trash2, Printer, CheckCircle2, Clock, Stethoscope } from 'lucide-react'
 import { useI18n } from '../../i18n/I18nContext'
@@ -109,23 +111,42 @@ function AddProcedureModal({ patient, onClose }) {
   const currency = clinic?.settings?.currency || 'JOD'
   const catalog = clinic?.prices?.length ? clinic.prices : []
 
-  const [priceKey, setPriceKey] = useState(catalog[0]?.key || 'composite')
-  const [toothId, setToothId] = useState('0')
-  const [dentition, setDentition] = useState('permanent')
-  const [status, setStatus] = useState('done')
-  const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
-  const [draftId] = useState(() => backend.genId('record'))
+  const draft = useFormDraft('treatment:' + patient.id, () => ({
+    priceKey: catalog[0]?.key || 'composite',
+    toothId: '0',
+    dentition: 'permanent',
+    status: 'done',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    draftId: backend.genId('record'),
+    doctorId: currentUser?.id,
+    price: can('priceCatalog') ? String(catalog[0]?.price ?? 0) : '0',
+    notes: ''
+  }))
+  const priceKey = draft.value.priceKey
+  const setPriceKey = (value) => draft.setField('priceKey', value)
+  const toothId = draft.value.toothId
+  const setToothId = (value) => draft.setField('toothId', value)
+  const dentition = draft.value.dentition
+  const setDentition = (value) => draft.setField('dentition', value)
+  const status = draft.value.status
+  const setStatus = (value) => draft.setField('status', value)
+  const date = draft.value.date
+  const setDate = (value) => draft.setField('date', value)
+  const draftId = draft.value.draftId
+  const setDraftId = (value) => draft.setField('draftId', value)
+  const doctorId = draft.value.doctorId
+  const setDoctorId = (value) => draft.setField('doctorId', value)
+  const price = draft.value.price
+  const setPrice = (value) => draft.setField('price', value)
+  const notes = draft.value.notes
+  const setNotes = (value) => draft.setField('notes', value)
   const { saving, runSave } = useSaveAction()
-  const [doctorId, setDoctorId] = useState(currentUser?.id)
-  const [price, setPrice] = useState(String(catalog[0]?.price ?? 0))
-  const [notes, setNotes] = useState('')
-
   const teeth = dentition === 'permanent' ? PERMANENT_TEETH : PRIMARY_TEETH
 
   function pick(key) {
     setPriceKey(key)
     const item = catalog.find((c) => c.key === key)
-    if (item) setPrice(String(item.price))
+    if (item) setPrice(can('priceCatalog') ? String(item.price) : '0')
   }
 
   function save() { return runSave(async () => {
@@ -141,13 +162,14 @@ function AddProcedureModal({ patient, onClose }) {
       surfaces: [], status, date: parseISO(date).toISOString(),
       doctorId, price: Number(price) || 0, notes,
     })
-    if (saved) onClose()
+    if (saved) { await draft.clear(); onClose() }
   }) }
 
   return (
     <Modal open onClose={() => { if (!saving) onClose() }} size="md" title={t('patient.treatments')} icon={<Plus size={18} className="text-brand-500" />}
-      footer={<><button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} disabled={saving || !date} className="btn-primary">{t('common.save')}</button></>}>
-      <fieldset disabled={saving} className="space-y-3">
+      footer={<><button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} disabled={saving || draft.blocked || !date} className="btn-primary">{t('common.save')}</button></>}>
+      <DraftNotice draft={draft} />
+      <fieldset disabled={saving || draft.blocked} className="space-y-3">
         <Field label={t('settings.treatment')}>
           <select className="input" value={priceKey} onChange={(e) => pick(e.target.value)}>
             {catalog.map((c) => <option key={c.key} value={c.key}>{lang === 'ar' ? c.ar : c.en}</option>)}

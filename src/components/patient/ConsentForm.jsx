@@ -1,3 +1,5 @@
+import { useFormDraft } from '../../lib/useFormDraft'
+import DraftNotice from '../DraftNotice'
 import { useState } from 'react'
 import { Printer, Save, FileSignature, Check } from 'lucide-react'
 import { useI18n } from '../../i18n/I18nContext'
@@ -24,7 +26,7 @@ export default function ConsentForm({ patient }) {
     'I, the undersigned, consent to the treatment plan whose elements are listed below, which — including its benefits, risks and alternatives — has been explained to me and fully understood:'
   )
 
-  const [form, setForm] = useState({
+  const draft = useFormDraft('consent:' + patient.id, () => ({
     name: c.name || pName || '',
     phone: c.phone ?? (patient.phone || ''),
     fileNo: c.fileNo || patient.fileNo || '',
@@ -33,18 +35,23 @@ export default function ConsentForm({ patient }) {
     date: c.date || new Date().toISOString().slice(0, 10),
     statement: c.statement || defaultStatement,
     plan: c.plan || '',
-  })
+  }))
+  const form = draft.value
+  const setForm = draft.set
   const [saved, setSaved] = useState(false)
   const { saving, runSave } = useSaveAction()
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
   function save() { return runSave(async () => {
+    if (draft.blocked) return
     if (!await updatePatient(patient.id, { consent: form })) return
+    await draft.clear()
     setSaved(true); setTimeout(() => setSaved(false), 1500)
     toast(L('تم الحفظ', 'Saved'))
   }) }
 
   function print() {
+    if (draft.loading || draft.pending) return
     const planHtml = form.plan.trim()
       ? `<div style="border:1px solid #cbd5e1;border-radius:10px;padding:14px 16px;white-space:pre-wrap;font-size:14px;margin-top:10px;min-height:90px">${escapeHtml(form.plan)}</div>`
       : `<div style="border:1px dashed #cbd5e1;border-radius:10px;padding:28px;margin-top:10px"></div>`
@@ -75,11 +82,13 @@ export default function ConsentForm({ patient }) {
 
   return (
     <div className="card max-w-3xl space-y-4 p-6">
+      <DraftNotice draft={draft} />
       <div>
         <h3 className="flex items-center gap-2 text-lg font-bold text-ink-800"><FileSignature size={20} className="text-brand-500" /> {L('نموذج موافقة على العلاج', 'Treatment consent form')}</h3>
         <p className="mt-1 text-sm text-ink-400">{L('عدّل البيانات وخطة العلاج كما تشاء قبل الطباعة.', 'Edit the details and treatment plan as needed before printing.')}</p>
       </div>
 
+      <fieldset disabled={draft.blocked} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={L('اسم المريض الكامل', 'Patient full name')}><input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} /></Field>
         <Field label={L('رقم الجوال', 'Mobile number')}><input className="input" dir="ltr" value={form.phone} onChange={(e) => set('phone', e.target.value)} /></Field>
@@ -97,9 +106,10 @@ export default function ConsentForm({ patient }) {
         <textarea className="input min-h-[150px] resize-y" placeholder={L('مثال:\n- حشوة العصب للسن 36\n- تركيب تاج خزفي\n- قلع الضرس 48', 'e.g.\n- Root canal for tooth 36\n- Porcelain crown\n- Extraction of tooth 48')} value={form.plan} onChange={(e) => set('plan', e.target.value)} />
       </Field>
 
+      </fieldset>
       <div className="flex flex-wrap gap-2">
-        <button onClick={print} className="btn-primary"><Printer size={16} /> {L('طباعة', 'Print')}</button>
-        <button onClick={save} disabled={saving} className="btn-outline">{saved ? <><Check size={16} /> {L('تم الحفظ', 'Saved')}</> : <><Save size={16} /> {L('حفظ', 'Save')}</>}</button>
+        <button onClick={print} disabled={draft.loading || Boolean(draft.pending)} className="btn-primary"><Printer size={16} /> {L('طباعة', 'Print')}</button>
+        <button onClick={save} disabled={saving || draft.blocked} className="btn-outline">{saved ? <><Check size={16} /> {L('تم الحفظ', 'Saved')}</> : <><Save size={16} /> {L('حفظ', 'Save')}</>}</button>
       </div>
     </div>
   )

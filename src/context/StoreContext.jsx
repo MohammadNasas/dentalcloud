@@ -1,3 +1,5 @@
+import { hasVerifiedPaidAccess } from '../lib/entitlement.js'
+import { clearDraftScope, draftScope } from '../lib/draftStorage.js'
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { hashPassword, DOCTOR_COLORS, resetDB, seedDB, isComplimentary, isAppOwner } from '../lib/db'
 import { backend } from '../lib/backend'
@@ -175,6 +177,23 @@ export function StoreProvider({ children }) {
   }, [loadSession])
 
   const { clinic, currentUser } = state
+  const [accessNow, setAccessNow] = useState(Date.now())
+  useEffect(() => {
+    const tick = () => setAccessNow(Date.now())
+    const timer = setInterval(tick, 30000)
+    window.addEventListener('focus', tick)
+    return () => { clearInterval(timer); window.removeEventListener('focus', tick) }
+  }, [])
+  const expiredClinic = (value, now = Date.now()) => backend.mode === 'cloud' && value
+    && value.tier !== 'student' && !hasVerifiedPaidAccess(value, now)
+    && !(Date.parse(value.trialEndsAt || '') > now)
+  const subscriptionReadOnly = !isDemo && Boolean(expiredClinic(clinic, accessNow))
+  const rejectExpiredWrite = () => {
+    if (!expiredClinic(stateRef.current.clinic)) return false
+    toast('انتهى الاشتراك: يمكنك العرض والتصدير أو التجديد. / Subscription expired: view, export or renew.')
+    return true
+  }
+
   const tier = clinic?.tier === 'economy' ? 'pro' : (clinic?.tier || 'student')
   const can = useCallback((feature) => {
     const need = FEATURE_MIN_TIER[feature]
@@ -258,6 +277,7 @@ export function StoreProvider({ children }) {
       toast('يوجد تعديلات لم تُحفظ. أعد المحاولة قبل تسجيل الخروج. / Please retry unsaved changes before signing out.')
       return
     }
+    clearDraftScope(draftScope(stateRef.current.currentUser?.id, stateRef.current.clinic?.id)).catch(() => toast('تعذّر مسح مسودات الجهاز. / Could not clear device drafts.'))
     queueRef.current.reset()
     setState(EMPTY)
     backend.signOut().catch((e) => console.error(e))
@@ -266,6 +286,7 @@ export function StoreProvider({ children }) {
   // Drafts update immediately for typing. Success is reported only after the
   // server confirms; failed drafts remain visible with an explicit retry.
   const upsert = useCallback((key, table, obj) => {
+    if (rejectExpiredWrite()) return Promise.resolve(null)
     if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
     const apply = (saved) => setState((s) => {
       const exists = s[key].some((x) => x.id === saved.id)
@@ -276,6 +297,7 @@ export function StoreProvider({ children }) {
   }, [isDemo])
 
   const drop = useCallback((key, table, id, extra) => {
+    if (rejectExpiredWrite()) return Promise.resolve(null)
     if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
     return queueRef.current.enqueue(`${table}:${id}`, () => backend.remove(table, id), () => {
       setState((s) => ({ ...s, [key]: s[key].filter((x) => x.id !== id), ...(extra ? extra(s) : {}) }))
@@ -423,7 +445,7 @@ export function StoreProvider({ children }) {
     saveStatus, retrySaves: queueRef.current.retry,
     otpEmail: pendingOtp?.email || null, verifyOtp, resendOtp, cancelOtp,
     paymentResult, dismissPaymentResult,
-    clinic, currentUser, tier, can, isOwner, readOnly: isDemo,
+    clinic, currentUser, tier, can, isOwner, readOnly: isDemo || subscriptionReadOnly, subscriptionReadOnly, demoMode: isDemo,
     login, logout, register, resetPassword, updatePassword,
     patients: state.patients, doctors: state.doctors, appointments: state.appointments,
     toothRecords: state.toothRecords, payments: state.payments, suggestions: state.suggestions,

@@ -88,7 +88,7 @@ const BOTTOM_NAV = [
 
 export default function Layout() {
   const { t, L, lang, toggleLang } = useI18n()
-  const { currentUser, clinic, logout, can, appointments, getPatient, isOwner, readOnly } = useStore()
+  const { currentUser, clinic, logout, can, appointments, getPatient, isOwner, readOnly, subscriptionReadOnly } = useStore()
   const navItems = (() => {
     if (!isOwner) return NAV
     const items = [...NAV]
@@ -238,7 +238,7 @@ export default function Layout() {
           <div className="ms-auto flex items-center gap-2">
             {readOnly ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-700">
-                <Lock size={12} /> {lang === 'ar' ? 'عرض فقط · حساب تجريبي' : 'View only · Demo'}
+                <Lock size={12} /> {subscriptionReadOnly ? (lang === 'ar' ? 'انتهى الاشتراك · عرض فقط' : 'Subscription expired · View only') : (lang === 'ar' ? 'عرض فقط · حساب تجريبي' : 'View only · Demo')}
               </span>
             ) : (
               <span className="hidden items-center gap-1.5 text-xs font-semibold text-emerald-600 sm:flex">
@@ -262,6 +262,10 @@ export default function Layout() {
         </header>
 
         <main className="min-h-0 flex-1 overflow-y-auto">
+          {subscriptionReadOnly && <div className="flex items-center justify-between gap-3 bg-amber-50 px-5 py-3 text-sm text-amber-900" role="status">
+            <span>{lang === 'ar' ? 'ملفاتك متاحة للعرض والتصدير. جدّد اشتراكك لاستئناف الحفظ.' : 'Records remain available to view and export. Renew to resume saving.'}</span>
+            <button className="btn-primary shrink-0" onClick={() => navigate('/packages')}>{lang === 'ar' ? 'تجديد الاشتراك' : 'Renew subscription'}</button>
+          </div>}
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 10 }}

@@ -1,3 +1,5 @@
+import { useFormDraft } from '../lib/useFormDraft'
+import DraftNotice from './DraftNotice'
 import { useState } from 'react'
 import { Plus, Wallet } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
@@ -16,15 +18,30 @@ export default function PaymentModal({ patient, onClose }) {
   const currency = clinic?.settings?.currency || 'JOD'
   const debt = balanceForPatient(patient.id).debt
 
-  const [amount, setAmount] = useState(debt > 0 ? String(debt) : '')
-  const [note, setNote] = useState('')
-  const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
-  const [draftId] = useState(() => backend.genId('payment'))
+  const draft = useFormDraft('payment:' + patient.id, () => ({
+    amount: debt > 0 ? String(debt) : '',
+    note: '',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    draftId: backend.genId('payment'),
+    split: false,
+    single: 'cash',
+    rows: [{ method: 'cash', amount: '' }, { method: 'card', amount: '' }]
+  }))
+  const amount = draft.value.amount
+  const setAmount = (value) => draft.setField('amount', value)
+  const note = draft.value.note
+  const setNote = (value) => draft.setField('note', value)
+  const date = draft.value.date
+  const setDate = (value) => draft.setField('date', value)
+  const draftId = draft.value.draftId
+  const setDraftId = (value) => draft.setField('draftId', value)
+  const split = draft.value.split
+  const setSplit = (value) => draft.setField('split', value)
+  const single = draft.value.single
+  const setSingle = (value) => draft.setField('single', value)
+  const rows = draft.value.rows
+  const setRows = (value) => draft.setField('rows', value)
   const { saving, runSave } = useSaveAction()
-  const [split, setSplit] = useState(false)
-  const [single, setSingle] = useState('cash')
-  const [rows, setRows] = useState([{ method: 'cash', amount: '' }, { method: 'card', amount: '' }])
-
   const supportsMethods = can('paymentMethods')
   const supportsSplit = can('splitPayments')
 
@@ -39,15 +56,16 @@ export default function PaymentModal({ patient, onClose }) {
     }
     if (total <= 0 || !date) return
     const saved = await addPayment({ id: draftId, patientId: patient.id, amount: total, methods, note, date: parseISO(date).toISOString() })
-    if (saved) onClose()
+    if (saved) { await draft.clear(); onClose() }
   }) }
 
   return (
     <Modal open onClose={() => { if (!saving) onClose() }} size="md"
       title={`${t('pay.record')} — ${lang === 'ar' ? patient.nameAr || patient.name : patient.name}`}
       icon={<Wallet size={18} className="text-brand-500" />}
-      footer={<><button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} disabled={saving || !date} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button></>}>
-      <fieldset disabled={saving} className="space-y-3">
+      footer={<><button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button><button onClick={save} disabled={saving || draft.blocked || !date} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button></>}>
+      <DraftNotice draft={draft} />
+      <fieldset disabled={saving || draft.blocked} className="space-y-3">
         {debt > 0 && <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-600">{t('pay.debt')}: {money(debt, currency)}</p>}
 
         {!(supportsMethods && split) && (

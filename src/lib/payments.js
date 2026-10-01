@@ -45,12 +45,15 @@ export async function notifyCouponUse({ email, tier, coupon }) {
   if (_notifiedCoupons.has(key)) return
   _notifiedCoupons.add(key)
   try {
-    await fetch('/api/coupon-notify', {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) { _notifiedCoupons.delete(key); return }
+    const response = await fetch(api('/api/coupon-notify'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, tier, coupon }),
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ tier, coupon }),
     })
-  } catch { /* notification is best-effort — never interrupt the purchase */ }
+    if (!response.ok && response.status !== 429) _notifiedCoupons.delete(key)
+  } catch { _notifiedCoupons.delete(key) /* best-effort; never interrupt checkout */ }
 }
 
 export async function capturePaypal(payment) {

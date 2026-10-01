@@ -1,72 +1,69 @@
-// Cloudflare Pages Function: POST /api/coupon-notify
-// Privately emails the APP OWNER when a customer applies a valid gift/discount
-// code at checkout — BEFORE they pay. The recipient is fixed on the server, so
-// the notification can only ever reach the owner (never the customer).
-//
-// Env vars:
-//   RESEND_API_KEY    (required to actually send — from https://resend.com)
-//   COUPON_NOTIFY_TO  (optional — recipient; defaults to the owner below)
-//   RESEND_FROM       (optional — sender; defaults to Resend's shared sender)
-//
-// Keep COUPONS in sync with src/lib/coupons.js and the paypal-* functions.
+// Authenticated, server-throttled notification to a fixed recipient only.
 const COUPONS = { DENTAL40: 40 }
-const OWNER_EMAIL = 'mohammadissogood556@gmail.com'
-
-const json = (body, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-  })
-
-export const onRequestOptions = () =>
-  new Response('', {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    },
-  })
-
-export const onRequestPost = async ({ request, env }) => {
-  let payload
-  try { payload = await request.json() } catch { return json({ ok: false, error: 'bad_json' }, 400) }
-  const { email, tier, coupon } = payload || {}
-
-  // Only notify for codes we actually recognise (stops strangers spamming you).
-  const code = String(coupon || '').trim().toUpperCase()
-  const percent = COUPONS[code]
-  if (!percent) return json({ ok: false, error: 'bad_coupon' }, 400)
-
-  const apiKey = env.RESEND_API_KEY
-  if (!apiKey) return json({ ok: false, error: 'email_not_configured' }, 503)
-
-  const to = env.COUPON_NOTIFY_TO || OWNER_EMAIL
-  const from = env.RESEND_FROM || 'DentalCloud <onboarding@resend.dev>'
-  const customer = String(email || '').trim() || 'مستخدم غير معروف / unknown'
-  const when = new Date().toISOString()
-
-  const subject = `🎁 كود الخصم ${code} استُخدم — ${customer}`
-  const html = `
-    <div style="font-family:Arial,sans-serif;line-height:1.7;color:#1e293b">
-      <h2 style="margin:0 0 8px">🎁 تم استخدام كود خصم</h2>
-      <p style="margin:0 0 16px;color:#64748b">شخص أدخل كود الهدية في شاشة الدفع قبل أن يدفع.</p>
-      <table style="border-collapse:collapse">
-        <tr><td style="padding:4px 12px 4px 0;color:#64748b">الكود</td><td style="font-weight:bold">${code} (${percent}%)</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#64748b">إيميل المستخدم</td><td style="font-weight:bold">${customer}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#64748b">الباقة</td><td style="font-weight:bold">${String(tier || '—')}</td></tr>
-        <tr><td style="padding:4px 12px 4px 0;color:#64748b">الوقت (UTC)</td><td>${when}</td></tr>
-      </table>
-    </div>`
-
-  try {
-    const r = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from, to, subject, html, reply_to: customer.includes('@') ? customer : undefined }),
-    })
-    if (!r.ok) return json({ ok: false, error: 'send_failed', message: await r.text() }, 502)
-    return json({ ok: true })
-  } catch (e) {
-    return json({ ok: false, error: 'server_error', message: String(e) }, 500)
+const json = (body, status = 200) => new Response(JSON.stringify(body), {
+  status, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' },
+})
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+}[c]))
+export const onRequestOptions = () => new Response('', { headers: {
+  'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+} })
+async function readPayload(request) {
+  const reader = request.body?.getReader()
+  if (!reader) throw new Error('body')
+  const chunks = []
+  let size = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    size += value.byteLength
+    if (size > 4096) { await reader.cancel(); throw new Error('body') }
+    chunks.push(value)
   }
+  const bytes = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length }
+  return JSON.parse(new TextDecoder().decode(bytes))
+}
+export async function onRequestPost({ request, env }) {
+  const bearer = request.headers.get('Authorization') || ''
+  if (!/^Bearer \S+$/i.test(bearer)) return json({ ok: false, error: 'unauthorized' }, 401)
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY || !env.RESEND_API_KEY)
+    return json({ ok: false, error: 'notification_unavailable' }, 503)
+  let payload
+  try { payload = await readPayload(request) } catch { return json({ ok: false, error: 'bad_request' }, 400) }
+  if (typeof payload?.coupon !== 'string' || payload.coupon.length > 32 || payload.tier !== 'pro')
+    return json({ ok: false, error: 'bad_request' }, 400)
+  const code = payload.coupon.trim().toUpperCase()
+  if (!Object.hasOwn(COUPONS, code)) return json({ ok: false, error: 'bad_coupon' }, 400)
+  const base = env.SUPABASE_URL.replace(/\/$/, '')
+  try {
+    const auth = await fetch(base + '/auth/v1/user', {
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: bearer }, signal: AbortSignal.timeout(10000),
+    })
+    if (!auth.ok) return json({ ok: false, error: 'unauthorized' }, 401)
+    const user = await auth.json()
+    if (!user.id || typeof user.email !== 'string' || !user.email_confirmed_at)
+      return json({ ok: false, error: 'verified_email_required' }, 403)
+    const reservation = await fetch(base + '/rest/v1/rpc/reserve_coupon_notification', {
+      method: 'POST', signal: AbortSignal.timeout(10000),
+      headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + env.SUPABASE_SERVICE_ROLE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_user_id: user.id }),
+    })
+    if (!reservation.ok) return json({ ok: false, error: 'notification_unavailable' }, 503)
+    if (await reservation.json() !== true) return json({ ok: false, error: 'rate_limited' }, 429)
+    const sent = await fetch('https://api.resend.com/emails', {
+      method: 'POST', signal: AbortSignal.timeout(10000),
+      headers: { Authorization: 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: env.RESEND_FROM || 'DentalCloud <onboarding@resend.dev>',
+        to: env.COUPON_NOTIFY_TO || 'mohammadissogood556@gmail.com',
+        subject: 'DentalCloud — coupon notification',
+        html: '<p>Coupon: ' + escapeHtml(code) + '</p><p>User: ' + escapeHtml(user.email) + '</p><p>Plan: Pro</p>',
+      }),
+    })
+    return sent.ok ? json({ ok: true }) : json({ ok: false, error: 'send_failed' }, 502)
+  } catch { return json({ ok: false, error: 'notification_unavailable' }, 503) }
 }

@@ -1,3 +1,5 @@
+import { useFormDraft } from '../lib/useFormDraft'
+import DraftNotice from './DraftNotice'
 import { useState, useEffect, useRef } from 'react'
 import { CalendarPlus, Trash2 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
@@ -12,34 +14,24 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
   const { t, lang } = useI18n()
   const { patients, doctors, appointments, addAppointment, updateAppointment, deleteAppointment, currentUser, can } = useStore()
 
-  const [form, setForm] = useState({})
   const [acceptedConflict, setAcceptedConflict] = useState(null)
-  const draftId = useRef(null)
   const { saving, runSave } = useSaveAction()
-
-  useEffect(() => {
-    if (!open) return
-    setAcceptedConflict(null)
-    draftId.current = appointment?.id || backend.genId('appointment')
-    if (appointment) {
-      const d = new Date(appointment.start)
-      const dur = Math.round((new Date(appointment.end) - new Date(appointment.start)) / 60000) || 30
-      setForm({
-        patientId: appointment.patientId, doctorId: appointment.doctorId,
-        date: format(d, 'yyyy-MM-dd'), time: format(d, 'HH:mm'),
-        duration: dur, reason: appointment.reason || '', step: appointment.step || '',
-        status: appointment.status || 'scheduled', notes: appointment.notes || '',
-      })
-    } else {
-      const d = defaultDate ? (typeof defaultDate === 'string' ? parseISO(defaultDate) : new Date(defaultDate)) : new Date()
-      setForm({
-        patientId: defaultPatientId || patients[0]?.id || '', doctorId: currentUser?.id,
-        // Date inputs use the selected local calendar day, not its UTC date.
-        date: format(d, 'yyyy-MM-dd'), time: '09:00', duration: 30,
-        reason: '', step: '', status: 'scheduled', notes: '',
-      })
+  const draft = useFormDraft('appointment:' + (appointment?.id || 'new:' + (defaultPatientId || '') + ':' + String(defaultDate || 'today')), () => {
+    const d = appointment ? new Date(appointment.start)
+      : defaultDate ? (typeof defaultDate === 'string' ? parseISO(defaultDate) : new Date(defaultDate)) : new Date()
+    return {
+      id: appointment?.id || backend.genId('appointment'),
+      patientId: appointment?.patientId || defaultPatientId || patients[0]?.id || '',
+      doctorId: appointment?.doctorId || currentUser?.id,
+      date: format(d, 'yyyy-MM-dd'), time: appointment ? format(d, 'HH:mm') : '09:00',
+      duration: appointment ? Math.round((new Date(appointment.end) - d) / 60000) || 30 : 30,
+      reason: appointment?.reason || '', step: appointment?.step || '',
+      status: appointment?.status || 'scheduled', notes: appointment?.notes || '',
     }
-  }, [open, appointment?.id, defaultDate, defaultPatientId])
+  }, open)
+  const form = draft.value
+  const setForm = draft.set
+  useEffect(() => setAcceptedConflict(null), [open, appointment?.id, defaultDate, defaultPatientId])
 
   const set = (k, v) => {
     if (['date', 'time', 'duration', 'doctorId', 'patientId', 'status'].includes(k)) setAcceptedConflict(null)
@@ -50,7 +42,7 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
   const endMs = startMs + (Number(form.duration) || 30) * 60000
   const validTime = Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs
   const candidate = {
-    id: draftId.current, patientId: form.patientId, doctorId: form.doctorId, status: form.status,
+    id: form.id, patientId: form.patientId, doctorId: form.doctorId, status: form.status,
     start: validTime ? new Date(startMs).toISOString() : '',
     end: validTime ? new Date(endMs).toISOString() : '',
   }
@@ -64,17 +56,17 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
     const start = new Date(`${form.date}T${form.time}`)
     const end = new Date(start.getTime() + (Number(form.duration) || 30) * 60000)
     const data = {
-      id: draftId.current,
+      id: form.id,
       patientId: form.patientId, doctorId: form.doctorId,
       start: start.toISOString(), end: end.toISOString(),
       reason: form.reason, step: form.step, status: form.status, notes: form.notes,
     }
     const saved = appointment ? await updateAppointment(appointment.id, data) : await addAppointment(data)
-    if (saved) onClose()
+    if (saved) { await draft.clear(); onClose() }
   }) }
 
   function remove() { return runSave(async () => {
-    if (await deleteAppointment(appointment.id)) onClose()
+    if (await deleteAppointment(appointment.id)) { await draft.clear(); onClose() }
   }) }
 
   return (
@@ -85,11 +77,12 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
         <>
           {appointment && <button onClick={remove} disabled={saving} className="btn-ghost me-auto text-rose-500 hover:bg-rose-50"><Trash2 size={15} /> {t('common.delete')}</button>}
           <button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button>
-          <button onClick={save} disabled={saving || !form.patientId || !validTime || needsConfirmation} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
+          <button onClick={save} disabled={saving || draft.blocked || !form.patientId || !validTime || needsConfirmation} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
         </>
       }
     >
-      <fieldset disabled={saving} className="space-y-3">
+      <DraftNotice draft={draft} />
+      <fieldset disabled={saving || draft.blocked} className="space-y-3">
         <Field label={t('appt.selectPatient')}>
           <select className="input" value={form.patientId} onChange={(e) => set('patientId', e.target.value)}>
             {patients.map((p) => <option key={p.id} value={p.id}>{lang === 'ar' ? p.nameAr || p.name : p.name} — #{p.fileNo}</option>)}

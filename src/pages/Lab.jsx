@@ -1,3 +1,5 @@
+import { useFormDraft } from '../lib/useFormDraft'
+import DraftNotice from '../components/DraftNotice'
 import { useState, useMemo } from 'react'
 import {
   FlaskConical, Plus, Trash2, Search, ChevronDown, ChevronUp,
@@ -340,10 +342,10 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
 }
 
 function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSave, onClose }) {
-  const [draftId] = useState(() => order?.id || backend.genId('labOrder'))
+
   const { saving, runSave } = useSaveAction()
   const matchedLab = order && (labs.find((lab) => lab.id === order.labId) || labs.find((lab) => lab.name === order.labName))
-  const [form, setForm] = useState(order ? {
+  const draft = useFormDraft('lab-order:' + (order?.id || 'new'), () => ({ id: order?.id || backend.genId('labOrder'), ...(order ? {
     labId: matchedLab?.id || '',
     labName: matchedLab?.name || order.labName || '',
     labPhone: matchedLab?.phone || order.labPhone || '',
@@ -357,7 +359,10 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
     paid: String(order.paid || ''),
     dueDate: order.dueDate || '',
     status: order.status || 'sent',
-  } : { ...DEFAULT_FORM })
+  } : { ...DEFAULT_FORM }) }))
+  const form = draft.value
+  const setForm = draft.set
+  const draftId = form.id
 
   const f = (k, v) => setForm((prev) => ({ ...prev, [k]: v }))
 
@@ -392,12 +397,14 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
   }
 
   function submit(sendWhatsApp = false) { return runSave(async () => {
+    if (draft.blocked) return
     const data = buildData(sendWhatsApp ? 'sent' : undefined)
     // Reserve the user-initiated tab before awaiting so mobile browsers allow it.
     const chat = sendWhatsApp && waNumber(data.labPhone).length >= 8 ? window.open('about:blank', '_blank') : null
     if (chat) chat.opener = null
     const saved = await onSave(data)
     if (!saved) { chat?.close(); return }
+    await draft.clear()
     if (sendWhatsApp && waNumber(data.labPhone).length >= 8) {
       const wt = WORK_TYPES.find((item) => item.key === data.workType)
       const remaining = Math.max(0, data.price - data.paid)
@@ -427,11 +434,13 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
       icon={<FlaskConical size={18} className="text-violet-500" />}
       footer={<>
         <button onClick={onClose} disabled={saving} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-        <button onClick={() => submit(false)} disabled={saving || !form.labId} className="btn-outline"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
-        <button onClick={() => submit(true)} disabled={saving || !form.labId || waNumber(form.labPhone).length < 8}
+        <button onClick={() => submit(false)} disabled={saving || draft.blocked || !form.labId} className="btn-outline"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
+        <button onClick={() => submit(true)} disabled={saving || draft.blocked || !form.labId || waNumber(form.labPhone).length < 8}
           className="btn bg-emerald-500 text-white hover:bg-emerald-600"><WhatsAppIcon size={16} /> {lang === 'ar' ? 'حفظ وإرسال واتساب' : 'Save & send WhatsApp'}</button>
       </>}
     >
+      <DraftNotice draft={draft} />
+      <fieldset disabled={saving || draft.blocked}>
       <div className="grid gap-4 md:grid-cols-2">
         {/* Saved lab */}
         <Field label={lang === 'ar' ? 'المختبر' : 'Lab'} required hint={form.labPhone ? `${lang === 'ar' ? 'واتساب' : 'WhatsApp'}: ${form.labPhone}` : undefined}>
@@ -549,6 +558,7 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
           </p>
         )}
       </div>
+      </fieldset>
     </Modal>
   )
 }

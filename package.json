@@ -45,6 +45,7 @@
     "autoprefixer": "^10.4.19",
     "electron": "^31.7.6",
     "electron-builder": "^26.15.0",
+    "fake-indexeddb": "^6.2.5",
     "png-to-ico": "^2.1.8",
     "postcss": "^8.4.40",
     "sharp": "^0.34.5",
