@@ -175,7 +175,7 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <RecentPatients />
+          <RecentPatients patients={patients} t={t} lang={lang} navigate={navigate} Arrow={Arrow} />
         )}
 
         {/* Tomorrow reminders */}
@@ -221,7 +221,7 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <QuickUpgrade />
+          <QuickUpgrade t={t} navigate={navigate} />
         )}
       </div>
 
@@ -254,41 +254,41 @@ export default function Dashboard() {
       <PatientFormModal open={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   )
+}
 
-  function RecentPatients() {
-    const recent = [...patients].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 6)
-    return (
-      <div className="card lg:col-span-2">
-        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
-          <h3 className="flex items-center gap-2 font-bold text-ink-800"><Users size={18} className="text-brand-500" /> {t('patient.patients')}</h3>
-          <button onClick={() => navigate('/patients')} className="text-sm font-bold text-brand-600 hover:underline">{t('common.view')}</button>
-        </div>
-        <div className="divide-y divide-ink-50">
-          {recent.length === 0 ? (
-            <EmptyState icon={<Users size={26} />} title={t('patient.noPatients')} />
-          ) : recent.map((p) => (
-            <button key={p.id} onClick={() => navigate(`/patients/${p.id}`)} className="flex w-full items-center gap-3 px-5 py-3 text-start hover:bg-ink-50/60">
-              <Avatar name={p.name} size={38} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-bold text-ink-800">{lang === 'ar' ? p.nameAr || p.name : p.name}</p>
-                <p className="truncate text-xs text-ink-400">#{p.fileNo} · {p.complaint}</p>
-              </div>
-              <Arrow size={16} className="text-ink-300" />
-            </button>
-          ))}
-        </div>
+function RecentPatients({ patients, t, lang, navigate, Arrow }) {
+  const recent = [...patients].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 6)
+  return (
+    <div className="card lg:col-span-2">
+      <div className="flex items-center justify-between border-b border-ink-100 px-5 py-4">
+        <h3 className="flex items-center gap-2 font-bold text-ink-800"><Users size={18} className="text-brand-500" /> {t('patient.patients')}</h3>
+        <button onClick={() => navigate('/patients')} className="text-sm font-bold text-brand-600 hover:underline">{t('common.view')}</button>
       </div>
-    )
-  }
+      <div className="divide-y divide-ink-50">
+        {recent.length === 0 ? (
+          <EmptyState icon={<Users size={26} />} title={t('patient.noPatients')} />
+        ) : recent.map((p) => (
+          <button key={p.id} onClick={() => navigate(`/patients/${p.id}`)} className="flex w-full items-center gap-3 px-5 py-3 text-start hover:bg-ink-50/60">
+            <Avatar name={p.name} size={38} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate font-bold text-ink-800">{lang === 'ar' ? p.nameAr || p.name : p.name}</p>
+              <p className="truncate text-xs text-ink-400">#{p.fileNo} · {p.complaint}</p>
+            </div>
+            <Arrow size={16} className="text-ink-300" />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
-  function QuickUpgrade() {
-    return (
-      <div className="card flex flex-col items-center justify-center gap-3 p-6 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-500"><Stethoscope size={24} /></div>
-        <p className="font-bold text-ink-700">{t('packages.title')}</p>
-        <p className="text-sm text-ink-400">{t('packages.subtitle')}</p>
-        <button onClick={() => navigate('/packages')} className="btn-soft">{t('common.upgrade')}</button>
-      </div>
-    )
-  }
+function QuickUpgrade({ t, navigate }) {
+  return (
+    <div className="card flex flex-col items-center justify-center gap-3 p-6 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-500"><Stethoscope size={24} /></div>
+      <p className="font-bold text-ink-700">{t('packages.title')}</p>
+      <p className="text-sm text-ink-400">{t('packages.subtitle')}</p>
+      <button onClick={() => navigate('/packages')} className="btn-soft">{t('common.upgrade')}</button>
+    </div>
+  )
 }

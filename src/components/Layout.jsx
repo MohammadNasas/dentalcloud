@@ -86,32 +86,9 @@ const BOTTOM_NAV = [
   { to: '/payments', key: 'payments', icon: Wallet, feature: 'clinicBalances' },
 ]
 
-export default function Layout() {
-  const { t, L, lang, toggleLang } = useI18n()
-  const { currentUser, clinic, logout, can, appointments, getPatient, isOwner, readOnly, subscriptionReadOnly } = useStore()
-  const navItems = (() => {
-    if (!isOwner) return NAV
-    const items = [...NAV]
-    const i = items.findIndex((n) => n.to === '/settings')
-    const inbox = { to: '/inbox', key: 'inbox', icon: Inbox }
-    if (i >= 0) items.splice(i, 0, inbox); else items.push(inbox)
-    return items
-  })()
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const location = useLocation()
-  const navigate = useNavigate()
-
-  const tierInfo = TIERS[clinic?.tier || 'student']
-
-  const todayItems = (appointments || [])
-    .filter((a) => isToday(parseISO(a.start)) && a.status !== 'cancelled')
-    .sort((a, b) => a.start.localeCompare(b.start))
-    .map((a) => {
-      const p = getPatient(a.patientId)
-      return { id: a.id, patientId: a.patientId, time: fmtTime(a.start, lang), name: (lang === 'ar' ? p?.nameAr || p?.name : p?.name) || '' }
-    })
-
-  const NavList = ({ onNavigate }) => (
+// Keep sidebar component identities stable during store updates and focus checks.
+function NavList({ onNavigate, navItems, can, t }) {
+  return (
     <motion.nav
       className="flex flex-1 flex-col gap-1 px-3"
       variants={NAV_CONTAINER}
@@ -150,8 +127,11 @@ export default function Layout() {
       })}
     </motion.nav>
   )
+}
 
-  const SidebarInner = ({ onNavigate }) => (
+function SidebarInner({ onNavigate, navItems, can, t, L, lang, clinic, currentUser, logout }) {
+  const tierInfo = TIERS[clinic?.tier || 'student']
+  return (
     <div className="flex h-full flex-col">
       {/* Brand */}
       <div className="flex items-center gap-3 px-5 py-5">
@@ -175,7 +155,7 @@ export default function Layout() {
         </div>
       </div>
 
-      <NavList onNavigate={onNavigate} />
+      <NavList onNavigate={onNavigate} navItems={navItems} can={can} t={t} />
 
       {/* User */}
       <div className="mt-auto border-t border-white/10 p-3">
@@ -194,6 +174,32 @@ export default function Layout() {
       </div>
     </div>
   )
+}
+
+export default function Layout() {
+  const { t, L, lang, toggleLang } = useI18n()
+  const { currentUser, clinic, logout, can, appointments, getPatient, isOwner, readOnly, subscriptionReadOnly } = useStore()
+  const navItems = (() => {
+    if (!isOwner) return NAV
+    const items = [...NAV]
+    const i = items.findIndex((n) => n.to === '/settings')
+    const inbox = { to: '/inbox', key: 'inbox', icon: Inbox }
+    if (i >= 0) items.splice(i, 0, inbox); else items.push(inbox)
+    return items
+  })()
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const sidebarProps = { navItems, can, t, L, lang, clinic, currentUser, logout }
+
+  const todayItems = (appointments || [])
+    .filter((a) => isToday(parseISO(a.start)) && a.status !== 'cancelled')
+    .sort((a, b) => a.start.localeCompare(b.start))
+    .map((a) => {
+      const p = getPatient(a.patientId)
+      return { id: a.id, patientId: a.patientId, time: fmtTime(a.start, lang), name: (lang === 'ar' ? p?.nameAr || p?.name : p?.name) || '' }
+    })
 
   const pageTitle = (() => {
     const item = navItems.find((n) => (n.end ? location.pathname === n.to : location.pathname.startsWith(n.to) && n.to !== '/'))
@@ -204,7 +210,7 @@ export default function Layout() {
     <div className="flex h-screen overflow-hidden bg-[var(--app-bg)]">
       {/* Desktop sidebar */}
       <aside className="hidden w-64 shrink-0 border-e border-ink-800 bg-ink-900 lg:block">
-        <SidebarInner />
+        <SidebarInner {...sidebarProps} />
       </aside>
 
       {/* Mobile sidebar — always mounted and animated via state (no AnimatePresence).
@@ -224,7 +230,7 @@ export default function Layout() {
         animate={{ x: mobileOpen ? 0 : (lang === 'ar' ? 280 : -280) }}
         transition={{ type: 'spring', stiffness: 320, damping: 34 }}
       >
-        <SidebarInner onNavigate={() => setMobileOpen(false)} />
+        <SidebarInner {...sidebarProps} onNavigate={() => setMobileOpen(false)} />
       </motion.aside>
 
       {/* Main */}
