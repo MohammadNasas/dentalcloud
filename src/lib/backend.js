@@ -128,6 +128,7 @@ const localBackend = {
       db.toothRecords = db.toothRecords.filter((t) => t.patientId !== id)
       db.appointments = db.appointments.filter((a) => a.patientId !== id)
       db.payments = db.payments.filter((p) => p.patientId !== id)
+        db.labOrders = (db.labOrders || []).filter((p) => p.patientId !== id)
     }
     if (!saveDB(db)) throw new Error('Could not save on this device')
     return true

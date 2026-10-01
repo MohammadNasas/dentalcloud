@@ -1,3 +1,14 @@
+// Project pending deletions without touching the original patient or its records.
+export function withoutDeletedRecords(state, items) {
+  const hidden = new Set(items.map((item) => item.key))
+  const patientHidden = (id) => hidden.has(`patients:${id}`)
+  const result = { ...state, patients: state.patients.filter((p) => !patientHidden(p.id)) }
+  for (const key of ['appointments', 'toothRecords', 'payments', 'labOrders']) {
+    result[key] = state[key].filter((item) => !patientHidden(item.patientId) && !hidden.has(`${key}:${item.id}`))
+  }
+  return result
+}
+
 // Delay the actual delete: undo cancels a timer, never recreates a stale record.
 export function createUndoDelete(onChange, { now = Date.now, schedule = setTimeout, cancel = clearTimeout } = {}) {
   const entries = new Map()

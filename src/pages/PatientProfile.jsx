@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { Avatar, Badge, Segmented } from '../components/ui'
+import { Avatar, Badge, Segmented, Modal } from '../components/ui'
 import PatientFormModal from '../components/PatientFormModal'
 import FeatureLock from '../components/FeatureLock'
 import HistoryForm from '../components/patient/HistoryForm'
@@ -46,6 +46,7 @@ export default function PatientProfile() {
   const { getPatient, getDoctor, deletePatient, apptsForPatient, balanceForPatient, recordsForPatient, paymentsForPatient, clinic, can } = store
   const [tab, setTab] = useState('overview')
   const [editOpen, setEditOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const { saving: deleting, runSave } = useSaveAction()
 
@@ -78,7 +79,7 @@ export default function PatientProfile() {
   }
 
   function doDelete() { return runSave(async () => {
-    if (confirm(t('patient.deleteConfirm')) && await deletePatient(patient.id)) navigate('/patients')
+    if (await deletePatient(patient.id)) { setDeleteOpen(false); navigate('/patients') }
   }) }
 
   return (
@@ -122,7 +123,7 @@ export default function PatientProfile() {
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setEditOpen(true)} className="btn-outline !py-2"><Pencil size={15} /> {t('common.edit')}</button>
             <button onClick={doExport} disabled={exporting} className="btn-outline !py-2"><FileDown size={15} /> Word</button>
-            <button onClick={doDelete} disabled={deleting} className="btn-ghost !py-2 text-rose-500 hover:bg-rose-50"><Trash2 size={15} /></button>
+            <button onClick={() => setDeleteOpen(true)} disabled={deleting || store.readOnly} aria-label={lang === 'ar' ? 'حذف ملف المريض' : 'Delete patient file'} className="btn-ghost !py-2 text-rose-500 hover:bg-rose-50"><Trash2 size={15} /></button>
           </div>
         </div>
 
@@ -181,6 +182,20 @@ export default function PatientProfile() {
       </div>
 
       <PatientFormModal open={editOpen} onClose={() => setEditOpen(false)} patient={patient} />
+      <Modal open={deleteOpen} onClose={() => { if (!deleting) setDeleteOpen(false) }} size="sm"
+        title={lang === 'ar' ? 'حذف ملف المريض؟' : 'Delete patient file?'}
+        icon={<Trash2 size={19} className="text-rose-500" />}
+        footer={<>
+          <button autoFocus onClick={() => setDeleteOpen(false)} disabled={deleting} className="btn-outline">{t('common.cancel')}</button>
+          <button onClick={doDelete} disabled={deleting} className="btn-primary !bg-rose-600 hover:!bg-rose-700">
+            {deleting ? (lang === 'ar' ? 'جارٍ التنفيذ…' : 'Removing…') : (lang === 'ar' ? 'حذف الملف' : 'Delete file')}
+          </button>
+        </>}>
+        <p className="font-bold text-ink-800">{pName}</p>
+        <p className="mt-2 text-sm leading-7 text-ink-500">{lang === 'ar'
+          ? 'سيُحذف ملف المريض وسجلات علاجاته ومواعيده ومدفوعاته وطلبات المختبر. ستظهر لك مهلة 10 ثوانٍ للتراجع قبل تنفيذ الحذف نهائياً.'
+          : 'This deletes the patient file, treatments, appointments, payments and lab orders. You will have 10 seconds to undo before deletion is finalized.'}</p>
+      </Modal>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createUndoDelete } from '../src/lib/undoDelete.js'
+import { createUndoDelete, withoutDeletedRecords } from '../src/lib/undoDelete.js'
 
 function harness() {
   let items = [], id = 0
@@ -63,4 +63,44 @@ test('session cleanup cancels outstanding timers; stale callbacks cannot delete'
   await stale()
   assert.equal(writes, 0)
   assert.equal(h.timers.size, 0)
+})
+
+const patientFixture = () => ({
+  patients: [{ id: 'p1', photos: [{ id: 'xray' }], history: { notes: 'original' } }, { id: 'p2' }],
+  appointments: [{ id: 'a1', patientId: 'p1' }, { id: 'a2', patientId: 'p2' }],
+  toothRecords: [{ id: 't1', patientId: 'p1', price: 50 }],
+  payments: [{ id: 'pay1', patientId: 'p1', amount: 20 }],
+  labOrders: [{ id: 'lab1', patientId: 'p1' }],
+})
+
+test('patient undo restores the entire untouched file and all linked collections without server writes', () => {
+  const state = patientFixture(), original = structuredClone(state), h = harness()
+  h.controller.add({ key: 'patients:p1', kind: 'patient', commit: () => assert.fail('Undo must not write') })
+  const hidden = withoutDeletedRecords(state, h.items())
+  assert.deepEqual(hidden.patients, [{ id: 'p2' }])
+  assert.deepEqual(hidden.appointments, [{ id: 'a2', patientId: 'p2' }])
+  for (const key of ['toothRecords', 'payments', 'labOrders']) assert.deepEqual(hidden[key], [])
+  h.controller.undo('patients:p1')
+  assert.deepEqual(withoutDeletedRecords(state, h.items()), original)
+  assert.strictEqual(state.patients[0].history, withoutDeletedRecords(state, h.items()).patients[0].history)
+})
+
+test('patient deletion failure leaves the complete original file recoverable in the view', async () => {
+  const state = patientFixture(), h = harness()
+  h.controller.add({ key: 'patients:p1', kind: 'patient', commit: () => { throw new Error('offline') } })
+  await h.fire(1)
+  assert.deepEqual(withoutDeletedRecords(state, h.items()), state)
+})
+
+test('confirmed patient removal removes only its linked records from local state', async () => {
+  let state = patientFixture(); const h = harness()
+  h.controller.add({ key: 'patients:p1', kind: 'patient', commit: () => {
+    state = withoutDeletedRecords(state, [{ key: 'patients:p1' }]); return true
+  } })
+  await h.fire(1)
+  assert.deepEqual(state.patients, [{ id: 'p2' }])
+  assert.deepEqual(state.appointments, [{ id: 'a2', patientId: 'p2' }])
+  assert.deepEqual(state.payments, [])
+  assert.deepEqual(state.toothRecords, [])
+  assert.deepEqual(state.labOrders, [])
 })

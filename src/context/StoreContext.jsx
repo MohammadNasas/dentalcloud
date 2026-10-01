@@ -9,7 +9,7 @@ import { trackDailyActive } from '../lib/analytics'
 import { purgeCloudBackedImageCache } from '../lib/media'
 import { toast } from '../components/anim'
 import { createWriteQueue } from '../lib/writeQueue.js'
-import { createUndoDelete } from '../lib/undoDelete.js'
+import { createUndoDelete, withoutDeletedRecords } from '../lib/undoDelete.js'
 
 const StoreContext = createContext(null)
 
@@ -44,13 +44,7 @@ export function StoreProvider({ children }) {
   const [pendingDeletes, setPendingDeletes] = useState([])
   const undoRef = useRef(null)
   if (!undoRef.current) undoRef.current = createUndoDelete(setPendingDeletes)
-  const state = useMemo(() => {
-    const hidden = new Set(pendingDeletes.map((item) => item.key))
-    return { ...storedState,
-      appointments: storedState.appointments.filter((item) => !hidden.has(`appointments:${item.id}`)),
-      toothRecords: storedState.toothRecords.filter((item) => !hidden.has(`toothRecords:${item.id}`)),
-    }
-  }, [storedState, pendingDeletes])
+  const state = useMemo(() => withoutDeletedRecords(storedState, pendingDeletes), [storedState, pendingDeletes])
   const stateRef = useRef(storedState)
   const setState = useCallback((update) => {
     const next = typeof update === 'function' ? update(stateRef.current) : update
@@ -304,6 +298,7 @@ export function StoreProvider({ children }) {
   // server confirms; failed drafts remain visible with an explicit retry.
   const upsert = useCallback((key, table, obj) => {
     if (undoRef.current.has(`${key}:${obj.id}`)) return Promise.resolve(null)
+    if (obj.patientId && undoRef.current.has(`patients:${obj.patientId}`)) return Promise.resolve(null)
     if (rejectExpiredWrite()) return Promise.resolve(null)
     if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
     const apply = (saved) => setState((s) => {
@@ -315,6 +310,8 @@ export function StoreProvider({ children }) {
   }, [isDemo])
 
   const drop = useCallback((key, table, id, extra) => {
+    const existing = stateRef.current[key].find((item) => item.id === id)
+    if (existing?.patientId && undoRef.current.has(`patients:${existing.patientId}`)) return Promise.resolve(null)
     if (rejectExpiredWrite()) return Promise.resolve(null)
     if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
     return queueRef.current.enqueue(`${table}:${id}`, () => backend.remove(table, id), () => {
@@ -329,7 +326,8 @@ export function StoreProvider({ children }) {
       return Promise.resolve(null)
     }
     const current = stateRef.current
-    if (!current[key].some((item) => item.id === id)) return Promise.resolve(null)
+    const record = current[key].find((item) => item.id === id)
+    if (!record || (record.patientId && undoRef.current.has(`patients:${record.patientId}`))) return Promise.resolve(null)
     const clinicId = current.clinic?.id
     const userId = current.currentUser?.id
     const accepted = undoRef.current.add({ key: `${key}:${id}`, kind,
@@ -338,7 +336,7 @@ export function StoreProvider({ children }) {
         const removed = await backend.remove(table, id)
         if (!removed) return null
         if (stateRef.current.clinic?.id === clinicId && stateRef.current.currentUser?.id === userId)
-          setState((s) => ({ ...s, [key]: s[key].filter((item) => item.id !== id) }))
+          setState((s) => withoutDeletedRecords(s, [{ key: `${key}:${id}` }]))
         return removed
       },
       failed: () => toast('تعذّر تأكيد الحذف. تحقق من الاتصال وحدّث الصفحة. / Could not confirm deletion. Check your connection and refresh.', 'error'),
@@ -362,7 +360,7 @@ export function StoreProvider({ children }) {
   const addPatient = useCallback((data) => {
     const patient = {
       id: data.id || backend.genId(), clinicId: clinic.id,
-      fileNo: data.fileNo || String(1000 + state.patients.length + 1),
+      fileNo: data.fileNo || String(1000 + stateRef.current.patients.length + 1),
       name: data.name || '', nameAr: data.nameAr || data.name || '',
       phone: data.phone || '', gender: data.gender || '', dob: data.dob || '',
       age: data.age || '', occupation: data.occupation || '', address: data.address || '',
@@ -387,13 +385,8 @@ export function StoreProvider({ children }) {
       toast('احفظ التعديلات المعلّقة قبل حذف المريض. / Save pending changes before deleting the patient.')
       return Promise.resolve(null)
     }
-    return drop('patients', 'patients', id, (s) => ({
-      toothRecords: s.toothRecords.filter((t) => t.patientId !== id),
-      appointments: s.appointments.filter((a) => a.patientId !== id),
-      payments: s.payments.filter((p) => p.patientId !== id),
-      labOrders: s.labOrders.filter((p) => p.patientId !== id),
-    }))
-  }, [drop])
+    return scheduleDelete('patients', 'patients', id, 'patient')
+  }, [scheduleDelete])
 
   const addToothRecord = useCallback((data) => {
     const rec = {
