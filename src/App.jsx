@@ -6,6 +6,7 @@ import { useStore } from './context/StoreContext'
 import { useI18n } from './i18n/I18nContext'
 import { Modal, Spinner } from './components/ui'
 import { Confetti, SuccessCheck, ToastHost } from './components/anim'
+import UndoDeleteHost from './components/UndoDeleteHost'
 import logo from './lib/logo'
 import { startPaypalCheckout } from './lib/payments'
 import { hasVerifiedPaidAccess, getPaidThrough } from './lib/entitlement.js'
@@ -195,6 +196,7 @@ export default function App() {
       </Routes>
       {overlay}
       <SaveStatus />
+      <UndoDeleteHost />
       <ToastHost />
     </>
   )

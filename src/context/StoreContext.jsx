@@ -9,6 +9,7 @@ import { trackDailyActive } from '../lib/analytics'
 import { purgeCloudBackedImageCache } from '../lib/media'
 import { toast } from '../components/anim'
 import { createWriteQueue } from '../lib/writeQueue.js'
+import { createUndoDelete } from '../lib/undoDelete.js'
 
 const StoreContext = createContext(null)
 
@@ -39,8 +40,18 @@ export function StoreProvider({ children }) {
   const [saveStatus, setSaveStatus] = useState({ pending: 0, failed: 0 })
   const queueRef = useRef(null)
   if (!queueRef.current) queueRef.current = createWriteQueue(setSaveStatus)
-  const [state, setStateValue] = useState(EMPTY)
-  const stateRef = useRef(state)
+  const [storedState, setStateValue] = useState(EMPTY)
+  const [pendingDeletes, setPendingDeletes] = useState([])
+  const undoRef = useRef(null)
+  if (!undoRef.current) undoRef.current = createUndoDelete(setPendingDeletes)
+  const state = useMemo(() => {
+    const hidden = new Set(pendingDeletes.map((item) => item.key))
+    return { ...storedState,
+      appointments: storedState.appointments.filter((item) => !hidden.has(`appointments:${item.id}`)),
+      toothRecords: storedState.toothRecords.filter((item) => !hidden.has(`toothRecords:${item.id}`)),
+    }
+  }, [storedState, pendingDeletes])
+  const stateRef = useRef(storedState)
   const setState = useCallback((update) => {
     const next = typeof update === 'function' ? update(stateRef.current) : update
     stateRef.current = next
@@ -49,13 +60,15 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     const warn = (event) => {
-      if (!queueRef.current.hasUnsaved()) return
+      if (!queueRef.current.hasUnsaved() && !undoRef.current.hasPending()) return
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [])
+
+  useEffect(() => () => undoRef.current.reset(), [])
 
   // Read-only showcase mode: reached via ?demo=1 → loads in-memory example data
   // and blocks every write so visitors can browse but never change anything.
@@ -273,6 +286,10 @@ export function StoreProvider({ children }) {
   const cancelOtp = useCallback(() => setPendingOtp(null), [])
 
   const logout = useCallback(() => {
+    if (undoRef.current.hasPending()) {
+      toast('انتظر تأكيد الحذف أو اضغط تراجع قبل تسجيل الخروج. / Wait for deletion or undo before signing out.', 'info')
+      return
+    }
     if (queueRef.current.hasUnsaved()) {
       toast('يوجد تعديلات لم تُحفظ. أعد المحاولة قبل تسجيل الخروج. / Please retry unsaved changes before signing out.')
       return
@@ -286,6 +303,7 @@ export function StoreProvider({ children }) {
   // Drafts update immediately for typing. Success is reported only after the
   // server confirms; failed drafts remain visible with an explicit retry.
   const upsert = useCallback((key, table, obj) => {
+    if (undoRef.current.has(`${key}:${obj.id}`)) return Promise.resolve(null)
     if (rejectExpiredWrite()) return Promise.resolve(null)
     if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
     const apply = (saved) => setState((s) => {
@@ -302,6 +320,30 @@ export function StoreProvider({ children }) {
     return queueRef.current.enqueue(`${table}:${id}`, () => backend.remove(table, id), () => {
       setState((s) => ({ ...s, [key]: s[key].filter((x) => x.id !== id), ...(extra ? extra(s) : {}) }))
     })
+  }, [isDemo])
+
+  const scheduleDelete = useCallback((key, table, id, kind) => {
+    if (isDemo || rejectExpiredWrite()) return Promise.resolve(null)
+    if (queueRef.current.hasUnsaved()) {
+      toast('انتظر حفظ التعديلات قبل الحذف. / Save pending changes before deleting.', 'info')
+      return Promise.resolve(null)
+    }
+    const current = stateRef.current
+    if (!current[key].some((item) => item.id === id)) return Promise.resolve(null)
+    const clinicId = current.clinic?.id
+    const userId = current.currentUser?.id
+    const accepted = undoRef.current.add({ key: `${key}:${id}`, kind,
+      commit: async () => {
+        if (stateRef.current.clinic?.id !== clinicId || stateRef.current.currentUser?.id !== userId || rejectExpiredWrite()) return null
+        const removed = await backend.remove(table, id)
+        if (!removed) return null
+        if (stateRef.current.clinic?.id === clinicId && stateRef.current.currentUser?.id === userId)
+          setState((s) => ({ ...s, [key]: s[key].filter((item) => item.id !== id) }))
+        return removed
+      },
+      failed: () => toast('تعذّر تأكيد الحذف. تحقق من الاتصال وحدّث الصفحة. / Could not confirm deletion. Check your connection and refresh.', 'error'),
+    })
+    return Promise.resolve(accepted || null)
   }, [isDemo])
 
   // ── Selectors ─────────────────────────────────────────────────────────────
@@ -341,7 +383,7 @@ export function StoreProvider({ children }) {
   }, [upsert])
 
   const deletePatient = useCallback((id) => {
-    if (queueRef.current.hasUnsaved()) {
+    if (queueRef.current.hasUnsaved() || undoRef.current.hasPending()) {
       toast('احفظ التعديلات المعلّقة قبل حذف المريض. / Save pending changes before deleting the patient.')
       return Promise.resolve(null)
     }
@@ -364,7 +406,7 @@ export function StoreProvider({ children }) {
     const old = stateRef.current.toothRecords.find((t) => t.id === id)
     if (old) return upsert('toothRecords', 'toothRecords', { ...old, ...patch })
   }, [upsert])
-  const deleteToothRecord = useCallback((id) => drop('toothRecords', 'toothRecords', id), [drop])
+  const deleteToothRecord = useCallback((id) => scheduleDelete('toothRecords', 'toothRecords', id, 'treatment'), [scheduleDelete])
 
   const addAppointment = useCallback((data) => {
     const ap = { id: backend.genId(), clinicId: clinic.id, status: 'scheduled', notes: '', step: '', ...data }
@@ -374,7 +416,7 @@ export function StoreProvider({ children }) {
     const old = stateRef.current.appointments.find((a) => a.id === id)
     if (old) return upsert('appointments', 'appointments', { ...old, ...patch })
   }, [upsert])
-  const deleteAppointment = useCallback((id) => drop('appointments', 'appointments', id), [drop])
+  const deleteAppointment = useCallback((id) => scheduleDelete('appointments', 'appointments', id, 'appointment'), [scheduleDelete])
 
   const addPayment = useCallback((data) => {
     const pay = { id: backend.genId(), clinicId: clinic.id, doctorId: data.doctorId || currentUser?.id, date: data.date || new Date().toISOString(), note: '', methods: [], ...data }
@@ -434,6 +476,7 @@ export function StoreProvider({ children }) {
 
   const resetToDemo = useCallback(() => {
     if (backend.mode !== 'local') { logout(); return }
+    undoRef.current.reset()
     resetDB(); seedDB()
     setState(EMPTY)
     setBooting(true)
@@ -443,6 +486,7 @@ export function StoreProvider({ children }) {
   const value = {
     booting, loadError, retryLoad, recovery, mode: backend.mode,
     saveStatus, retrySaves: queueRef.current.retry,
+    pendingDeletes, undoDelete: undoRef.current.undo,
     otpEmail: pendingOtp?.email || null, verifyOtp, resendOtp, cancelOtp,
     paymentResult, dismissPaymentResult,
     clinic, currentUser, tier, can, isOwner, readOnly: isDemo || subscriptionReadOnly, subscriptionReadOnly, demoMode: isDemo,
