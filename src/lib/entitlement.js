@@ -64,6 +64,18 @@ export function hasVerifiedPaidAccess(clinic, now = Date.now()) {
     && timeOf(getPaidThrough(clinic)) > now)
 }
 
+// New Pro accounts must complete activation before entering the workspace.
+// Former subscribers keep read/export access after their entitlement expires.
+// A pending PayPal agreement alone is not a previous entitlement.
+export function requiresInitialSubscription(clinic, now = Date.now()) {
+  if (!clinic || clinic.tier === 'student' || hasVerifiedPaidAccess(clinic, now)) return false
+  if (timeOf(clinic.trialEndsAt) > now) return false
+  const previousEntitlement = [clinic.trialStartedAt, clinic.trialUsedAt,
+    clinic.trialEndsAt, clinic.paidAt, clinic.subscriptionLastPaidAt, clinic.paidThrough]
+    .some((value) => Number.isFinite(timeOf(value)))
+  return !previousEntitlement
+}
+
 export function paidEntitlementPatch(clinic, incomingPayment = null, now = Date.now()) {
   const existing = savedVerifiedPayment(clinic)
   let payment = validPayment(existing, now) && !paymentIsRevoked(clinic, existing) ? existing : null

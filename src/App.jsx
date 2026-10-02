@@ -9,7 +9,7 @@ import { Confetti, SuccessCheck, ToastHost } from './components/anim'
 import UndoDeleteHost from './components/UndoDeleteHost'
 import logo from './lib/logo'
 import { startPaypalCheckout } from './lib/payments'
-import { hasVerifiedPaidAccess, getPaidThrough } from './lib/entitlement.js'
+import { hasVerifiedPaidAccess, getPaidThrough, requiresInitialSubscription } from './lib/entitlement.js'
 import { paymentErrorMessage } from './lib/paymentErrors.js'
 import SaveStatus from './components/SaveStatus'
 import PageLoader from './components/PageLoader'
@@ -172,6 +172,10 @@ export default function App() {
   // Pro access is allowed during the free month or after a verified payment.
   // Merely having an ACTIVE PayPal agreement never counts as paid access.
   const expired = mode === 'cloud' && clinic && !verifiedPaidAccess && !trialActive && clinic.tier !== 'student'
+
+  if (mode === 'cloud' && requiresInitialSubscription(clinic, Math.max(accessClock, Date.now()))) {
+    return <><PageLoader><Paywall /></PageLoader>{overlay}<ToastHost /></>
+  }
 
   return (
     <>
