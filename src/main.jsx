@@ -9,6 +9,8 @@ import { applyReduceMotionOnBoot, useReduceMotion } from './lib/motionPref'
 import './index.css'
 import { isElectron } from './lib/downloads'
 import { legacyWebRoute } from './lib/routing'
+import { shouldShowSiteMigration } from './lib/siteMigration'
+import SiteMoved from './pages/SiteMoved'
 
 // Apply the saved performance-mode choice before the first paint.
 applyReduceMotionOnBoot()
@@ -26,6 +28,7 @@ function Root() {
 
 // The website has shareable paths; packaged file:// pages keep hash routing.
 const desktopRouting = isElectron || location.protocol === 'file:'
+const siteMoved = shouldShowSiteMigration(location, desktopRouting)
 const Router = desktopRouting ? HashRouter : BrowserRouter
 if (!desktopRouting) {
   const legacy = legacyWebRoute(location)
@@ -33,13 +36,13 @@ if (!desktopRouting) {
 }
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <I18nProvider>
+    {siteMoved ? <SiteMoved /> : <I18nProvider>
       <StoreProvider>
         <Router>
           <Root />
         </Router>
       </StoreProvider>
-    </I18nProvider>
+    </I18nProvider>}
   </React.StrictMode>
 )
 
