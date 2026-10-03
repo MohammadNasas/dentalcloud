@@ -294,7 +294,7 @@ export default function Login({ initialTab = 'signin', onBack, onTabChange }) {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t('auth.email')} required>
-                  <input className="input" type="email" dir="ltr" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder={reg.tier === 'student' ? 'name@university.edu' : 'name@clinic.com'} />
+                  <input className="input" type="email" dir="ltr" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder={reg.tier === 'student' ? (lang === 'ar' ? 'بريدك الإلكتروني الجامعي' : 'Your university email') : 'name@clinic.com'} />
                 </Field>
                 <Field label={t('auth.password')} required>
                   <input className="input" type="password" dir="ltr" value={reg.password} onChange={(e) => setReg({ ...reg, password: e.target.value })} />
