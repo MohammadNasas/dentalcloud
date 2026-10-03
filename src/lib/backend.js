@@ -1,4 +1,5 @@
 import { passwordResetRedirect } from './routing'
+import { isStudentEmail } from './studentEmail.js'
 // ──────────────────────────────────────────────────────────────────────────
 //  Backend adapter. One interface, two implementations:
 //   • localBackend   — explicit developer demo only (localStorage).
@@ -167,7 +168,9 @@ async function createClinicForUser(uid, { clinicName, doctorName, email, special
   const clinicObj = { id: clinicId, ...newClinic(clinicName, tier) }
   const doctorObj = { id: uid, clinicId, ...newDoctor(doctorName, email, specialty) }
   let r = await supabase.from('clinics').insert({ id: clinicId, owner_id: uid, data: clinicObj })
-  if (r.error) return { ok: false, error: 'dbError', message: r.error.message }
+  if (r.error) return r.error.message?.includes('student_email_required')
+    ? { ok: false, error: 'studentEmailRequired' }
+    : { ok: false, error: 'dbError', message: r.error.message }
   r = await supabase.from('doctors').insert({ id: uid, clinic_id: clinicId, data: doctorObj })
   if (r.error) return { ok: false, error: 'dbError', message: r.error.message }
   return { ok: true }
@@ -191,6 +194,8 @@ const cloudBackend = {
 
   async signUp(payload) {
     const email = (payload.email || '').trim()
+    if ((payload.tier || 'student') === 'student' && !isStudentEmail(email))
+      return { ok: false, error: 'studentEmailRequired' }
     const { data, error } = await supabase.auth.signUp({ email, password: payload.password })
     if (error) {
       const msg = error.message || ''

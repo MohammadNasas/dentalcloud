@@ -294,7 +294,7 @@ export default function Login({ initialTab = 'signin', onBack, onTabChange }) {
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t('auth.email')} required>
-                  <input className="input" type="email" dir="ltr" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder="name@clinic.com" />
+                  <input className="input" type="email" dir="ltr" value={reg.email} onChange={(e) => setReg({ ...reg, email: e.target.value })} placeholder={reg.tier === 'student' ? 'name@university.edu' : 'name@clinic.com'} />
                 </Field>
                 <Field label={t('auth.password')} required>
                   <input className="input" type="password" dir="ltr" value={reg.password} onChange={(e) => setReg({ ...reg, password: e.target.value })} />
@@ -313,6 +313,7 @@ export default function Login({ initialTab = 'signin', onBack, onTabChange }) {
                   ))}
                 </div>
               </Field>
+              {reg.tier === 'student' && <p className="rounded-xl bg-brand-50 px-3 py-2 text-xs leading-relaxed text-brand-700">{t('auth.studentEmailHint')}</p>}
               <label className="flex items-start gap-2 text-xs text-ink-500">
                 <input type="checkbox" checked={agreedTerms} onChange={(e) => setAgreedTerms(e.target.checked)}
                   className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-ink-300 accent-brand-600" />
