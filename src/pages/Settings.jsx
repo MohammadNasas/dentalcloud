@@ -14,6 +14,7 @@ import { cx, CURRENCIES } from '../lib/utils'
 import { useReduceMotion } from '../lib/motionPref'
 import { useSaveAction } from '../lib/useSaveAction'
 import { backend } from '../lib/backend'
+import { useOnboardingAction } from '../lib/useOnboardingAction'
 
 const SECTIONS = [
   { id: 'clinic', icon: Building2, key: 'clinic' },
@@ -27,6 +28,7 @@ const SECTIONS = [
 export default function Settings() {
   const { t } = useI18n()
   const [section, setSection] = useState('clinic')
+  useOnboardingAction('clinic', () => setSection('clinic'))
 
   return (
     <div className="space-y-5">

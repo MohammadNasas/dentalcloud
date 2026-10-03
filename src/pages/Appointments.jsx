@@ -16,6 +16,7 @@ import PageHero from '../components/PageHero'
 import { Avatar, EmptyState } from '../components/ui'
 import { fmtTime, fmtDateLong, parseISO } from '../lib/dates'
 import { cx } from '../lib/utils'
+import { useOnboardingAction } from '../lib/useOnboardingAction'
 
 export default function Appointments() {
   return (
@@ -34,6 +35,7 @@ function Calendar() {
   const [selectedDay, setSelectedDay] = useState(new Date())
   const [docFilter, setDocFilter] = useState('all')
   const [modal, setModal] = useState(null) // { appt } | { date }
+  useOnboardingAction('appointment', () => setModal({ date: new Date() }))
 
   const Prev = isRTL ? ChevronRight : ChevronLeft
   const Next = isRTL ? ChevronLeft : ChevronRight

@@ -15,6 +15,7 @@ import { Avatar } from './ui'
 import { PingDot, AnimatedBell } from './anim'
 import logo from '../lib/logo'
 import PageLoader from './PageLoader'
+import GettingStarted from './GettingStarted'
 
 const NAV_CONTAINER = {
   hidden: {},
@@ -283,6 +284,8 @@ export default function Layout() {
           </motion.div>
         </main>
       </div>
+
+      <GettingStarted />
 
       {/* Mobile bottom tab bar */}
       <nav

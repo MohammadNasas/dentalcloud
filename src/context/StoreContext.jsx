@@ -10,6 +10,7 @@ import { purgeCloudBackedImageCache } from '../lib/media'
 import { toast } from '../components/anim'
 import { createWriteQueue } from '../lib/writeQueue.js'
 import { createUndoDelete, withoutDeletedRecords } from '../lib/undoDelete.js'
+import { confirmOnboardingSave } from '../lib/onboarding.js'
 
 const StoreContext = createContext(null)
 
@@ -306,7 +307,12 @@ export function StoreProvider({ children }) {
       return { ...s, [key]: exists ? s[key].map((x) => (x.id === saved.id ? saved : x)) : [...s[key], saved] }
     })
     apply(obj)
-    return queueRef.current.enqueue(`${table}:${obj.id}`, () => backend.save(table, obj), apply)
+    const userId = stateRef.current.currentUser?.id
+    return queueRef.current.enqueue(`${table}:${obj.id}`, () => backend.save(table, obj), (saved) => {
+      apply(saved)
+      if (table === 'patients' || table === 'appointments')
+        confirmOnboardingSave(obj.clinicId, userId, table === 'patients' ? 'patient' : 'appointment', saved)
+    })
   }, [isDemo])
 
   const drop = useCallback((key, table, id, extra) => {
@@ -420,9 +426,14 @@ export function StoreProvider({ children }) {
   const updateClinic = useCallback((patch) => {
     if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
     const next = { ...stateRef.current.clinic, ...patch }
+    const userId = stateRef.current.currentUser?.id
     setState((s) => ({ ...s, clinic: next }))
     return queueRef.current.enqueue(`clinics:${next.id}`, () => backend.saveClinic(next),
-      (saved) => setState((s) => ({ ...s, clinic: saved })))
+      (saved) => {
+        setState((s) => ({ ...s, clinic: saved }))
+        if ((patch.name?.trim() || patch.nameAr?.trim()) && patch.settings?.currency)
+          confirmOnboardingSave(next.id, userId, 'clinic', saved)
+      })
   }, [isDemo])
   const setTier = useCallback((newTier) => updateClinic({ tier: newTier }), [updateClinic])
 

@@ -12,6 +12,7 @@ import PatientFilters from '../components/PatientFilters'
 import { money, waLink } from '../lib/utils'
 import { filterPatients } from '../lib/patientFilters'
 import { dayLabel, parseISO } from '../lib/dates'
+import { useOnboardingAction } from '../lib/useOnboardingAction'
 
 export default function Patients() {
   const { t, lang, isRTL } = useI18n()
@@ -20,6 +21,7 @@ export default function Patients() {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')
   const [addOpen, setAddOpen] = useState(false)
+  useOnboardingAction('patient', () => setAddOpen(true))
   const [exporting, setExporting] = useState(false)
   const Chevron = isRTL ? ChevronLeft : ChevronRight
   const currency = clinic?.settings?.currency || 'JOD'
