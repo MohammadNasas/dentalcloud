@@ -27,6 +27,7 @@ import {
 
 // logical table -> local db collection name
 const LOCAL = {
+  expenses: 'expenses',
   patients: 'patients', toothRecords: 'toothRecords', appointments: 'appointments',
   payments: 'payments', suggestions: 'suggestions', doctors: 'users', lab_orders: 'labOrders',
 }
@@ -103,17 +104,20 @@ const localBackend = {
     const db = getOrInitDB()
     const f = (arr) => arr.filter((x) => x.clinicId === clinicId)
     if (!db.labOrders) db.labOrders = []
+    if (!db.expenses) db.expenses = []
     return {
       clinic: db.clinics.find((c) => c.id === clinicId),
       doctors: f(db.users), patients: f(db.patients), toothRecords: f(db.toothRecords),
       appointments: f(db.appointments), payments: f(db.payments), suggestions: f(db.suggestions),
       labOrders: f(db.labOrders),
+      expenses: f(db.expenses),
     }
   },
 
   async save(table, obj) {
     const db = getOrInitDB()
     const col = LOCAL[table]
+    if (table === 'expenses' && !db.expenses) db.expenses = []
     const i = db[col].findIndex((x) => x.id === obj.id)
     if (i >= 0) db[col][i] = obj
     else db[col].push(obj)
@@ -228,13 +232,13 @@ const cloudBackend = {
   async signOut() { await supabase.auth.signOut() },
 
   async bootstrap(clinicId) {
-    const out = { clinic: null, doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [] }
+    const out = { clinic: null, doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [], expenses: [] }
     const cl = await supabase.from('clinics').select('*').eq('id', clinicId).single()
     if (cl.error) throw cl.error
     if (cl.data) out.clinic = { ...cl.data.data, id: cl.data.id }
     const pairs = [['doctors', 'doctors'], ['patients', 'patients'], ['tooth_records', 'toothRecords'],
       ['appointments', 'appointments'], ['payments', 'payments'], ['suggestions', 'suggestions'],
-      ['lab_orders', 'labOrders']]
+      ['lab_orders', 'labOrders'], ['clinic_expenses', 'expenses']]
     for (const [sb, key] of pairs) {
       // Supabase caps result pages. Never present a truncated or failed load
       // as an empty clinic that the doctor can unknowingly overwrite.

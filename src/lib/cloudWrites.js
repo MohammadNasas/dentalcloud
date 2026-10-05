@@ -1,4 +1,5 @@
 const TABLES = {
+  expenses: 'clinic_expenses',
   patients: 'patients', toothRecords: 'tooth_records', appointments: 'appointments',
   payments: 'payments', suggestions: 'suggestions', doctors: 'doctors', lab_orders: 'lab_orders',
 }

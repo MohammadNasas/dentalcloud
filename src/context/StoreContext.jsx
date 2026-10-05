@@ -11,6 +11,7 @@ import { toast } from '../components/anim'
 import { createWriteQueue } from '../lib/writeQueue.js'
 import { createUndoDelete, withoutDeletedRecords } from '../lib/undoDelete.js'
 import { confirmOnboardingSave } from '../lib/onboarding.js'
+import { validExpense } from '../lib/clinicFinances.js'
 
 const StoreContext = createContext(null)
 
@@ -28,7 +29,7 @@ export const FEATURE_MIN_TIER = {
 
 const EMPTY = {
   clinic: null, currentUser: null,
-  doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [],
+  doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [], expenses: [],
 }
 
 export function StoreProvider({ children }) {
@@ -106,6 +107,7 @@ export function StoreProvider({ children }) {
           doctors: data.doctors, patients: data.patients, toothRecords: data.toothRecords,
           appointments: data.appointments, payments: data.payments, suggestions: data.suggestions,
           labOrders: data.labOrders || [],
+          expenses: data.expenses || [],
         })
       } else {
         setState(EMPTY)
@@ -423,6 +425,20 @@ export function StoreProvider({ children }) {
   }, [clinic, currentUser, upsert])
   const deletePayment = useCallback((id) => drop('payments', 'payments', id), [drop])
 
+  const saveExpense = useCallback((data) => {
+    if (!validExpense(data) || !can('clinicBalances')) return Promise.resolve(null)
+    const old = (stateRef.current.expenses || []).find((item) => item.id === data.id)
+    const expense = { ...old, ...data, id: old?.id || data.id || backend.genId(),
+      clinicId: stateRef.current.clinic.id,
+      createdBy: old?.createdBy || stateRef.current.currentUser?.id,
+      createdAt: old?.createdAt || new Date().toISOString() }
+    return upsert('expenses', 'expenses', expense)
+  }, [upsert, can])
+  const deleteExpense = useCallback((id) => {
+    if (!can('clinicBalances')) return Promise.resolve(null)
+    return scheduleDelete('expenses', 'expenses', id, 'expense')
+  }, [scheduleDelete, can])
+
   const updateClinic = useCallback((patch) => {
     if (isDemo) { toast('🔒 وضع العرض فقط — لا يمكن التعديل'); return Promise.resolve(null) }
     const next = { ...stateRef.current.clinic, ...patch }
@@ -498,6 +514,7 @@ export function StoreProvider({ children }) {
     patients: state.patients, doctors: state.doctors, appointments: state.appointments,
     toothRecords: state.toothRecords, payments: state.payments, suggestions: state.suggestions,
     labOrders: state.labOrders,
+    expenses: state.expenses || [], saveExpense, deleteExpense,
     getPatient, getDoctor, recordsForPatient, apptsForPatient, paymentsForPatient, balanceForPatient,
     addPatient, updatePatient, deletePatient,
     addToothRecord, updateToothRecord, deleteToothRecord,

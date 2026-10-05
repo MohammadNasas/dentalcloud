@@ -74,6 +74,7 @@ const NAV = [
   { to: '/instructions', key: 'instructions', icon: FileText },
   { to: '/lab', key: 'lab', icon: FlaskConical, feature: 'lab' },
   { to: '/reports', key: 'reports', icon: BarChart3, feature: 'reports' },
+  { to: '/clinic-finances', key: 'clinicFinances', icon: Wallet, feature: 'clinicBalances' },
   { to: '/download', key: 'download', icon: Download, webOnly: true },
   { to: '/packages', key: 'packages', icon: Package },
   { to: '/settings', key: 'settings', icon: Settings },

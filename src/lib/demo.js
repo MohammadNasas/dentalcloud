@@ -115,5 +115,6 @@ export function buildDemoState() {
     payments,
     labOrders,
     suggestions: [],
+    expenses: [],
   }
 }

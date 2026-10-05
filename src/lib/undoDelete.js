@@ -3,8 +3,9 @@ export function withoutDeletedRecords(state, items) {
   const hidden = new Set(items.map((item) => item.key))
   const patientHidden = (id) => hidden.has(`patients:${id}`)
   const result = { ...state, patients: state.patients.filter((p) => !patientHidden(p.id)) }
-  for (const key of ['appointments', 'toothRecords', 'payments', 'labOrders']) {
-    result[key] = state[key].filter((item) => !patientHidden(item.patientId) && !hidden.has(`${key}:${item.id}`))
+  for (const key of ['appointments', 'toothRecords', 'payments', 'labOrders', 'expenses']) {
+    if (key === 'expenses' && !state.expenses) continue
+    result[key] = (state[key] || []).filter((item) => !patientHidden(item.patientId) && !hidden.has(`${key}:${item.id}`))
   }
   return result
 }

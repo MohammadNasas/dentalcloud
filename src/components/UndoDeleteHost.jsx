@@ -31,6 +31,7 @@ export default function UndoDeleteHost() {
                 <div className="min-w-0 flex-1" role="status" aria-live="polite" aria-atomic="true">
                   <p className="text-sm font-bold text-ink-800">{busy ? (ar ? 'جارٍ تأكيد الحذف…' : 'Confirming deletion…')
                     : item.kind === 'patient' ? (ar ? 'تم حذف ملف المريض' : 'Patient file deleted')
+                    : item.kind === 'expense' ? (ar ? 'تم حذف المصروف' : 'Expense deleted')
                     : item.kind === 'appointment' ? (ar ? 'تم حذف الموعد' : 'Appointment removed') : (ar ? 'تم حذف العلاج' : 'Treatment removed')}</p>
                   <p className="mt-1 text-xs text-ink-500">{busy ? (ar ? 'بانتظار تأكيد الحفظ' : 'Waiting for confirmation') : (ar ? 'يمكنك التراجع خلال 10 ثوانٍ' : 'You can undo within 10 seconds')}</p>
                 </div>

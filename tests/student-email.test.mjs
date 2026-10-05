@@ -29,7 +29,7 @@ test('Student enrolment uses confirmed auth email and cannot be bypassed by API 
   await db.query("update clinics set data = data || '{\"tier\":\"student\"}' where id=$1", [ids.clinicB])
   await db.exec(migration)
   await db.exec(migration)
-  assert.equal(schema.slice(schema.indexOf('-- DentalCloud: confirmed educational email')).trim().replace(/\r\n/g, '\n'), migration.trim().replace(/\r\n/g, '\n'))
+  assert.equal(schema.slice(schema.indexOf('-- DentalCloud: confirmed educational email')).split('-- DentalCloud: independent clinic operating expenses.')[0].trim().replace(/\r\n/g, '\n'), migration.trim().replace(/\r\n/g, '\n'))
 
   for (const [email, expected] of cases) {
     await db.query('update auth.users set email=$1 where id=$2', [email, ids.outsider])

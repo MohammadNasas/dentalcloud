@@ -25,6 +25,7 @@ const PatientProfile = lazy(() => import('./pages/PatientProfile'))
 const Appointments = lazy(() => import('./pages/Appointments'))
 const Payments = lazy(() => import('./pages/Payments'))
 const Reports = lazy(() => import('./pages/Reports'))
+const ClinicFinances = lazy(() => import('./pages/ClinicFinances'))
 const Instructions = lazy(() => import('./pages/Instructions'))
 const Download = lazy(() => import('./pages/Download'))
 const Packages = lazy(() => import('./pages/Packages'))
@@ -189,6 +190,7 @@ export default function App() {
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/payments" element={<Payments />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/clinic-finances" element={<ClinicFinances />} />
           <Route path="/instructions" element={<Instructions />} />
           <Route path="/download" element={<Download />} />
           <Route path="/packages" element={expired ? <Paywall /> : <Packages />} />
