@@ -4,6 +4,7 @@ import { useStore } from '../context/StoreContext'
 import { useI18n } from '../i18n/I18nContext'
 import { Modal, Field } from '../components/ui'
 import FeatureLock from '../components/FeatureLock'
+import TreatmentPricingPlanner from '../components/TreatmentPricingPlanner'
 import { useSaveAction } from '../lib/useSaveAction'
 import { calendarDate } from '../lib/calendarDate'
 import { backend } from '../lib/backend'
@@ -98,6 +99,7 @@ function Finances() {
         <button className="btn-ghost !p-2" disabled={currentPage + 1 === pages} onClick={() => setPage(currentPage + 1)} aria-label={ar ? 'الصفحة التالية' : 'Next page'}><ChevronLeft size={16} /></button>
       </div>}
     </section>
+    <TreatmentPricingPlanner month={month} currency={currency} expenses={summary.rows} />
     {editing && <ExpenseEditor expense={editing} currency={currency} saveExpense={saveExpense}
       onSaved={(date) => { setMonth(date.slice(0, 7)); setPage(0); setEditing(null) }} onClose={() => setEditing(null)} />}
     <Modal open={Boolean(removing)} onClose={() => { if (!deleting) setRemoving(null) }} size="sm"
