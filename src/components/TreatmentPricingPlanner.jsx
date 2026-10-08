@@ -5,7 +5,7 @@ import { useI18n } from '../i18n/I18nContext'
 import { useSaveAction } from '../lib/useSaveAction'
 import { DEFAULT_PRICES } from '../lib/treatments'
 import { EXPENSE_CATEGORIES, financeMoney } from '../lib/clinicFinances'
-import { pricingOverhead, treatmentEstimate, adoptTreatmentPrice } from '../lib/treatmentPricing'
+import { pricingOverhead, treatmentEstimate, adoptTreatmentPrice, initialPricingPlan } from '../lib/treatmentPricing'
 
 export default function TreatmentPricingPlanner({ month, currency, expenses }) {
   const { clinic } = useStore()
@@ -18,9 +18,9 @@ function Planner({ month, currency, expenses }) {
   const ar = lang === 'ar', text = (a, e) => ar ? a : e
   const money = value => financeMoney(value, currency, lang)
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState(() => clinic.settings?.pricingPlans?.[currency]?.[month] || {
-    hours: '', doctorHourly: '', margin: '', excludedIds: [], treatments: {},
-  })
+  const [initial] = useState(() => initialPricingPlan(clinic.settings?.pricingPlans, currency, month))
+  const [draft, setDraft] = useState(initial.plan)
+  const price = value => new Intl.NumberFormat(ar ? 'ar-u-nu-latn' : 'en', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 3 }).format(value)
   const catalog = clinic.prices?.length ? clinic.prices : DEFAULT_PRICES
   const [selected, setSelected] = useState(catalog[0]?.key || '')
   const [message, setMessage] = useState('')
@@ -73,6 +73,7 @@ function Planner({ month, currency, expenses }) {
         <span>{text('مصاريف التشغيل المحتسبة', 'Included overhead')} · {month}</span><strong>{money(overhead)}</strong>
       </div>
       <p className="text-xs leading-6 text-ink-500">{text('اختر شهرًا مكتمل المصاريف من أعلى الصفحة. تُوزّع المصاريف على ساعات علاج المرضى المتوقعة فعليًا، وليس ساعات فتح العيادة. التقدير يتغيّر مع المصاريف المسجّلة.', 'Choose a month with complete expenses above. Overhead is spread over expected patient treatment hours, not clinic opening hours. Estimates change with recorded expenses.')}</p>
+      {initial.sourceMonth && <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-800">{text(`نقلنا إعدادات العلاجات من ${initial.sourceMonth}. راجع ساعات العمل والتكاليف ثم احفظ خطة الشهر؛ المصاريف المحتسبة تخص الشهر المحدد.`, `Treatment settings carried over from ${initial.sourceMonth}. Review hours and costs, then save this month's plan. Overhead uses the selected month's expenses.`)}</p>}
       <div className="grid gap-3 sm:grid-cols-3">
         {input(text('ساعات العلاج المتوقعة بالشهر', 'Expected treatment hours / month'), 'hours', draft.hours, patch, { min: 0.01, max: 10000 })}
         {input(text(`أجر الطبيب بالساعة (${currency})`, `Doctor pay / hour (${currency})`), 'doctorHourly', draft.doctorHourly, patch)}
@@ -102,8 +103,13 @@ function Planner({ month, currency, expenses }) {
         </div>
         <div className="rounded-2xl border border-brand-100 bg-brand-50/50 p-4">
           <div className="flex items-center justify-between gap-2 text-xs text-ink-500"><span>{text('السعر المقترح للعلاج كاملًا', 'Suggested price for full treatment')}</span><span>{text('الحالي: ', 'Current: ')}{money(Number(row?.price || 0))}</span></div>
-          <p className="my-3 text-3xl font-extrabold text-brand-700">{result ? money(result.suggested) : '—'}</p>
+          <p className="my-3 text-3xl font-extrabold text-brand-700">{result ? price(result.suggested) : '—'}</p>
+          <label className="mb-3 flex items-center justify-between gap-2 text-xs text-ink-500">{text('تقريب السعر للأعلى', 'Round price up')}
+            <select className="input !w-auto !py-1.5 text-xs" aria-label={text('تقريب السعر للأعلى', 'Round price up')} disabled={locked} value={draft.rounding} onChange={e => patch({ rounding: e.target.value })}>
+              <option value="1">{text('لأقرب وحدة', 'Next whole unit')}</option><option value="5">{text('لأقرب 5', 'Next 5')}</option><option value="10">{text('لأقرب 10', 'Next 10')}</option><option value="0">{text('بدون تقريب إضافي', 'No extra rounding')}</option>
+            </select></label>
           {result ? <>
+            {result.suggested !== result.precise && <p className="mb-3 text-[11px] text-ink-500">{text('قبل التقريب: ', 'Before rounding: ')}{money(result.precise)}</p>}
             <dl className="space-y-2 text-xs">{[
               [text('حصة مصاريف التشغيل', 'Overhead share'), result.operating],
               [text('أجر الطبيب', 'Doctor pay'), result.doctor],
