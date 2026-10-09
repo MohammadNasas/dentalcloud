@@ -8,6 +8,7 @@ import { useReduceMotion } from '../lib/motionPref'
 import { CalendarPreview, AppShowcase } from '../components/PackagePreviews'
 import { FloatScene, FloatingTooth, HeroPreview, PatientPreview } from '../components/LandingVisuals'
 import LandingFAQ from '../components/LandingFAQ'
+import WelcomeTour from '../components/WelcomeTour'
 import { cx } from '../lib/utils'
 import logo from '../lib/logo'
 import './Landing.css'
@@ -47,6 +48,7 @@ export default function Landing() {
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.4] tracking-tight text-ink-900 sm:text-5xl xl:text-[56px]">{ar?'عيادتك مرتّبة.':'Your clinic, in order.'}<br/><span className="text-brand-600">{ar?'وقتك لمرضاك.':'Your time, for patients.'}</span></h1>
           <p className="mt-5 max-w-md text-base leading-8 text-ink-500 sm:text-lg">{ar?'المرضى، المواعيد والمدفوعات — كل تفاصيل عيادتك في مكان واحد، بالعربي والإنجليزي.':'Patients, appointments and payments — your entire clinic in one place, in Arabic and English.'}</p>
           <div className="mt-7 flex flex-wrap gap-3"><Link to="/register" className="btn-primary !rounded-xl !px-6 !py-3.5">{ar?'ابدأ شهرك المجاني':'Start your free month'}<ArrowRight size={17} className={isRTL?'rotate-180':''}/></Link><button onClick={()=>scrollTo('landing-showcase')} className="btn-outline !rounded-xl !px-6 !py-3.5">{ar?'اكتشف المزايا':'Explore the features'}</button></div>
+          <WelcomeTour/>
           <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-ink-400"><Monitor size={16}/><Smartphone size={14}/><span>{ar?'على الكمبيوتر والموبايل':'On desktop and mobile'}</span><span className="mx-1 h-1 w-1 rounded-full bg-brand-300"/><span>{ar?'باقة الطالب مجانية':'Free Student plan'}</span></div>
         </motion.div>
         <HeroPreview/>

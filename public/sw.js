@@ -21,6 +21,8 @@ self.addEventListener('fetch', (e) => {
   // Only handle our own origin; let Supabase, payment APIs and fonts hit network.
   if (url.origin !== self.location.origin) return
   if (url.pathname.startsWith('/api/')) return
+  // Let the browser handle media byte ranges; a cached full response breaks seeking.
+  if (req.headers.has('range') || /\.(mp4|webm)$/i.test(url.pathname)) return
 
   if (req.mode === 'navigate') {
     e.respondWith((async () => {
