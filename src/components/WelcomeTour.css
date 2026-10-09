@@ -45,4 +45,3 @@ to{opacity:1}
 .tour-video{display:block;width:100%;aspect-ratio:16/9;background:#0b1729}
 .tour-error{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;aspect-ratio:16/9;padding:24px;text-align:center;font-size:14px}
 .tour-error button{color:#83ebcf;text-decoration:underline}
-
