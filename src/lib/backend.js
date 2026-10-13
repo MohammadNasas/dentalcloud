@@ -125,6 +125,16 @@ const localBackend = {
     return obj
   },
 
+  async importPatients(patients) {
+    if (!patients.length || patients.length > 500 || patients.some(p => p.clinicId !== patients[0].clinicId)) throw new Error('invalidBatch')
+    const db = getOrInitDB()
+    const ids = new Set(db.patients.map(p => p.id))
+    const inserted = patients.filter(p => !ids.has(p.id))
+    db.patients.push(...inserted)
+    if (!saveDB(db)) throw new Error('Could not save on this device')
+    return { inserted, skipped: patients.length - inserted.length }
+  },
+
   async remove(table, id) {
     const db = getOrInitDB()
     const col = LOCAL[table]

@@ -233,6 +233,11 @@ function buildPatientSections(patient, ctx, lang, { pageBreakBefore } = {}) {
   // Payments + balance
   const pays = paymentsForPatient(patient.id)
   const bal = balanceForPatient(patient.id)
+  if (patient.importSource) {
+    out.push(kv(lang === 'ar' ? 'السجل السابق المستورد' : 'Imported previous record', patient.importedHistory || '—', lang))
+    out.push(kv(lang === 'ar' ? 'المصدر الأصلي' : 'Original source', patient.importSource.original || '—', lang))
+    out.push(kv(lang === 'ar' ? 'الرصيد السابق' : 'Opening balance', bal.unknown || bal.currencyMismatch ? (lang === 'ar' ? 'يحتاج مراجعة' : 'Needs review') : `${bal.opening} ${currency}`, lang))
+  }
   out.push(sectionTitle(lang === 'ar' ? 'الحساب المالي' : 'Account', lang))
   if (pays.length) {
     const rows = pays.map((p) => [

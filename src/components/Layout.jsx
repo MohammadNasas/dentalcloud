@@ -16,6 +16,7 @@ import { PingDot, AnimatedBell } from './anim'
 import logo from '../lib/logo'
 import PageLoader from './PageLoader'
 import GettingStarted from './GettingStarted'
+import ReleaseNotice from './ReleaseNotice'
 
 const NAV_CONTAINER = {
   hidden: {},
@@ -287,6 +288,7 @@ export default function Layout() {
       </div>
 
       <GettingStarted />
+      <ReleaseNotice />
 
       {/* Mobile bottom tab bar */}
       <nav

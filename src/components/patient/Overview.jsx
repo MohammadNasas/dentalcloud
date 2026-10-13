@@ -8,6 +8,7 @@ import FeatureLock from '../FeatureLock'
 import { Badge } from '../ui'
 import { ProgressRing } from '../anim'
 import { fmtDate } from '../../lib/dates'
+import ImportedRecordsPanel from './ImportedRecordsPanel'
 
 // High-risk systemic flags worth surfacing prominently.
 const RISK_KEYS = ['anticoagulant', 'valve', 'diabetes1', 'diabetes2', 'bisphosphonates', 'hemophilia', 'pacemaker', 'radiotherapy']
@@ -52,6 +53,7 @@ export default function Overview({ patient, onTab }) {
   return (
     <div className="grid gap-5 lg:grid-cols-3">
       <div className="space-y-5 lg:col-span-2">
+        <ImportedRecordsPanel patient={patient} />
         {/* Priority teeth */}
         <div className="card overflow-hidden">
           <div className="flex items-center gap-2 border-b border-ink-100 px-5 py-3.5">

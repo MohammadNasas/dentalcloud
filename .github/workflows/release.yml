@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       # الإصدار = الرقم الأساسي من package.json + رقم الـ CI run (دائماً يزيد)
       - name: Set auto version

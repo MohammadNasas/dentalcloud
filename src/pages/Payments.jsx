@@ -60,6 +60,7 @@ function PaymentsInner() {
           ))}
         </div>
       </PageHero>
+      {balances.some(b => b.unknown || b.currencyMismatch || b.opening) && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{lang === 'ar' ? 'المستحقات تشمل الأرصدة السابقة المعتمدة. الأرصدة غير المحسومة أو بعملة أخرى لا تدخل الإجمالي وتحتاج مراجعة من ملف المريض. الأرصدة السابقة ليست إيرادًا جديدًا.' : 'Dues include confirmed opening balances. Unresolved balances or other currencies are excluded and need review in the patient file. Opening balances are not new revenue.'}</p>}
 
       {can('paymentMethods') && Object.keys(methodTotals).length > 0 && (
         <div className="card p-4">

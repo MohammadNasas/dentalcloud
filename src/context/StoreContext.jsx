@@ -12,6 +12,7 @@ import { createWriteQueue } from '../lib/writeQueue.js'
 import { createUndoDelete, withoutDeletedRecords } from '../lib/undoDelete.js'
 import { confirmOnboardingSave } from '../lib/onboarding.js'
 import { validExpense } from '../lib/clinicFinances.js'
+import { prepareImport, patientBalance } from '../lib/patientImport.js'
 
 const StoreContext = createContext(null)
 
@@ -41,6 +42,7 @@ export function StoreProvider({ children }) {
   const [loadError, setLoadError] = useState(false)
   const [saveStatus, setSaveStatus] = useState({ pending: 0, failed: 0 })
   const queueRef = useRef(null)
+  const importPendingRef = useRef(false)
   if (!queueRef.current) queueRef.current = createWriteQueue(setSaveStatus)
   const [storedState, setStateValue] = useState(EMPTY)
   const [pendingDeletes, setPendingDeletes] = useState([])
@@ -56,7 +58,7 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     const warn = (event) => {
-      if (!queueRef.current.hasUnsaved() && !undoRef.current.hasPending()) return
+      if (!queueRef.current.hasUnsaved() && !undoRef.current.hasPending() && !importPendingRef.current) return
       event.preventDefault()
       event.returnValue = ''
     }
@@ -283,6 +285,7 @@ export function StoreProvider({ children }) {
   const cancelOtp = useCallback(() => setPendingOtp(null), [])
 
   const logout = useCallback(() => {
+    if (importPendingRef.current) { toast('انتظر تأكيد الاستيراد. / Wait for the import to finish.'); return }
     if (undoRef.current.hasPending()) {
       toast('انتظر تأكيد الحذف أو اضغط تراجع قبل تسجيل الخروج. / Wait for deletion or undo before signing out.', 'info')
       return
@@ -359,10 +362,35 @@ export function StoreProvider({ children }) {
   const apptsForPatient = useCallback((pid) => state.appointments.filter((a) => a.patientId === pid), [state.appointments])
   const paymentsForPatient = useCallback((pid) => state.payments.filter((p) => p.patientId === pid), [state.payments])
   const balanceForPatient = useCallback((pid) => {
-    const fees = recordsForPatient(pid).reduce((s, r) => s + (Number(r.price) || 0), 0)
-    const paid = paymentsForPatient(pid).reduce((s, p) => s + (Number(p.amount) || 0), 0)
-    return { fees, paid, debt: Math.max(0, fees - paid), raw: fees - paid }
-  }, [recordsForPatient, paymentsForPatient])
+    return patientBalance(getPatient(pid), recordsForPatient(pid), paymentsForPatient(pid), clinic?.settings?.currency || 'JOD')
+  }, [getPatient, recordsForPatient, paymentsForPatient, clinic])
+
+  const importPatients = useCallback(async (rows, options) => {
+    if (isDemo || rejectExpiredWrite() || importPendingRef.current || queueRef.current.hasUnsaved() || undoRef.current.hasPending()) throw new Error('saveFailed')
+    const current = stateRef.current, clinicId = current.clinic?.id, userId = current.currentUser?.id
+    if (!clinicId || !userId) throw new Error('saveFailed')
+    importPendingRef.current = true
+    try {
+      const batch = await prepareImport(rows, { ...options, clinicId, userId, existing: current.patients,
+        currency: current.clinic.settings?.currency || 'JOD', allowBalances: can('clinicBalances') })
+      if (JSON.stringify(batch).length > 2 * 1024 * 1024) throw new Error('expandedLimit')
+      if (stateRef.current.clinic?.id !== clinicId || stateRef.current.currentUser?.id !== userId) throw new Error('saveFailed')
+      const result = await backend.importPatients(batch)
+      if (stateRef.current.clinic?.id === clinicId && stateRef.current.currentUser?.id === userId) {
+        setState(s => ({ ...s, patients: [...s.patients, ...result.inserted.filter(p => !s.patients.some(old => old.id === p.id))] }))
+        if (result.skipped) {
+          // The INSERT is already committed. A failed refresh must not report
+          // the completed import as failed or encourage repeated mutations.
+          try {
+            const refreshed = await backend.bootstrap(clinicId)
+            if (stateRef.current.clinic?.id === clinicId && stateRef.current.currentUser?.id === userId)
+              setState(s => ({ ...s, patients: refreshed.patients }))
+          } catch { result.needsRefresh = true }
+        }
+      }
+      return result
+    } finally { importPendingRef.current = false }
+  }, [isDemo, can])
 
   // ── Mutations (draft state + confirmed result) ───────────────────────────
   const addPatient = useCallback((data) => {
@@ -516,7 +544,7 @@ export function StoreProvider({ children }) {
     labOrders: state.labOrders,
     expenses: state.expenses || [], saveExpense, deleteExpense,
     getPatient, getDoctor, recordsForPatient, apptsForPatient, paymentsForPatient, balanceForPatient,
-    addPatient, updatePatient, deletePatient,
+    addPatient, updatePatient, deletePatient, importPatients,
     addToothRecord, updateToothRecord, deleteToothRecord,
     addAppointment, updateAppointment, deleteAppointment,
     addPayment, deletePayment,

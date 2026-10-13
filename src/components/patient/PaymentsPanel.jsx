@@ -18,6 +18,10 @@ export default function PaymentsPanel({ patient }) {
 
   return (
     <div className="space-y-4">
+      {patient.importSource && <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{bal.unknown || bal.currencyMismatch
+        ? (lang === 'ar' ? 'الرصيد السابق يحتاج مراجعة من صفحة نظرة عامة. الأرقام أدناه للبيانات المؤكدة فقط.' : 'Review the previous balance in Overview. Figures below include confirmed data only.')
+        : (lang === 'ar' ? `يشمل المتبقي رصيدًا سابقًا قدره ${money(bal.opening,currency)}، وهو ليس دفعة أو إيرادًا جديدًا.` : `Outstanding balance includes ${money(bal.opening,currency)} brought forward, not a new payment or revenue.`)}</div>}
+      {bal.raw < 0 && <p className="text-sm text-brand-700">{lang === 'ar' ? 'رصيد لصالح المريض: ' : 'Patient credit: '}{money(-bal.raw,currency)}</p>}
       <div className="grid grid-cols-3 gap-3">
         <div className="card p-4 text-center">
           <p className="text-xs font-semibold text-ink-400">{t('pay.fees')}</p>

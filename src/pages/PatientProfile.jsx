@@ -137,7 +137,7 @@ export default function PatientProfile() {
             <div className="bg-white px-5 py-3">
               <p className="text-xs font-semibold text-ink-400">{t('patient.balance')}</p>
               <p className={`mt-0.5 font-bold ${bal.debt > 0 ? 'text-rose-500' : 'text-emerald-600'}`}>
-                {bal.debt > 0 ? money(bal.debt, currency) : t('pay.settled')}
+                {bal.unknown || bal.currencyMismatch ? (lang === 'ar' ? 'الرصيد السابق يحتاج مراجعة' : 'Review previous balance') : bal.debt > 0 ? money(bal.debt, currency) : bal.raw < 0 ? `${lang === 'ar' ? 'رصيد لصالحه' : 'Credit'} ${money(-bal.raw, currency)}` : t('pay.settled')}
               </p>
             </div>
           )}
