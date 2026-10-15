@@ -32,7 +32,7 @@ test('public crawl files contain only public destinations and correct MIME file 
   assert.doesNotMatch(robots,/Disallow: \/(?:patients|assets)/)
 })
 test('private route responses carry noindex without blocking public home',()=>{
-  const headers=fs.readFileSync(new URL('../public/_headers',import.meta.url),'utf8')
+  const headers=fs.readFileSync(new URL('../public/_headers',import.meta.url),'utf8').replace(/\r\n/g,'\n')
   for(const path of ['/login','/patients','/patients/*','/payments','/settings']) assert.ok(headers.includes(`${path}\n  X-Robots-Tag: noindex, follow`))
   assert.doesNotMatch(headers,/^\/\*?\s*$/m)
 })
