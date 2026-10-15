@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Globe, ArrowRight, Check, CalendarDays, Wallet, Sparkles, Crown, GraduationCap, Users, Monitor, Smartphone, Activity, FileText, Images, Languages } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
@@ -15,8 +15,11 @@ import './Landing.css'
 
 const TIER_ICON = { student: GraduationCap, pro: Crown }
 export default function Landing() {
-  const { t, lang, L, toggleLang, isRTL } = useI18n()
+  const { t, lang, L, setLang, isRTL } = useI18n()
   const ar = lang === 'ar'
+  const navigate = useNavigate()
+  const otherLanguagePath = ar ? '/en/' : '/'
+  const switchLanguage = () => { setLang(ar ? 'en' : 'ar'); navigate(otherLanguagePath) }
   const reduced = useReducedMotion()
   const [performance] = useReduceMotion()
   const still = reduced || performance
@@ -35,7 +38,7 @@ export default function Landing() {
           {[["landing-features",ar?'المزايا':'Features'],["landing-showcase",ar?'استكشف النظام':'Explore'],["landing-pricing",ar?'الباقات':'Plans']].map(([id,label])=><button key={id} onClick={()=>scrollTo(id)} className="hover:text-brand-600">{label}</button>)}
         </nav>
         <div className="ms-auto flex items-center gap-1 sm:gap-2">
-          <button onClick={toggleLang} aria-label={ar ? 'Switch to English' : 'التبديل إلى العربية'} className="btn-ghost !px-2 !py-2"><Globe size={15}/><span className="text-xs">{ar ? 'EN' : 'ع'}</span></button>
+          <Link to={otherLanguagePath} hrefLang={ar ? 'en' : 'ar'} onClick={() => setLang(ar ? 'en' : 'ar')} aria-label={ar ? 'Switch to English' : 'التبديل إلى العربية'} className="btn-ghost !px-2 !py-2"><Globe size={15}/><span className="text-xs">{ar ? 'EN' : 'ع'}</span></Link>
           <Link to="/login" className="btn-ghost !px-2 !py-2 text-xs">{t('auth.signIn')}</Link>
           <Link to="/register" className="btn-primary hidden !py-2 text-xs sm:inline-flex">{ar?'ابدأ الآن':'Get started'}</Link>
         </div>
@@ -46,9 +49,9 @@ export default function Landing() {
         <motion.div {...reveal} className="relative z-10">
           <span className="chip bg-brand-100/60 text-brand-700"><Sparkles size={13}/>{ar?'لعيادة أكثر تنظيماً':'A more organised clinic'}</span>
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.4] tracking-tight text-ink-900 sm:text-5xl xl:text-[56px]">{ar?'عيادتك مرتّبة.':'Your clinic, in order.'}<br/><span className="text-brand-600">{ar?'وقتك لمرضاك.':'Your time, for patients.'}</span></h1>
-          <p className="mt-5 max-w-md text-base leading-8 text-ink-500 sm:text-lg">{ar?'DentalCloud برنامج لإدارة عيادات الأسنان: المرضى، المواعيد والمدفوعات في مكان واحد، بالعربي والإنجليزي.':'Patients, appointments and payments — your entire clinic in one place, in Arabic and English.'}</p>
+          <p className="mt-5 max-w-md text-base leading-8 text-ink-500 sm:text-lg">{ar?'دينتال كلاود (DentalCloud) برنامج لإدارة عيادات الأسنان: المرضى، المواعيد والمدفوعات في مكان واحد، بالعربي والإنجليزي.':'DentalCloud dental clinic management software brings patients, appointments and payments together, in Arabic and English.'}</p>
           <div className="mt-7 flex flex-wrap gap-3"><Link to="/register" className="btn-primary !rounded-xl !px-6 !py-3.5">{ar?'ابدأ شهرك المجاني':'Start your free month'}<ArrowRight size={17} className={isRTL?'rotate-180':''}/></Link><button onClick={()=>scrollTo('landing-showcase')} className="btn-outline !rounded-xl !px-6 !py-3.5">{ar?'اكتشف المزايا':'Explore the features'}</button></div>
-          <WelcomeTour/>
+          <WelcomeTour onLanguageChange={switchLanguage}/>
           <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-ink-400"><Monitor size={16}/><Smartphone size={14}/><span>{ar?'على الكمبيوتر والموبايل':'On desktop and mobile'}</span><span className="mx-1 h-1 w-1 rounded-full bg-brand-300"/><span>{ar?'باقة الطالب مجانية':'Free Student plan'}</span></div>
         </motion.div>
         <HeroPreview/>

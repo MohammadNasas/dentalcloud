@@ -1,6 +1,12 @@
-import { defineConfig } from 'vite'
+import { defineConfig, normalizePath } from 'vite'
 import react from '@vitejs/plugin-react'
 import obfuscator from 'vite-plugin-javascript-obfuscator'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { localizedLandingHtml } from './scripts/localized-landing.mjs'
+
+const landingEntry = fileURLToPath(new URL('./index.html', import.meta.url))
+const englishEntry = fileURLToPath(new URL('./en/index.html', import.meta.url))
 
 // Heavy obfuscation is reserved for the Electron desktop build (`vite build --mode
 // electron`), where startup cost is irrelevant and we want maximum source
@@ -50,6 +56,17 @@ const LIGHT = {
 export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
+    ...(mode === 'electron' ? [] : [{
+      name: 'localized-landing',
+      transformIndexHtml: {
+        order: 'pre',
+        handler(html, context) {
+          if (normalizePath(context.filename) === normalizePath(englishEntry)) return localizedLandingHtml(readFileSync(landingEntry, 'utf8'), 'en')
+          if (normalizePath(context.filename) === normalizePath(landingEntry)) return localizedLandingHtml(html, 'ar')
+          return html
+        },
+      },
+    }]),
     // Obfuscates our own source (everything under src/) in the production build.
     // Scoped to src/ only so third-party libraries (React, etc.) stay untouched and
     // startup stays fast. Dev mode is unaffected (apply:build).
@@ -62,6 +79,7 @@ export default defineConfig(({ mode }) => ({
     }),
   ],
   base: mode === 'electron' ? './' : '/', // deep web links need origin-relative assets
+  build: { rollupOptions: { input: mode === 'electron' ? landingEntry : { main: landingEntry, english: englishEntry } } },
   server: {
     host: true, // expose on LAN so the app opens from any device on the same network
     port: 5173,

@@ -18,6 +18,12 @@ export default function PageMetadata() {
     }
     set('name','description',meta.description); set('name','robots',meta.robots)
     set('property','og:title',meta.title); set('property','og:description',meta.description)
+    document.head.querySelectorAll('link[rel="alternate"][hreflang]').forEach(node => node.remove())
+    for (const [language, href] of Object.entries(meta.alternates)) {
+      const link = document.createElement('link')
+      link.rel = 'alternate'; link.hreflang = language; link.href = href
+      document.head.appendChild(link)
+    }
     let canonical = document.head.querySelector('link[rel="canonical"]')
     if (meta.canonical) {
       if (!canonical) { canonical = document.createElement('link'); canonical.rel='canonical'; document.head.appendChild(canonical) }
