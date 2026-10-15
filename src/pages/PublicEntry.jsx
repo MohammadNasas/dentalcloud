@@ -22,10 +22,6 @@ export default function PublicEntry() {
 
   useEffect(() => {
     if (desktop) return
-    const title = path === '/' ? (lang === 'ar' ? 'إدارة عيادات الأسنان' : 'Dental clinic management')
-      : register ? (lang === 'ar' ? 'إنشاء حساب' : 'Create an account')
-        : (lang === 'ar' ? 'تسجيل الدخول' : 'Sign in')
-    document.title = `${title} — DentalCloud`
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [path, lang, desktop, register])
 

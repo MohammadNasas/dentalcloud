@@ -11,6 +11,7 @@ import { isElectron } from './lib/downloads'
 import { legacyWebRoute } from './lib/routing'
 import { shouldShowSiteMigration } from './lib/siteMigration'
 import SiteMoved from './pages/SiteMoved'
+import PageMetadata from './components/PageMetadata'
 
 // Apply the saved performance-mode choice before the first paint.
 applyReduceMotionOnBoot()
@@ -21,6 +22,7 @@ function Root() {
   const [reduce] = useReduceMotion()
   return (
     <MotionConfig reducedMotion={reduce ? 'always' : 'never'}>
+      <PageMetadata />
       <App />
     </MotionConfig>
   )
