@@ -59,6 +59,24 @@ test('subscription enforcement against real PostgreSQL RLS and triggers', async 
       await denied(insert('appointments'))
     }
   })
+  await t.test('monthly SQL access requires matching trusted plan and caps expiry to one month', async () => {
+    const monthly = {tier:'pro',paid:true,subscriptionProvider:'paypal',subscriptionPaymentVerified:true,
+      subscriptionVerifiedPlan:'pro_monthly',subscriptionVerifiedAmount:7,subscriptionVerifiedCurrency:'USD',
+      subscriptionLastPaidAt:new Date().toISOString()}
+    await state(monthly)
+    assert.equal(await level(),1)
+    await insert('appointments')
+    for (const patch of [{subscriptionVerifiedPlan:null},{subscriptionVerifiedPlan:'pro'},
+      {subscriptionVerifiedAmount:50},{subscriptionVerifiedCurrency:'EUR'},
+      {subscriptionLastPaidAt:new Date(Date.now()-40*86400000).toISOString(),paidThrough:'2099-01-01'}]) {
+      await state({...monthly,...patch})
+      assert.equal(await level(),-1,JSON.stringify(patch))
+      await denied(insert('appointments'))
+    }
+    await state({tier:'pro',paid:false})
+    await db.query("update public.clinics set data=data || $1::jsonb where id=$2",[JSON.stringify(monthly),ids.clinicB])
+    assert.equal(await level(),-1)
+  })
   await t.test('blocked update/delete preserve existing paid records and old metadata', async () => {
     await state({tier:'student',paid:false})
     await db.query("insert into storage.objects values(gen_random_uuid(),'patient-images',$1) on conflict(bucket_id,name) do update set name=excluded.name",[ids.clinicB+'/'+ids.patientB+'/xray.jpg'])

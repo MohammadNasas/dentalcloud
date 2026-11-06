@@ -1,9 +1,10 @@
+import { trialLabel, preferredPlan } from '../lib/subscriptionPlans.js'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Stethoscope, Check, ArrowRight, LogOut, GraduationCap, Crown, Lock, Landmark, Wallet } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { TIERS, tierPeriodLabel } from '../lib/db'
+import { BILLING_PLANS as TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { startPaypalCheckout, paymentsEnabled } from '../lib/payments'
 import { paymentErrorMessage } from '../lib/paymentErrors.js'
@@ -15,16 +16,16 @@ import PaymentHelp from '../components/PaymentHelp'
 import logo from '../lib/logo'
 import { useSaveAction } from '../lib/useSaveAction'
 
-const ICONS = { student: GraduationCap, pro: Crown }
+const ICONS = { student: GraduationCap, pro: Crown, pro_monthly: Crown }
 
 // Shown to a cloud account that hasn't paid yet — they must pay to enter the app.
 export default function Paywall() {
   const { t, lang, L, isRTL, toggleLang } = useI18n()
   const { clinic, currentUser, logout, setTier } = useStore()
-  const [selected, setSelected] = useState(clinic?.tier === 'student' ? 'student' : 'pro')
+  const [selected, setSelected] = useState(preferredPlan(clinic, currentUser))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [paidOnly, setPaidOnly] = useState(false)
+  const [paidOnly, setPaidOnly] = useState(Boolean(clinic?.trialUsedAt || clinic?.trialStartedAt || clinic?.paypalSubscriptionId))
   const [payMethod, setPayMethod] = useState('paypal')
   const { saving, runSave } = useSaveAction()
   async function pay() {
@@ -74,12 +75,12 @@ export default function Paywall() {
           <p className="mt-1 text-white/80">{t('packages.activateSub')}</p>
         </div>
 
-        <div className="mx-auto mt-7 grid max-w-2xl gap-4 sm:grid-cols-2">
+        <div className="mx-auto mt-7 grid max-w-4xl gap-4 md:grid-cols-3">
           {Object.values(TIERS).map((ti) => {
             const Icon = ICONS[ti.id]; const accent = PACKAGE_FEATURES[ti.id].accent
             const active = selected === ti.id
             return (
-              <button key={ti.id} onClick={() => { setSelected(ti.id); setPaidOnly(false); setError('') }}
+              <button key={ti.id} onClick={() => { setSelected(ti.id); setPaidOnly(Boolean(clinic?.trialUsedAt || clinic?.trialStartedAt || clinic?.paypalSubscriptionId)); setError('') }}
                 className={cx('card relative p-5 text-start transition-all', active ? 'ring-2 ring-white scale-[1.02]' : 'opacity-90 hover:opacity-100')}>
                 {active && <span className="absolute top-3 flex h-6 w-6 items-center justify-center rounded-full bg-brand-600 text-white end-3"><Check size={14} /></span>}
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white" style={{ background: accent }}><Icon size={22} /></div>
@@ -91,7 +92,7 @@ export default function Paywall() {
                     </>
                   )}
                 </p>
-                {ti.price > 0 && <p className={cx('mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-extrabold', paidOnly && active ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')}>{paidOnly && active ? t('packages.noTrialBadge') : t('packages.freeTrialBadge')}</p>}
+                {ti.price > 0 && <p className={cx('mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-extrabold', paidOnly && active ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')}>{paidOnly && active ? t('packages.noTrialBadge') : trialLabel(ti, t)}</p>}
               </button>
             )
           })}
@@ -123,14 +124,14 @@ export default function Paywall() {
               </div>
 
               {payMethod === 'bank' ? (
-                <BankTransferPanel amount={tier.price} planLabel={L(tier)} />
+                <BankTransferPanel amount={tier.price} planLabel={`${L(tier)} · ${tierPeriodLabel(tier, t)}`} />
               ) : (
                 <div className="mt-6 flex flex-col items-center gap-3">
                   <p className="w-full rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-amber-900 shadow-sm">
-                    {t('packages.paypalNoAccountNote')}
+                    {t('packages.paypalNoAccountNote')}<br />{paidOnly ? t('packages.chargeNow') : trialLabel(tier, t)} · ${tier.price} {tierPeriodLabel(tier, t)}
                   </p>
                   <button onClick={pay} disabled={busy} className="btn bg-white !px-8 !py-3.5 text-base font-extrabold text-brand-700 hover:bg-white/90">
-                    {busy ? <Spinner /> : <>{paidOnly ? t('packages.continuePaid') : `${t('packages.startTrial')} — ${t('packages.trialToday')}`} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} /></>}
+                    {busy ? <Spinner /> : <>{paidOnly ? `${t('packages.continuePaid')} — $${tier.price}` : `${t('packages.startTrial')} — ${t('packages.trialToday')}`} <ArrowRight size={18} className={isRTL ? 'rotate-180' : ''} /></>}
                   </button>
                   <p className="text-xs text-white/70">🔒 {t('packages.securePay')}</p>
                 </div>

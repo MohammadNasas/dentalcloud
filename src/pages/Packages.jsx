@@ -1,9 +1,11 @@
+import { hasVerifiedPaidAccess } from '../lib/entitlement.js'
+import { trialLabel } from '../lib/subscriptionPlans.js'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Sparkles, Crown, GraduationCap, ArrowRight, Star, Landmark, Wallet } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { TIERS, tierPeriodLabel } from '../lib/db'
+import { BILLING_PLANS as TIERS, tierPeriodLabel } from '../lib/db'
 import { PACKAGE_FEATURES, fullFeatures } from '../lib/packages'
 import { Modal, Spinner } from '../components/ui'
 import { cx } from '../lib/utils'
@@ -15,11 +17,10 @@ import BankTransferPanel from '../components/BankTransferPanel'
 import PaymentHelp from '../components/PaymentHelp'
 import { useSaveAction } from '../lib/useSaveAction'
 
-const ICONS = { student: GraduationCap, pro: Crown }
+const ICONS = { student: GraduationCap, pro: Crown, pro_monthly: Crown }
 
 // Tier ranking (student < pro) so we can block downgrades.
-const TIER_ORDER = Object.keys(TIERS)
-const tierRank = (id) => TIER_ORDER.indexOf(id)
+const tierRank = (id) => id === 'student' ? 0 : 1
 
 export default function Packages() {
   const { t, lang, L, isRTL } = useI18n()
@@ -29,10 +30,10 @@ export default function Packages() {
   const [expanded, setExpanded] = useState({})
   const [processing, setProcessing] = useState(false)
   const [payError, setPayError] = useState('')
-  const [paidOnly, setPaidOnly] = useState(false)
+  const [paidOnly, setPaidOnly] = useState(Boolean(clinic?.trialUsedAt || clinic?.trialStartedAt || clinic?.paypalSubscriptionId))
   const [payMethod, setPayMethod] = useState('paypal')
   const { saving, runSave } = useSaveAction()
-  const current = clinic?.tier
+  const current = clinic?.tier === 'student' ? 'student' : (clinic?.subscriptionPlan || 'pro')
 
   function confirmBuy() { return runSave(async () => {
     setPayError('')
@@ -40,7 +41,7 @@ export default function Packages() {
     if (current && tierRank(buying) < tierRank(current)) { setBuying(null); return }
     // The Student plan is free — activate it instantly, no payment.
     if (TIERS[buying].price === 0) {
-      if (!await setTier(buying)) return
+      if (!await setTier(buying === 'pro_monthly' ? 'pro' : buying)) return
       setActivated(true)
       setTimeout(() => { setBuying(null); setActivated(false) }, 1600)
       return
@@ -61,7 +62,7 @@ export default function Packages() {
       return
     }
     // Local/demo mode → activate instantly (no real billing).
-    if (!await setTier(buying)) return
+    if (!await setTier(buying === 'pro_monthly' ? 'pro' : buying)) return
     setActivated(true)
     setTimeout(() => { setBuying(null); setActivated(false) }, 1600)
   }) }
@@ -87,11 +88,11 @@ export default function Packages() {
       </div>
 
       {/* Pricing cards */}
-      <div className="mx-auto grid max-w-4xl gap-5 md:grid-cols-2">
+      <div className="mx-auto grid max-w-6xl gap-5 md:grid-cols-3">
         {Object.values(TIERS).map((tier, idx) => {
           const Icon = ICONS[tier.id]
           const accent = PACKAGE_FEATURES[tier.id].accent
-          const isCurrent = current === tier.id
+          const isCurrent = current === tier.id && (tier.id === 'student' || hasVerifiedPaidAccess(clinic) || Date.parse(clinic?.trialEndsAt) > Date.now())
           const isDowngrade = current && tierRank(tier.id) < tierRank(current)
           const popular = tier.id === 'pro'
           const features = fullFeatures(tier.id)
@@ -115,7 +116,7 @@ export default function Packages() {
                 </div>
                 <div>
                   <h3 className="text-lg font-extrabold text-ink-800">{L(tier)}</h3>
-                  <p className="text-xs font-semibold text-ink-400">{t(`tier.${tier.id}Tag`)}</p>
+                  <p className="text-xs font-semibold text-ink-400">{t(`tier.${tier.id === 'pro_monthly' ? 'pro' : tier.id}Tag`)}</p>
                 </div>
               </div>
 
@@ -131,10 +132,10 @@ export default function Packages() {
               </div>
               {tier.price > 0 && (
                 <p className="mt-1 inline-flex w-fit rounded-full bg-brand-50 px-2 py-0.5 text-xs font-extrabold text-brand-700">
-                  {t('packages.freeTrialBadge')}
+                  {trialLabel(tier, t)}
                 </p>
               )}
-              <p className="mt-2 text-sm text-ink-500">{t(`packages.${tier.id}Desc`)}</p>
+              <p className="mt-2 text-sm text-ink-500">{t(`packages.${tier.id === 'pro_monthly' ? 'pro' : tier.id}Desc`)}</p>
 
               <div className="my-5 h-px bg-ink-100" />
 
@@ -152,7 +153,7 @@ export default function Packages() {
                         <Check size={16} className="mt-0.5 shrink-0" /> {t('packages.everythingIn')} «{L(TIERS[inheritsId])}»
                       </li>
                     )}
-                    {own.map((f, i) => (
+                    {own.slice(0, 5).map((f, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm text-ink-600">
                         <Check size={16} className="mt-0.5 shrink-0" style={{ color: accent }} /><span>{L(f)}</span>
                       </li>
@@ -176,7 +177,7 @@ export default function Packages() {
                   <Check size={16} /> {t('packages.includedInPlan')}
                 </button>
               ) : (
-                <button onClick={() => { setBuying(tier.id); setPaidOnly(false); setPayError('') }} className="btn w-full text-white" style={{ background: accent }}>
+                <button onClick={() => { setBuying(tier.id); setPaidOnly(Boolean(clinic?.trialUsedAt || clinic?.trialStartedAt || clinic?.paypalSubscriptionId)); setPayError('') }} className="btn w-full text-white" style={{ background: accent }}>
                   {t('packages.buyNow')} <ArrowRight size={16} className={isRTL ? 'rotate-180' : ''} />
                 </button>
               )}
@@ -187,7 +188,7 @@ export default function Packages() {
 
       {/* Purchase modal */}
       {buying && (
-        <Modal open onClose={() => { setActivated(false); setBuying(null); setPayError(''); setPaidOnly(false); setProcessing(false) }} size="lg"
+        <Modal open onClose={() => { setActivated(false); setBuying(null); setPayError(''); setPaidOnly(Boolean(clinic?.trialUsedAt || clinic?.trialStartedAt || clinic?.paypalSubscriptionId)); setProcessing(false) }} size="lg"
           title={`${t('packages.whatYouGet')} — ${L(TIERS[buying])}`}
           icon={<Sparkles size={18} style={{ color: PACKAGE_FEATURES[buying].accent }} />}
         >
@@ -229,12 +230,12 @@ export default function Packages() {
               )}
 
               {paymentsEnabled && TIERS[buying].price > 0 && payMethod === 'bank' ? (
-                <BankTransferPanel amount={TIERS[buying].price} planLabel={L(TIERS[buying])} />
+                <BankTransferPanel amount={TIERS[buying].price} planLabel={`${L(TIERS[buying])} · ${tierPeriodLabel(TIERS[buying], t)}`} />
               ) : (
                 <>
                   {paymentsEnabled && TIERS[buying].price > 0 && payMethod === 'paypal' && (
                     <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-center text-sm font-extrabold leading-relaxed text-amber-900">
-                      {t('packages.paypalNoAccountNote')}
+                      {t('packages.paypalNoAccountNote')}<br />{paidOnly ? t('packages.chargeNow') : trialLabel(TIERS[buying], t)} · ${TIERS[buying].price} {tierPeriodLabel(TIERS[buying], t)}
                     </p>
                   )}
                   <div className="mt-5 flex items-center justify-between rounded-xl bg-ink-50 p-4">
@@ -243,7 +244,7 @@ export default function Packages() {
                       <p className="text-2xl font-extrabold text-ink-800">
                         {TIERS[buying].price === 0 ? t('packages.free') : paymentsEnabled && payMethod === 'paypal' ? (
                           <>
-                            <span dir="ltr">{paidOnly ? t('packages.payNowAmount') : t('packages.trialToday')}</span>
+                            <span dir="ltr">{paidOnly ? `$${TIERS[buying].price} ${t('packages.chargeNow')}` : t('packages.trialToday')}</span>
                             {!paidOnly && <span className="text-sm font-normal text-ink-400"> · ${TIERS[buying].price} {tierPeriodLabel(TIERS[buying], t)}</span>}
                           </>
                         ) : (

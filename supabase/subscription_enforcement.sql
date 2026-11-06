@@ -31,10 +31,15 @@ begin
   end if;
   paid_at := dentalcloud_private.safe_time(coalesce(nullif(c->>'subscriptionLastPaidAt',''), c->>'paidAt'));
   if c->'subscriptionPaymentVerified' is distinct from 'true'::jsonb
-    or coalesce(c->>'subscriptionVerifiedAmount','') !~ '^50([.]0+)?$'
+    or not (
+      (coalesce(c->>'subscriptionVerifiedPlan','pro') = 'pro' and coalesce(c->>'subscriptionVerifiedAmount','') ~ '^50([.]0+)?$')
+      or (coalesce(c->>'subscriptionVerifiedPlan','pro') = 'pro_monthly' and coalesce(c->>'subscriptionVerifiedAmount','') ~ '^7([.]0+)?$')
+    )
     or upper(coalesce(c->>'subscriptionVerifiedCurrency','')) <> 'USD'
     or paid_at is null or paid_at > now() + interval '5 minutes' then return -1; end if;
-  if coalesce(c->>'paidThrough','') = '' then paid_until := paid_at + interval '1 year'; end if;
+  if coalesce(c->>'paidThrough','') <> '' and paid_until is null then return -1; end if;
+  paid_until := least(paid_until, (paid_at at time zone 'UTC' +
+    case when c->>'subscriptionVerifiedPlan' = 'pro_monthly' then interval '1 month' else interval '1 year' end) at time zone 'UTC');
   if paid_until is null or paid_until <= now() then return -1; end if;
   if jsonb_typeof(coalesce(c->'subscriptionRevokedPayments','[]'::jsonb)) <> 'array' then return -1; end if;
   if exists (

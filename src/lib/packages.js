@@ -41,6 +41,8 @@ export const PACKAGE_FEATURES = {
   },
 }
 
+PACKAGE_FEATURES.pro_monthly = PACKAGE_FEATURES.pro
+
 // Resolve the full (inherited) feature set for a tier.
 export function fullFeatures(tierId) {
   const chain = []

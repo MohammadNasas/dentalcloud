@@ -3,8 +3,9 @@ import { saveSubscription } from '../../src/lib/saveSubscription.js'
 // New flow: verifies an approved PayPal subscription/trial and activates the clinic.
 // Legacy flow: still captures old one-time PayPal orders if a user returns from one.
 // Route: POST /api/paypal-capture
-import { paidEntitlementPatch, paymentFromSubscription } from '../../src/lib/entitlement.js'
-const PRICES = { pro: 50 }
+import { paidEntitlementPatch, paymentFromSubscription, hasVerifiedPaidAccess } from '../../src/lib/entitlement.js'
+import { subscriptionPlan, trialEnd } from '../../src/lib/subscriptionPlans.js'
+const PRICES = { pro: 50, pro_monthly: 7 }
 // Kept only so a checkout created before Economy was retired can still finish.
 const LEGACY_PRICES = { economy: 70 }
 const COUPONS = { DENTAL40: 40 }
@@ -13,7 +14,7 @@ const expectedPrice = (tier, code) => {
   const base = PRICES[tier] || LEGACY_PRICES[tier] || 0
   return Math.round(base * (1 - pct / 100) * 100) / 100
 }
-const canonicalTier = (tier) => tier === 'economy' ? 'pro' : tier
+const canonicalTier = (tier) => tier === 'economy' || tier === 'pro_monthly' ? 'pro' : tier
 const validTier = (tier) => Boolean(PRICES[tier] || LEGACY_PRICES[tier])
 const normalizeEmail = (email) => String(email || '').trim().toLowerCase()
 
@@ -76,20 +77,14 @@ async function saveClinic(supaUrl, headers, clinicId, data, previous) {
   Object.assign(data, saved)
 }
 
-function addOneMonthIso() {
-  const d = new Date()
-  d.setMonth(d.getMonth() + 1)
-  return d.toISOString()
-}
-
-async function updateSubscriptionPrice(base, accessToken, subscriptionId, sequence) {
+async function updateSubscriptionPrice(base, accessToken, subscriptionId, sequence, amount) {
   const r = await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify([{
       op: 'replace',
       path: `/plan/billing_cycles/@sequence==${sequence}/pricing_scheme/fixed_price`,
-      value: { currency_code: 'USD', value: PRICES.pro.toFixed(2) },
+      value: { currency_code: 'USD', value: amount.toFixed(2) },
     }]),
   })
   return r.ok
@@ -175,25 +170,30 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, userI
   if (!subR.ok) return json({ ok: false, error: 'subscription_lookup_failed', status: sub.status, message: sub.message }, subR.status)
 
   const [refClinicId, refTier, refMode] = String(sub.custom_id || '').split('--')
-  const clinicId = refClinicId || hintedClinicId
-  const originalTier = refTier || hintedTier
+  const clinicId = refClinicId
+  const originalTier = refTier
   const tier = canonicalTier(originalTier)
+  const plan = subscriptionPlan(originalTier)
   const checkoutMode = refMode === 'paid' ? 'paid' : 'trial'
-  if (!clinicId || !validTier(originalTier) || !PRICES[tier]) return json({ ok: false, error: 'bad_subscription_reference' }, 400)
+  if (!clinicId || !plan || !validTier(originalTier) || !PRICES[tier]) return json({ ok: false, error: 'bad_subscription_reference' }, 400)
   if (!await userBelongsToClinic(supaUrl, headers, userId, clinicId)) return json({ ok: false, error: 'clinic_access_denied' }, 403)
   if (sub.status !== 'ACTIVE') return json({ ok: false, error: 'subscription_not_active', status: sub.status }, 400)
 
   const clinic = await getClinic(supaUrl, headers, clinicId)
   if (!clinic) return json({ ok: false, error: 'clinic_not_found' }, 404)
 
+  if (clinic.paypalSubscriptionId && clinic.paypalSubscriptionId !== subscriptionId
+    && (hasVerifiedPaidAccess(clinic) || Date.parse(clinic.trialEndsAt) > Date.now()))
+    return json({ ok: false, error: 'already_paid' }, 409)
+
   if (checkoutMode === 'paid') {
     // This plan has no trial cycle. PayPal should charge immediately; if its
     // subscription lookup lags behind the payment event, attach it but keep the
-    // clinic locked until status sync/webhook verifies exactly $50 USD.
+    // clinic locked until status sync/webhook verifies the expected USD payment.
     const now = new Date().toISOString()
     const entitlement = paidEntitlementPatch(clinic, paymentFromSubscription(sub))
     const paid = entitlement.paid
-    const priceUpdated = await updateSubscriptionPrice(base, accessToken, subscriptionId, 1)
+    const priceUpdated = await updateSubscriptionPrice(base, accessToken, subscriptionId, 1, plan.price)
     const nextData = {
       ...clinic,
       ...entitlement,
@@ -203,7 +203,8 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, userI
       subscriptionStatus: sub.status,
       subscriptionStatusUpdatedAt: sub.status_update_time || now,
       nextBillingTime: sub.billing_info?.next_billing_time || clinic.nextBillingTime,
-      renewalPrice: priceUpdated ? PRICES[tier] : clinic.renewalPrice,
+      subscriptionPlan: plan.id,
+      renewalPrice: priceUpdated ? plan.price : clinic.renewalPrice,
       renewalCurrency: 'USD',
       renewalPriceUpdatePending: !priceUpdated,
       ...(priceUpdated ? { renewalPriceUpdatedAt: now } : {}),
@@ -244,16 +245,20 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, userI
 
   const now = new Date().toISOString()
   const entitlement = paidEntitlementPatch(clinic, paymentFromSubscription(sub))
-  const trialStartedAt = clinic.trialStartedAt || clinic.trialUsedAt || now
-  const nextBillingTime = clinic.trialEndsAt || sub.billing_info?.next_billing_time || addOneMonthIso()
+  const trialStartedAt = clinic.trialStartedAt || clinic.trialUsedAt || trial?.trial_started_at || sub.start_time || now
+  const trialLimit = trialEnd(trialStartedAt, plan.id)
+  const reportedEnd = clinic.trialEndsAt || sub.billing_info?.next_billing_time || trialLimit
+  const nextBillingTime = plan.id === 'pro_monthly'
+    ? new Date(Math.min(Date.parse(reportedEnd), Date.parse(trialLimit))).toISOString()
+    : reportedEnd
   if (trial) await activateTrial(supaUrl, headers, subscriptionId, trialStartedAt, nextBillingTime)
-  const priceUpdated = await updateSubscriptionPrice(base, accessToken, subscriptionId, 2)
+  const priceUpdated = await updateSubscriptionPrice(base, accessToken, subscriptionId, 2, plan.price)
   const nextData = {
     ...clinic,
     ...entitlement,
     tier,
     // Subscription approval starts the free trial; it is not a payment.
-    // paid becomes true only after a verified $50 PayPal payment.
+    // paid becomes true only after a verified PayPal payment for the selected plan.
     subscriptionProvider: 'paypal',
     paypalSubscriptionId: subscriptionId,
     subscriptionStatus: sub.status,
@@ -264,7 +269,8 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, userI
     trialStartedAt,
     trialEndsAt: nextBillingTime,
     nextBillingTime,
-    renewalPrice: priceUpdated ? PRICES[tier] : clinic.renewalPrice,
+    subscriptionPlan: plan.id,
+      renewalPrice: priceUpdated ? plan.price : clinic.renewalPrice,
     renewalCurrency: 'USD',
     renewalPriceUpdatePending: !priceUpdated,
     ...(priceUpdated ? { renewalPriceUpdatedAt: now } : {}),
@@ -288,7 +294,7 @@ async function finalizeLegacyOrder({ base, accessToken, supaUrl, headers, userId
   const paid = Number(capture.amount?.value || 0)
   const [clinicId, originalTier, coupon] = String(reference).split('--')
   const tier = canonicalTier(originalTier)
-  if (!clinicId || !validTier(originalTier) || !PRICES[tier]) return json({ ok: false, error: 'bad_reference' }, 400)
+  if (!clinicId || originalTier === 'pro_monthly' || !validTier(originalTier) || !PRICES[tier]) return json({ ok: false, error: 'bad_reference' }, 400)
   if (!await userBelongsToClinic(supaUrl, headers, userId, clinicId)) return json({ ok: false, error: 'clinic_access_denied' }, 403)
 
   const expected = expectedPrice(originalTier, coupon)

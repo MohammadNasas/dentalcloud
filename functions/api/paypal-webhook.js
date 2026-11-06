@@ -3,7 +3,7 @@ import { saveSubscription } from '../../src/lib/saveSubscription.js'
 // Route: POST /api/paypal-webhook
 // Configure this URL in PayPal and set PAYPAL_WEBHOOK_ID for signature verification.
 import { paidEntitlementPatch, revokePaymentPatch, savedVerifiedPayment } from '../../src/lib/entitlement.js'
-const PRO_PRICE = 50
+import { subscriptionPlan } from '../../src/lib/subscriptionPlans.js'
 // Activating a subscription only starts its free trial. Payment is granted
 // exclusively by a signed, completed $50 PayPal sale event.
 const PAID_EVENTS = new Set(['PAYMENT.SALE.COMPLETED'])
@@ -64,13 +64,13 @@ function subscriptionIdFrom(event) {
   return r.billing_agreement_id || r.subscription_id || (String(r.id || '').startsWith('I-') ? r.id : '') || ''
 }
 
-function verifiedPaymentFrom(event) {
+function verifiedPaymentFrom(event, plan) {
   const r = event.resource || {}
   const amount = Number(r.amount?.total ?? r.amount?.value ?? r.transaction_info?.transaction_amount?.value)
   const currency = String(r.amount?.currency || r.amount?.currency_code || r.transaction_info?.transaction_amount?.currency_code || '').toUpperCase()
   const state = String(r.state || r.status || 'COMPLETED').toUpperCase()
-  if (state !== 'COMPLETED' || !Number.isFinite(amount) || amount !== PRO_PRICE || currency !== 'USD') return null
-  return { amount, currency, id: r.id || null, time: r.create_time || event.create_time || null, source: 'verified_webhook' }
+  if (state !== 'COMPLETED' || !Number.isFinite(amount) || amount !== plan?.price || currency !== 'USD') return null
+  return { amount, currency, planId: plan.id, id: r.id || null, time: r.create_time || event.create_time || null, source: 'verified_webhook' }
 }
 
 function originalSaleId(event) {
@@ -234,7 +234,7 @@ export const onRequestPost = async ({ request, env }) => {
       const refundAmount = Number(resource.amount?.total ?? resource.amount?.value)
       const fullRefund = eventType === 'PAYMENT.SALE.REVERSED'
         || (String(sale?.state || '').toUpperCase() === 'REFUNDED')
-        || (Number.isFinite(refundAmount) && refundAmount >= PRO_PRICE - 0.01
+        || (Number.isFinite(refundAmount) && refundAmount >= Number(sale?.amount?.total ?? sale?.amount?.value ?? payment?.amount) - 0.01
           && String(resource.amount?.currency || resource.amount?.currency_code || '').toUpperCase() === 'USD')
       // A partial refund is a business decision: flag it for review instead of
       // silently taking away the entire purchased year.
@@ -266,9 +266,9 @@ export const onRequestPost = async ({ request, env }) => {
       return json({ ok: true, paid: paidEntitlementPatch(clinic.data).paid, subscriptionId })
     }
 
-    const payment = verifiedPaymentFrom(event)
+    const payment = verifiedPaymentFrom(event, subscriptionPlan(clinic.data.subscriptionPlan || 'pro'))
     if (!payment) {
-      return json({ ok: true, ignored: 'payment_not_50_usd', subscriptionId })
+      return json({ ok: true, ignored: 'payment_amount_or_currency_mismatch', subscriptionId })
     }
 
     const entitlement = paidEntitlementPatch(clinic.data, payment)

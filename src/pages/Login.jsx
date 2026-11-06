@@ -1,3 +1,4 @@
+import { trialLabel } from '../lib/subscriptionPlans.js'
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
@@ -6,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { TIERS, DEMO_LOGIN, tierPeriodLabel } from '../lib/db'
+import { BILLING_PLANS as TIERS, DEMO_LOGIN, tierPeriodLabel } from '../lib/db'
 import { Field, Spinner } from '../components/ui'
 import { FloatingField } from '../components/anim'
 import { cx } from '../lib/utils'
@@ -42,7 +43,7 @@ export default function Login({ initialTab = 'signin', onBack, onTabChange }) {
 
   const [signin, setSignin] = useState({ email: '', password: '' })
   const [reg, setReg] = useState({
-    clinicName: '', doctorName: '', email: '', password: '', specialty: '', tier: 'student',
+    clinicName: '', doctorName: '', email: '', password: '', specialty: '', tier: TIERS[new URLSearchParams(window.location.search).get('plan')]?.id || 'student',
   })
   const isCloud = mode === 'cloud'
   const isLocal = mode === 'local'
@@ -80,7 +81,7 @@ export default function Login({ initialTab = 'signin', onBack, onTabChange }) {
       setError(lang === 'ar' ? 'يجب الموافقة على الشروط وسياسة الخصوصية' : 'You must agree to the Terms and Privacy Policy'); return
     }
     setBusy(true)
-    const res = await register({ ...reg, email: reg.email.trim() })
+    const res = await register({ ...reg, billingPlan: reg.tier, tier: reg.tier === 'pro_monthly' ? 'pro' : reg.tier, email: reg.email.trim() })
     setBusy(false)
     // needsOtp isn't an error — it's the normal transition to the code screen.
     if (!res.ok && !res.needsOtp) setError(t(`auth.${res.error || 'signupFailed'}`) + (res.message ? ` (${res.message})` : ''))
@@ -301,14 +302,14 @@ export default function Login({ initialTab = 'signin', onBack, onTabChange }) {
                 </Field>
               </div>
               <Field label={t('auth.choosePlan')}>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-3">
                   {Object.values(TIERS).map((tier) => (
                     <button type="button" key={tier.id} onClick={() => setReg({ ...reg, tier: tier.id })}
                       className={cx('rounded-xl border-2 p-2.5 text-center transition-all', reg.tier === tier.id ? 'border-brand-500 bg-brand-50' : 'border-ink-200 hover:border-ink-300')}>
                       {reg.tier === tier.id && <CheckCircle2 size={14} className="mx-auto mb-1 text-brand-500" />}
                       <p className="text-xs font-bold text-ink-700">{L(tier)}</p>
-                      <p className="text-sm font-extrabold text-brand-600">{tier.price === 0 ? t('packages.free') : `$${tier.price}`}</p>
-                      {tier.price > 0 && <p className="mt-1 text-[10px] font-bold text-emerald-600">{t('packages.freeTrialBadge')}</p>}
+                      <p className="text-sm font-extrabold text-brand-600">{tier.price === 0 ? t('packages.free') : `$${tier.price} ${tierPeriodLabel(tier, t)}`}</p>
+                      {tier.price > 0 && <p className="mt-1 text-[10px] font-bold text-emerald-600">{trialLabel(tier, t)}</p>}
                     </button>
                   ))}
                 </div>

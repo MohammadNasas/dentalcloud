@@ -2,7 +2,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion, useReducedMotion } from 'framer-motion'
 import { Globe, ArrowRight, Check, CalendarDays, Wallet, Sparkles, Crown, GraduationCap, Users, Monitor, Smartphone, Activity, FileText, Images, Languages } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
-import { TIERS, tierPeriodLabel } from '../lib/db'
+import { BILLING_PLANS as TIERS, tierPeriodLabel } from '../lib/db'
+import { trialLabel } from '../lib/subscriptionPlans.js'
 import { PACKAGE_FEATURES } from '../lib/packages'
 import { useReduceMotion } from '../lib/motionPref'
 import { CalendarPreview, AppShowcase } from '../components/PackagePreviews'
@@ -13,7 +14,7 @@ import { cx } from '../lib/utils'
 import logo from '../lib/logo'
 import './Landing.css'
 
-const TIER_ICON = { student: GraduationCap, pro: Crown }
+const TIER_ICON = { student: GraduationCap, pro: Crown, pro_monthly: Crown }
 export default function Landing() {
   const { t, lang, L, setLang, isRTL } = useI18n()
   const ar = lang === 'ar'
@@ -50,7 +51,7 @@ export default function Landing() {
           <span className="chip bg-brand-100/60 text-brand-700"><Sparkles size={13}/>{ar?'لعيادة أكثر تنظيماً':'A more organised clinic'}</span>
           <h1 className="mt-5 text-4xl font-extrabold leading-[1.4] tracking-tight text-ink-900 sm:text-5xl xl:text-[56px]">{ar?'عيادتك مرتّبة.':'Your clinic, in order.'}<br/><span className="text-brand-600">{ar?'وقتك لمرضاك.':'Your time, for patients.'}</span></h1>
           <p className="mt-5 max-w-md text-base leading-8 text-ink-500 sm:text-lg">{ar?'دينتال كلاود (DentalCloud) برنامج لإدارة عيادات الأسنان: المرضى، المواعيد والمدفوعات في مكان واحد، بالعربي والإنجليزي.':'DentalCloud dental clinic management software brings patients, appointments and payments together, in Arabic and English.'}</p>
-          <div className="mt-7 flex flex-wrap gap-3"><Link to="/register" className="btn-primary !rounded-xl !px-6 !py-3.5">{ar?'ابدأ شهرك المجاني':'Start your free month'}<ArrowRight size={17} className={isRTL?'rotate-180':''}/></Link><button onClick={()=>scrollTo('landing-showcase')} className="btn-outline !rounded-xl !px-6 !py-3.5">{ar?'اكتشف المزايا':'Explore the features'}</button></div>
+          <div className="mt-7 flex flex-wrap gap-3"><Link to="/register" className="btn-primary !rounded-xl !px-6 !py-3.5">{ar?'ابدأ تجربتك المجانية':'Start your free trial'}<ArrowRight size={17} className={isRTL?'rotate-180':''}/></Link><button onClick={()=>scrollTo('landing-showcase')} className="btn-outline !rounded-xl !px-6 !py-3.5">{ar?'اكتشف المزايا':'Explore the features'}</button></div>
           <WelcomeTour onLanguageChange={switchLanguage}/>
           <div className="mt-6 flex flex-wrap items-center gap-2 text-xs text-ink-400"><Monitor size={16}/><Smartphone size={14}/><span>{ar?'على الكمبيوتر والموبايل':'On desktop and mobile'}</span><span className="mx-1 h-1 w-1 rounded-full bg-brand-300"/><span>{ar?'باقة الطالب مجانية':'Free Student plan'}</span></div>
         </motion.div>
@@ -70,18 +71,18 @@ export default function Landing() {
         <div className="relative mt-6 flex flex-wrap justify-center gap-3">{features.map(f=><span key={f.title} className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs font-bold text-white/90"><f.icon size={18} className="text-teal-300"/>{f.title}</span>)}</div>
       </FloatScene>
     </section>
-    <section id="landing-pricing" className="mx-auto max-w-5xl px-4 py-16 sm:px-6">
+    <section id="landing-pricing" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
       <div className="mb-9 text-center"><h2 className="text-2xl font-extrabold text-ink-800 sm:text-3xl">{ar?'اختر ما يناسب عيادتك':'Choose what fits your clinic'}</h2><p className="mt-2 text-sm text-ink-400">{t('packages.subtitle')}</p></div>
-      <div className="mx-auto grid max-w-3xl gap-6 md:grid-cols-2">{Object.values(TIERS).map(tier=>{
+      <div className="mx-auto grid max-w-6xl gap-6 md:grid-cols-3">{Object.values(TIERS).map(tier=>{
         const Icon=TIER_ICON[tier.id], popular=tier.id==='pro', own=PACKAGE_FEATURES[tier.id].features, inherits=PACKAGE_FEATURES[tier.id].inherits
         return <motion.article {...reveal} key={tier.id} className={cx('relative flex flex-col rounded-3xl border bg-white p-7 shadow-[0_12px_40px_-25px_#0d948830]',popular?'border-brand-500':'border-ink-100')}>
           <div className="flex items-center gap-3"><Icon size={26} className="text-brand-600"/><h3 className="text-xl font-extrabold text-ink-800">{L(tier)}</h3></div>
-          {popular&&<span className="mt-3 w-fit rounded-full bg-brand-50 px-3 py-1 text-[11px] font-bold text-brand-700">{ar?'للعيادة المتكاملة':'For the complete clinic'}</span>}
+          <p className="mt-3 text-xs text-ink-400">{tier.id==='student'?(ar?'للتعلّم والتدريب':'For learning and practice'):(ar?'جميع مزايا Pro لإدارة عيادتك':'All Pro features for your clinic')}</p>
           <div className="mt-6 flex items-baseline gap-2"><span className="text-4xl font-extrabold text-ink-800">{tier.price===0?(ar?'مجاني':'Free'):`$${tier.price}`}</span>{tier.price>0&&<span className="text-sm text-ink-500">{tierPeriodLabel(tier,t)}</span>}</div>
-          {tier.price>0&&<p className="mt-2 text-xs font-bold text-brand-600">{t('packages.freeTrialBadge')}</p>}
+          {tier.price>0&&<p className="mt-2 text-xs font-bold text-brand-600">{trialLabel(tier, t)}</p>}
           <ul className="mb-4 mt-6 space-y-3">{inherits&&<li className="flex gap-2 text-sm font-semibold text-brand-700"><Check size={16}/>{t('packages.everythingIn')} «{L(TIERS[inherits])}»</li>}{own.slice(0,4).map((f,i)=><li key={i} className="flex items-start gap-2 text-sm text-ink-500"><Check size={16} className="mt-0.5 shrink-0 text-brand-500"/>{L(f)}</li>)}</ul>
           {own.length>4&&<details className="mb-6 text-sm text-ink-500"><summary className="cursor-pointer font-bold text-brand-700">{ar?'عرض كل المزايا':'See all features'}</summary><ul className="mt-3 space-y-2">{own.slice(4).map((f,i)=><li key={i} className="flex gap-2"><Check size={15} className="mt-1 shrink-0 text-brand-500"/>{L(f)}</li>)}</ul></details>}
-          <Link to="/register" className={cx('mt-auto w-full !rounded-xl !py-3',popular?'btn-primary':'btn-outline')}>{popular?(ar?'جرّب الآن':'Try it now'):(ar?'ابدأ مجاناً':'Start free')}</Link>
+          <Link to={`/register?plan=${tier.id}`} className={cx('mt-auto w-full !rounded-xl !py-3',popular?'btn-primary':'btn-outline')}>{tier.price>0?(ar?'ابدأ التجربة المجانية':'Start free trial'):(ar?'ابدأ مجاناً':'Start free')}</Link>
         </motion.article>
       })}</div>
     </section>

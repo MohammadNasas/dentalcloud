@@ -1,6 +1,6 @@
 // A paid year belongs to a verified payment, not to automatic-renewal status.
 // These helpers are shared by the server handlers and the access gate.
-const PRICE = 50
+import { periodEnd, subscriptionPlan, subscriptionPlanFromPayPal } from './subscriptionPlans.js'
 const timeOf = (value) => typeof value === 'string' && value ? Date.parse(value) : NaN
 
 export function annualPaidThrough(paymentTime) {
@@ -17,7 +17,7 @@ export function annualPaidThrough(paymentTime) {
 function validPayment(payment, now) {
   const timestamp = timeOf(payment?.time)
   return payment && Number.isFinite(timestamp) && timestamp <= now + 300_000
-    && Number.isFinite(Number(payment.amount)) && Number(payment.amount) === PRICE
+    && Number.isFinite(Number(payment.amount)) && Number(payment.amount) === subscriptionPlan(payment.planId || 'pro')?.price
     && String(payment.currency || '').toUpperCase() === 'USD'
 }
 
@@ -32,6 +32,7 @@ export function savedVerifiedPayment(clinic) {
   if (clinic?.subscriptionPaymentVerified !== true) return null
   return {
     id: clinic.subscriptionVerifiedPaymentId || null,
+    planId: clinic.subscriptionVerifiedPlan || 'pro',
     amount: clinic.subscriptionVerifiedAmount,
     currency: clinic.subscriptionVerifiedCurrency,
     time: clinic.subscriptionLastPaidAt || clinic.paidAt || null,
@@ -47,13 +48,18 @@ export function paymentFromSubscription(subscription) {
     currency: String(last.amount?.currency_code || last.amount?.currency || '').toUpperCase(),
     time: last.time || null,
     source: 'paypal_subscription',
+    planId: subscriptionPlanFromPayPal(subscription)?.id || 'unknown',
   } : null
 }
 
 export function getPaidThrough(clinic) {
   // Derive legacy records only from an actual verified payment timestamp.
   // An explicit expiry is never extended by a status sync or repeated callback.
-  return clinic?.paidThrough || annualPaidThrough(savedVerifiedPayment(clinic)?.time)
+  const payment = savedVerifiedPayment(clinic)
+  const end = periodEnd(payment?.time, subscriptionPlan(payment?.planId)?.period)
+  if (!clinic?.paidThrough) return end
+  if (!Number.isFinite(timeOf(clinic.paidThrough))) return null
+  return end && timeOf(end) < timeOf(clinic.paidThrough) ? end : clinic.paidThrough
 }
 
 export function hasVerifiedPaidAccess(clinic, now = Date.now()) {
@@ -88,7 +94,8 @@ export function paidEntitlementPatch(clinic, incomingPayment = null, now = Date.
   }
   if (!payment) return { paid: false, paidThrough: null, subscriptionPaymentVerified: false }
   const samePayment = existing && timeOf(existing.time) === timeOf(payment.time)
-  const anniversary = annualPaidThrough(payment.time)
+  const plan = subscriptionPlan(payment.planId || 'pro')
+  const anniversary = periodEnd(payment.time, plan.period)
   // Preserve an already shorter contractual period; reject arbitrary extensions.
   const storedEnd = samePayment ? timeOf(clinic.paidThrough) : NaN
   const paidThrough = Number.isFinite(storedEnd) && storedEnd > timeOf(payment.time)
@@ -99,6 +106,7 @@ export function paidEntitlementPatch(clinic, incomingPayment = null, now = Date.
     paidAt: payment.time,
     subscriptionPaymentVerified: true,
     subscriptionVerifiedAmount: Number(payment.amount),
+    subscriptionVerifiedPlan: plan.id,
     subscriptionVerifiedCurrency: 'USD',
     subscriptionVerifiedPaymentId: payment.id || null,
     subscriptionPaymentVerificationSource: payment.source,

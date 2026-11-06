@@ -5,8 +5,9 @@
 // SUPABASE_SERVICE_ROLE_KEY, PAYPAL_BASE (optional), SITE_URL (optional)
 // Optional: PAYPAL_PRODUCT_ID, PAYPAL_PRO_TRIAL_PLAN_ID, PAYPAL_PRO_PAID_PLAN_ID
 import { hasVerifiedPaidAccess } from '../../src/lib/entitlement.js'
-const PRICES = { pro: 50 }
-const LABELS = { pro: 'Pro' }
+import { SUBSCRIPTION_PLANS, subscriptionPlan } from '../../src/lib/subscriptionPlans.js'
+const PRICES = Object.fromEntries(Object.values(SUBSCRIPTION_PLANS).map(p => [p.id, p.price]))
+const LABELS = { pro: 'Pro Annual', pro_monthly: 'Pro Monthly' }
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -69,19 +70,19 @@ async function createProduct(base, accessToken) {
 async function createTrialPlan(base, accessToken, { productId, tier, amount }) {
   return paypalJson(`${base}/v1/billing/plans`, accessToken, {
     product_id: productId,
-    name: `DentalCloud ${LABELS[tier]} - 1 month free trial`,
-    description: `First month free, then $${amount}/year.`,
+    name: `DentalCloud ${LABELS[tier]} - ${tier === 'pro_monthly' ? '3 days' : '1 month'} free trial`,
+    description: `${tier === 'pro_monthly' ? '3 days' : '1 month'} free, then $${amount}/${subscriptionPlan(tier).period}.`,
     status: 'ACTIVE',
     billing_cycles: [
       {
-        frequency: { interval_unit: 'MONTH', interval_count: 1 },
+        frequency: { interval_unit: subscriptionPlan(tier).trialUnit, interval_count: subscriptionPlan(tier).trialCount },
         tenure_type: 'TRIAL',
         sequence: 1,
         total_cycles: 1,
         pricing_scheme: { fixed_price: { currency_code: 'USD', value: '0' } },
       },
       {
-        frequency: { interval_unit: 'YEAR', interval_count: 1 },
+        frequency: { interval_unit: subscriptionPlan(tier).interval, interval_count: 1 },
         tenure_type: 'REGULAR',
         sequence: 2,
         total_cycles: 0,
@@ -99,11 +100,11 @@ async function createTrialPlan(base, accessToken, { productId, tier, amount }) {
 async function createPaidPlan(base, accessToken, { productId, tier, amount }) {
   return paypalJson(`${base}/v1/billing/plans`, accessToken, {
     product_id: productId,
-    name: `DentalCloud ${LABELS[tier]} - paid annually`,
-    description: `$${amount} charged now, then annually. No free trial.`,
+    name: `DentalCloud ${LABELS[tier]} - recurring subscription`,
+    description: `$${amount} charged now, then every ${subscriptionPlan(tier).period}. No free trial.`,
     status: 'ACTIVE',
     billing_cycles: [{
-      frequency: { interval_unit: 'YEAR', interval_count: 1 },
+      frequency: { interval_unit: subscriptionPlan(tier).interval, interval_count: 1 },
       tenure_type: 'REGULAR',
       sequence: 1,
       total_cycles: 0,
@@ -132,6 +133,19 @@ async function ensurePlanId(env, base, accessToken, tier, amount, checkoutMode) 
     ? env[`PAYPAL_${tier.toUpperCase()}_PAID_PLAN_ID`]
     : env[`PAYPAL_${tier.toUpperCase()}_TRIAL_PLAN_ID`] || env[`PAYPAL_PLAN_${tier.toUpperCase()}`]
   if (explicit) {
+    const response = await fetch(`${base}/v1/billing/plans/${encodeURIComponent(explicit)}`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    })
+    if (!response.ok) throw new Error('plan_lookup_failed')
+    const configured = await response.json()
+    const regular = configured.billing_cycles?.find(c => c.tenure_type === 'REGULAR')
+    const trial = configured.billing_cycles?.filter(c => c.tenure_type === 'TRIAL') || []
+    const expected = subscriptionPlan(tier)
+    if (regular?.frequency?.interval_unit !== expected.interval || regular?.frequency?.interval_count !== 1
+      || (isPaid ? trial.length !== 0 : trial.length !== 1
+        || trial[0].frequency?.interval_unit !== expected.trialUnit
+        || trial[0].frequency?.interval_count !== expected.trialCount || trial[0].total_cycles !== 1))
+      throw new Error('plan_billing_cycle_mismatch')
     // Keep the PayPal approval screen and every existing subscriber on this
     // plan aligned with the public price before starting a new subscription.
     await updatePlanPrice(base, accessToken, explicit, amount, isPaid ? 1 : 2)
@@ -243,8 +257,9 @@ async function resumeTrial({ base, accessToken, trial, clinicId, tier, siteUrl }
   if (!r.ok) return json({ error: 'checkout_resume_failed', retryable: true }, 503)
   const sub = await r.json()
   const [referenceClinic, referenceTier, referenceMode] = String(sub.custom_id || '').split('--')
-  if (referenceClinic !== clinicId || referenceTier !== tier || referenceMode !== 'trial')
+  if (referenceClinic !== clinicId || referenceMode !== 'trial')
     return json({ error: 'subscription_clinic_mismatch' }, 409)
+  if (referenceTier !== tier) return json({ error: 'pending_other_plan' }, 409)
   if (sub.status === 'ACTIVE') {
     // Approval may have succeeded while the original return page was closed.
     // Reuse the authenticated finalize flow; never create/charge a second sub.
@@ -285,7 +300,7 @@ export const onRequestPost = async ({ request, env }) => {
   try { payload = await request.json() } catch { return json({ error: 'bad_json' }, 400) }
   const { tier, clinicId } = payload || {}
   const checkoutMode = payload?.checkoutMode === 'paid' ? 'paid' : 'trial'
-  if (!PRICES[tier] || !clinicId) return json({ error: 'bad_request' }, 400)
+  if (!subscriptionPlan(tier) || tier === 'economy' || !clinicId) return json({ error: 'bad_request' }, 400)
 
   let reservation = null
   let paypalAccessToken = ''
@@ -310,7 +325,7 @@ export const onRequestPost = async ({ request, env }) => {
       } else {
         reservation = { email: user.email, userId: user.id, clinicId, headers }
       }
-    } else if (hasVerifiedPaidAccess(clinicRow.data)) {
+    } else if (hasVerifiedPaidAccess(clinicRow.data) || Date.parse(clinicRow.data?.trialEndsAt) > Date.now()) {
       return json({ error: 'already_paid' }, 409)
     }
 
@@ -320,6 +335,15 @@ export const onRequestPost = async ({ request, env }) => {
       return json({ error: 'auth_failed', message: tok.error_description || tok.error }, 400)
     }
     paypalAccessToken = tok.access_token
+    if (checkoutMode === 'paid' && clinicRow.data?.paypalSubscriptionId) {
+      const previous = await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(clinicRow.data.paypalSubscriptionId)}`, {
+        headers: { Authorization: `Bearer ${tok.access_token}`, Accept: 'application/json' },
+      })
+      if (!previous.ok) return json({ error: 'checkout_resume_failed', retryable: true }, 503)
+      const previousSub = await previous.json()
+      if (!['CANCELLED', 'EXPIRED'].includes(previousSub.status))
+        return json({ error: 'subscription_still_active' }, 409)
+    }
     if (resumableTrial) return await resumeTrial({ base, accessToken: tok.access_token, trial: resumableTrial, clinicId, tier, siteUrl })
 
     const amount = PRICES[tier]

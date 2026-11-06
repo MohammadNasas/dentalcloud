@@ -15,8 +15,15 @@ export const TIERS = {
   pro: { id: 'pro', en: 'Pro', ar: 'الاحترافية', price: 50, period: 'year' },
 }
 
+export const BILLING_PLANS = {
+  student: TIERS.student,
+  pro_monthly: { ...TIERS.pro, id: 'pro_monthly', en: 'Pro Monthly', ar: 'الاحترافية الشهرية', price: 7, period: 'month' },
+  pro: { ...TIERS.pro, en: 'Pro Annual', ar: 'الاحترافية السنوية' },
+}
+
 // Billing period label for a tier (free, one-time/lifetime, or yearly).
 export function tierPeriodLabel(tier, t) {
+  if (tier?.period === 'month') return t('packages.month')
   if (tier?.period === 'free') return t('packages.free')
   if (tier?.period === 'lifetime') return t('packages.lifetime')
   return t('packages.perYear')

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
-import { TIERS, DOCTOR_COLORS, tierPeriodLabel } from '../lib/db'
+import { BILLING_PLANS as TIERS, DOCTOR_COLORS, tierPeriodLabel } from '../lib/db'
 import { DEFAULT_PRICES, INSTRUCTIONS } from '../lib/treatments'
 import FeatureLock from '../components/FeatureLock'
 import { Modal, Field, Segmented, Avatar, Badge } from '../components/ui'
@@ -337,7 +337,7 @@ function PlanSection() {
   const { t, L } = useI18n()
   const navigate = useNavigate()
   const { clinic, resetToDemo, mode } = useStore()
-  const tier = TIERS[clinic?.tier || 'student']
+  const tier = TIERS[clinic?.tier === 'student' ? 'student' : (clinic?.subscriptionPlan || 'pro')]
 
   return (
     <div className="space-y-4">

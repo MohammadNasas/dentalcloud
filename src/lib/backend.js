@@ -197,7 +197,9 @@ const cloudBackend = {
   async restore() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return null
-    return await loadMe(session.user.id)
+    const me = await loadMe(session.user.id)
+    if (me) me.user.user_metadata = session.user.user_metadata
+    return me
   },
 
   async signIn(email, password) {
@@ -210,7 +212,7 @@ const cloudBackend = {
     const email = (payload.email || '').trim()
     if ((payload.tier || 'student') === 'student' && !isStudentEmail(email))
       return { ok: false, error: 'studentEmailRequired' }
-    const { data, error } = await supabase.auth.signUp({ email, password: payload.password })
+    const { data, error } = await supabase.auth.signUp({ email, password: payload.password, options: { data: { billingPlan: payload.billingPlan || payload.tier } } })
     if (error) {
       const msg = error.message || ''
       if (/registered|exists/i.test(msg)) return { ok: false, error: 'userExists' }

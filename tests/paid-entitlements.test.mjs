@@ -19,7 +19,7 @@ const req = (body) => new Request('https://app.test/api/test', { method: 'POST',
   headers: { Authorization: 'Bearer synthetic-test-token', 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
 test('desktop billing requests use HTTPS while web stays on its deployment origin', () => {
-  assert.equal(paymentApiUrl('/api/paypal-subscription-status', 'file:'), 'https://dentalcloud.pages.dev/api/paypal-subscription-status')
+  assert.equal(paymentApiUrl('/api/paypal-subscription-status', 'file:'), 'https://dentalcloudapp.com/api/paypal-subscription-status')
   assert.equal(paymentApiUrl('/api/paypal-create', 'https:'), '/api/paypal-create')
   assert.throws(() => paymentApiUrl('/api/paypal-capture', 'file:', 'http://insecure.test'))
 })
@@ -133,7 +133,7 @@ test('wrong payment amounts cannot alter an existing entitlement', async (t) => 
   const event = { event_type: 'PAYMENT.SALE.COMPLETED', resource: { id: 'WRONG', billing_agreement_id: 'I-ONE',
     state: 'completed', create_time: paidTime, amount: { total: '49.99', currency: 'USD' } } }
   const result = await (await webhook({ request: req(event), env: ENV })).json()
-  assert.equal(result.ignored, 'payment_not_50_usd')
+  assert.equal(result.ignored, 'payment_amount_or_currency_mismatch')
   assert.equal(mock.calls.some((x) => x.url.pathname === '/rest/v1/rpc/apply_subscription_patch'), false)
   assert.equal(mock.clinic().paid, true)
 })

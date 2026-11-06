@@ -296,6 +296,7 @@ function paidCreateFetch() {
       if (url.startsWith(`${ENV.SUPABASE_URL}/rest/v1/doctors`)) return Response.json([{ id: 'user-2' }])
       if (url.startsWith(`${ENV.SUPABASE_URL}/rest/v1/clinics`)) return Response.json([{ id: 'clinic-2', data: { tier: 'student', paid: false, trialUsedAt: '2026-01-01T00:00:00.000Z' } }])
       if (url === `${ENV.PAYPAL_BASE}/v1/oauth2/token`) return Response.json({ access_token: 'paypal-token' })
+      if (url === `${ENV.PAYPAL_BASE}/v1/billing/plans/P-PAID` && method === 'GET') return Response.json({ billing_cycles: [{ tenure_type: 'REGULAR', frequency: { interval_unit: 'YEAR', interval_count: 1 } }] })
       if (url.includes('/v1/billing/plans/P-PAID/update-pricing-schemes')) return Response.json({})
       if (url === `${ENV.PAYPAL_BASE}/v1/billing/subscriptions`) return Response.json({ id: 'I-PAID', links: [{ rel: 'approve', href: 'https://paypal.test/approve-paid' }] })
       if (url.includes('/subscription_trials')) throw new Error(`Paid creation touched trial ledger: ${method} ${url}`)

@@ -3,7 +3,7 @@ import { saveSubscription } from '../../src/lib/saveSubscription.js'
 // Route: POST /api/paypal-subscription-status
 import { paidEntitlementPatch, paymentFromSubscription } from '../../src/lib/entitlement.js'
 const ACTIVE_STATUSES = new Set(['ACTIVE'])
-const PRO_PRICE = 50
+import { subscriptionPlanFromPayPal } from '../../src/lib/subscriptionPlans.js'
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -53,14 +53,14 @@ async function userBelongsToClinic(supaUrl, headers, userId, clinicId) {
   return r.ok && Array.isArray(rows) && rows.length > 0
 }
 
-async function updateSubscriptionPrice(base, accessToken, subscriptionId, sequence) {
+async function updateSubscriptionPrice(base, accessToken, subscriptionId, sequence, amount) {
   const r = await fetch(`${base}/v1/billing/subscriptions/${encodeURIComponent(subscriptionId)}`, {
     method: 'PATCH',
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', Accept: 'application/json' },
     body: JSON.stringify([{
       op: 'replace',
       path: `/plan/billing_cycles/@sequence==${sequence}/pricing_scheme/fixed_price`,
-      value: { currency_code: 'USD', value: PRO_PRICE.toFixed(2) },
+      value: { currency_code: 'USD', value: amount.toFixed(2) },
     }]),
   })
   return r.ok
@@ -184,6 +184,8 @@ export const onRequestPost = async ({ request, env }) => {
     const sub = await subR.json().catch(() => ({}))
     if (!subR.ok) return json({ ok: false, error: 'subscription_lookup_failed', message: sub.message }, subR.status)
 
+    const plan = subscriptionPlanFromPayPal(sub)
+    if (!plan) return json({ ok: false, error: 'bad_subscription_reference' }, 400)
     const [refClinicId, , refMode] = String(sub.custom_id || '').split('--')
     const checkoutMode = refMode === 'paid' ? 'paid' : 'trial'
     if (!refClinicId || refClinicId !== clinicId) return json({ ok: false, error: 'subscription_clinic_mismatch' }, 403)
@@ -229,20 +231,21 @@ export const onRequestPost = async ({ request, env }) => {
         return json({ ok: true, status: blockedData.subscriptionStatus, paid: false, error: 'trial_already_used', requiresPaidCheckout: true, duplicateTrialBlocked: true, clinic: { ...blockedData, id: clinicId } })
       }
     }
-    let priceUpdated = Number(clinic.renewalPrice) === PRO_PRICE && !clinic.renewalPriceUpdatePending
-    if (paid && ACTIVE_STATUSES.has(sub.status) && !priceUpdated) priceUpdated = await updateSubscriptionPrice(base, tok.access_token, subscriptionId, checkoutMode === 'paid' ? 1 : 2)
+    let priceUpdated = Number(clinic.renewalPrice) === plan.price && !clinic.renewalPriceUpdatePending
+    if (paid && ACTIVE_STATUSES.has(sub.status) && !priceUpdated) priceUpdated = await updateSubscriptionPrice(base, tok.access_token, subscriptionId, checkoutMode === 'paid' ? 1 : 2, plan.price)
     const now = new Date().toISOString()
     const nextData = {
       ...clinic,
       ...entitlement,
       tier: clinic.tier === 'economy' ? 'pro' : clinic.tier,
       subscriptionProvider: 'paypal',
+      subscriptionPlan: plan.id,
       paypalSubscriptionId: subscriptionId,
       subscriptionStatus: sub.status,
       subscriptionStatusUpdatedAt: sub.status_update_time || now,
       subscriptionSyncedAt: now,
       nextBillingTime: sub.billing_info?.next_billing_time || clinic.nextBillingTime,
-      ...(priceUpdated ? { renewalPrice: PRO_PRICE, renewalCurrency: 'USD', renewalPriceUpdatedAt: now } : {}),
+      ...(priceUpdated ? { renewalPrice: plan.price, renewalCurrency: 'USD', renewalPriceUpdatedAt: now } : {}),
       renewalPriceUpdatePending: paid && !priceUpdated,
       ...(ACTIVE_STATUSES.has(sub.status) ? { subscriptionStoppedAt: null } : { subscriptionStoppedAt: now }),
     }
