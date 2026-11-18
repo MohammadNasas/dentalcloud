@@ -9,6 +9,7 @@ import { Modal, Field } from './ui'
 import { appointmentConflicts } from '../lib/appointmentConflicts.js'
 import { backend } from '../lib/backend'
 import { useSaveAction } from '../lib/useSaveAction'
+import { LOYALTY_CATEGORIES } from '../lib/loyalty'
 
 export default function AppointmentModal({ open, onClose, appointment, defaultDate, defaultPatientId }) {
   const { t, lang } = useI18n()
@@ -27,6 +28,7 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
       duration: appointment ? Math.round((new Date(appointment.end) - d) / 60000) || 30 : 30,
       reason: appointment?.reason || '', step: appointment?.step || '',
       status: appointment?.status || 'scheduled', notes: appointment?.notes || '',
+      loyaltyCategory: appointment?.loyaltyCategory || 'general', loyaltyExcluded: appointment?.loyaltyExcluded || false,
     }
   }, open)
   const form = draft.value
@@ -60,6 +62,7 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
       patientId: form.patientId, doctorId: form.doctorId,
       start: start.toISOString(), end: end.toISOString(),
       reason: form.reason, step: form.step, status: form.status, notes: form.notes,
+      loyaltyCategory: form.loyaltyCategory || 'general', loyaltyExcluded: Boolean(form.loyaltyExcluded),
     }
     const saved = appointment ? await updateAppointment(appointment.id, data) : await addAppointment(data)
     if (saved) { await draft.clear(); onClose() }
@@ -138,6 +141,10 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
         </div>}
 
         <Field label={t('appt.reason')}><input className="input" value={form.reason} onChange={(e) => set('reason', e.target.value)} /></Field>
+        <div className="rounded-xl bg-brand-50/50 p-3">
+          <Field label={lang === 'ar' ? 'نوع الزيارة لبطاقة الولاء' : 'Visit type for loyalty'}><select className="input" value={form.loyaltyCategory || 'general'} onChange={e => set('loyaltyCategory', e.target.value)}>{LOYALTY_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c[lang] || c.en}</option>)}</select></Field>
+          <label className="mt-3 flex items-center gap-2 text-xs text-ink-500"><input type="checkbox" checked={Boolean(form.loyaltyExcluded)} onChange={e => set('loyaltyExcluded',e.target.checked)} />{lang === 'ar' ? 'استبعاد هذه الزيارة من الأختام' : 'Exclude this visit from stamps'}</label>
+        </div>
 
         {can('apptWorkLog') && (
           <Field label={t('appt.step')} hint={lang === 'ar' ? 'الخطوة التي وصل إليها العلاج' : 'treatment step reached'}>

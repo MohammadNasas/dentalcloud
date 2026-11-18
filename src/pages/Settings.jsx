@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Building2, Users, DollarSign, FileText, Lightbulb, Crown, Database,
-  Plus, Trash2, Save, Globe, Check, UserCog, RotateCcw, Gauge, Zap,
+  Plus, Trash2, Save, Globe, Check, UserCog, RotateCcw, Gauge, Zap, Gift,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -15,19 +15,22 @@ import { useReduceMotion } from '../lib/motionPref'
 import { useSaveAction } from '../lib/useSaveAction'
 import { backend } from '../lib/backend'
 import { useOnboardingAction } from '../lib/useOnboardingAction'
+import LoyaltySettings from '../components/LoyaltySettings'
 
 const SECTIONS = [
   { id: 'clinic', icon: Building2, key: 'clinic' },
   { id: 'doctors', icon: Users, key: 'doctors' },
   { id: 'prices', icon: DollarSign, key: 'prices' },
+  { id: 'loyalty', icon: Gift, key: 'loyalty' },
   { id: 'performance', icon: Gauge, key: 'performance' },
   { id: 'suggestions', icon: Lightbulb, key: 'suggestions' },
   { id: 'plan', icon: Crown, key: 'yourPlan' },
 ]
 
 export default function Settings() {
-  const { t } = useI18n()
-  const [section, setSection] = useState('clinic')
+  const { t, lang } = useI18n()
+  const [search] = useSearchParams()
+  const [section, setSection] = useState(search.get('section') === 'loyalty' ? 'loyalty' : 'clinic')
   useOnboardingAction('clinic', () => setSection('clinic'))
 
   return (
@@ -37,7 +40,7 @@ export default function Settings() {
           <button key={s.id} onClick={() => setSection(s.id)}
             className={cx('flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
               section === s.id ? 'bg-brand-600 text-white shadow-soft' : 'bg-white text-ink-500 hover:text-brand-600')}>
-            <s.icon size={16} /> {t(`settings.${s.key}`)}
+            <s.icon size={16} /> {s.id === 'loyalty' ? (lang === 'ar' ? 'بطاقات الولاء' : 'Loyalty cards') : t(`settings.${s.key}`)}
           </button>
         ))}
       </div>
@@ -46,6 +49,7 @@ export default function Settings() {
         {section === 'clinic' && <ClinicSection />}
         {section === 'doctors' && <DoctorsSection />}
         {section === 'prices' && <PricesSection />}
+        {section === 'loyalty' && <FeatureLock feature="appointments"><LoyaltySettings /></FeatureLock>}
         {section === 'performance' && <PerformanceSection />}
         {section === 'suggestions' && <SuggestionsSection />}
         {section === 'plan' && <PlanSection />}

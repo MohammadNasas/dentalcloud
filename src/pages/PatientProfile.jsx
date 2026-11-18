@@ -3,7 +3,7 @@ import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, Pencil, FileDown, Trash2, Phone, MapPin, Briefcase,
   CalendarClock, Wallet, ClipboardList, Stethoscope, Grid3x3, Activity,
-  Images, History, NotebookPen, FileSignature, ScanFace,
+  Images, History, NotebookPen, FileSignature, ScanFace, Gift,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
@@ -24,9 +24,11 @@ import { money, waLink } from '../lib/utils'
 import { dayLabel, parseISO } from '../lib/dates'
 import WhatsAppIcon from '../components/WhatsAppIcon'
 import { useSaveAction } from '../lib/useSaveAction'
+import PatientLoyalty from '../components/PatientLoyalty'
 
 const TABS = [
   { id: 'overview', icon: ClipboardList, key: 'overview' },
+  { id: 'loyalty', icon: Gift, key: 'loyalty', feature: 'appointments' },
   { id: 'history', icon: Stethoscope, key: 'history' },
   { id: 'chart', icon: Grid3x3, key: 'chart' },
   { id: 'orthodontics', icon: ScanFace, key: 'orthodontics', feature: 'orthodontics' },
@@ -121,6 +123,7 @@ export default function PatientProfile() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {can('appointments') && <button onClick={() => setTab('loyalty')} className="btn-outline !py-2"><Gift size={15} />{lang === 'ar' ? 'بطاقة الولاء' : 'Loyalty card'}</button>}
             <button onClick={() => setEditOpen(true)} className="btn-outline !py-2"><Pencil size={15} /> {t('common.edit')}</button>
             <button onClick={doExport} disabled={exporting} className="btn-outline !py-2"><FileDown size={15} /> Word</button>
             <button onClick={() => setDeleteOpen(true)} disabled={deleting || store.readOnly} aria-label={lang === 'ar' ? 'حذف ملف المريض' : 'Delete patient file'} className="btn-ghost !py-2 text-rose-500 hover:bg-rose-50"><Trash2 size={15} /></button>
@@ -160,7 +163,7 @@ export default function PatientProfile() {
                 tab === tb.id ? 'bg-brand-600 text-white shadow-soft' : 'bg-white text-ink-500 hover:text-brand-600'
               }`}
             >
-              <tb.icon size={16} /> {t(`patient.${tb.key}`)}
+              <tb.icon size={16} /> {tb.id === 'loyalty' ? (lang === 'ar' ? 'بطاقة الولاء' : 'Loyalty card') : t(`patient.${tb.key}`)}
               {locked && <span className="text-amber-300">🔒</span>}
             </button>
           )
@@ -170,6 +173,7 @@ export default function PatientProfile() {
       {/* Tab content */}
       <div className="page-enter" key={tab}>
         {tab === 'overview' && <Overview patient={patient} onTab={setTab} />}
+        {tab === 'loyalty' && <FeatureLock feature="appointments"><PatientLoyalty key={patient.id} patient={patient} /></FeatureLock>}
         {tab === 'history' && <HistoryForm patient={patient} />}
         {tab === 'chart' && <DentalChart patient={patient} />}
         {tab === 'orthodontics' && <FeatureLock feature="orthodontics"><OrthodonticsPanel patient={patient} /></FeatureLock>}

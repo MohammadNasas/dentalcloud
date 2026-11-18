@@ -12,6 +12,7 @@ import { legacyWebRoute } from './lib/routing'
 import { shouldShowSiteMigration } from './lib/siteMigration'
 import SiteMoved from './pages/SiteMoved'
 import PageMetadata from './components/PageMetadata'
+const PublicLoyalty = React.lazy(() => import('./pages/PublicLoyalty'))
 
 // Apply the saved performance-mode choice before the first paint.
 applyReduceMotionOnBoot()
@@ -38,7 +39,9 @@ if (!desktopRouting) {
 }
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {siteMoved ? <SiteMoved /> : <I18nProvider>
+    {siteMoved ? <SiteMoved /> : !desktopRouting && location.pathname.replace(/\/$/,'') === '/loyalty'
+      ? <React.Suspense fallback={<div className="p-8 text-center">…</div>}><PublicLoyalty /></React.Suspense>
+      : <I18nProvider>
       <StoreProvider>
         <Router>
           <Root />

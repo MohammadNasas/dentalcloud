@@ -1,4 +1,14 @@
 # Account routes stay crawlable so Google can read noindex. Authentication remains unchanged.
+/loyalty
+  X-Robots-Tag: noindex, nofollow, noarchive
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+
+/loyalty/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+
 /login
   X-Robots-Tag: noindex, follow
 /login/*
