@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
-import { X, ArrowLeft, ArrowRight, FileUp, Wallet, ChartNoAxesCombined, MessageCircle, Sparkles, Check, FileText } from 'lucide-react'
+import { X, ArrowLeft, ArrowRight, Gift, QrCode, CalendarCheck, Settings, Sparkles, Check } from 'lucide-react'
 import './ReleaseNotice.css'
-export default function ReleaseNoticeDialog({ open, onClose, lang = 'ar' }) {
+export default function ReleaseNoticeDialog({ open, onClose, onExplore, lang = 'ar' }) {
   const dialog = useRef(null), ar = lang === 'ar', L = (a,b) => ar ? a : b
   useEffect(() => {
     const node = dialog.current
@@ -11,9 +11,9 @@ export default function ReleaseNoticeDialog({ open, onClose, lang = 'ar' }) {
     return () => { node.close(); previousFocus?.focus?.() }
   }, [open])
   const features = [
-    [Wallet, L('مصاريف عيادتك بصورة أوضح','A clearer view of your expenses'), L('تابع الإيجار والرواتب والمصاريف، وشوف صافي التحصيل الشهري.','Track rent, salaries and expenses alongside your monthly collections.')],
-    [ChartNoAxesCombined, L('أسعار مبنية على تكاليفك','Pricing informed by your costs'), L('جهّز خطة تسعير تراعي مصاريف العيادة والربح المستهدف.','Plan treatment prices around your clinic costs and target profit.')],
-    [MessageCircle, L('تعليمات المريض عبر واتساب','Patient instructions on WhatsApp'), L('اختر التعليمة والمريض، وجهّز إرسالها لرقمه مباشرة.','Choose the instructions and patient, then prepare their WhatsApp message.')],
+    [Settings, L('عرض تحدده أنت','Your clinic, your reward'), L('حدد عدد الزيارات والمكافأة من الإعدادات ← بطاقات الولاء.','Choose the visit target and reward in Settings → Loyalty cards.')],
+    [CalendarCheck, L('أختام مع الزيارات المكتملة','Stamps for completed visits'), L('تُحتسب الزيارات المؤهلة بعد تفعيل البرنامج، دون إضافة الزيارات القديمة.','Eligible completed visits count after enrollment. Earlier visits are not added.')],
+    [QrCode, L('بطاقة المريض برمز QR','A patient card with its own QR'), L('من ملف المريض ← بطاقة الولاء ← عرض رمز QR للبطاقة. يمسحه المريض ليرى زياراته ومكافأته بدون تسجيل دخول.','Open a patient → Loyalty card → Show card QR code. Patients scan it to view visits and rewards without signing in.')],
   ]
   return (
     <dialog ref={dialog} className="release-dialog" dir={ar?'rtl':'ltr'} aria-labelledby="release-title" onCancel={()=>onClose()} onClick={e=>{if(e.target===dialog.current)onClose()}}>
@@ -21,15 +21,15 @@ export default function ReleaseNoticeDialog({ open, onClose, lang = 'ar' }) {
         <header className="release-head">
           <div className="release-eyebrow"><span className="release-brand">DentalCloud</span><span className="release-pill"><Sparkles size={12}/>{L('جديد لعيادتك','NEW FOR YOUR CLINIC')}</span></div>
           <button className="release-close" aria-label={L('إغلاق','Close')} onClick={()=>onClose()}><X size={19}/></button>
-          <h1 id="release-title">{L('خطوة أسهل، كل يوم.','A little easier. Every day.')}</h1>
-          <p>{L('تعرّف على أحدث الإضافات لعيادتك.','Discover the latest additions to your clinic.')}</p>
+          <h1 id="release-title">{L('كل زيارة تستحق التقدير.','Every visit deserves appreciation.')}</h1>
+          <p>{L('بطاقات الولاء أصبحت متاحة في DentalCloud.','Loyalty cards are now available in DentalCloud.')}</p>
         </header>
         <section className="release-featured">
-          <div className="release-featured-copy"><span className="release-feature-label"><FileUp size={15}/>{L('استيراد ملفات المرضى','PATIENT IMPORT')}</span><h2>{L('ملفاتك القديمة، بداية مرتّبة.','Your old records. A fresh start.')}</h2><p>{L('انقل ملفات مرضاك، راجع البيانات وعدّلها قبل إضافتها لعيادتك.','Bring in your patient records, review the details and make changes before saving.')}</p><span className="release-location">{L('تلاقيها في: المرضى ← نقل ملفات المرضى','Find it in: Patients → Import patients')}</span></div>
-          <div className="release-art" aria-hidden="true"><div className="release-paper back"/><div className="release-paper"><FileText size={25}/><i/><i/><i/><span className="release-check"><Check size={18}/></span></div><span className="release-art-dot"/></div>
+          <div className="release-featured-copy"><span className="release-feature-label"><Gift size={15}/>{L('بطاقات الولاء','LOYALTY CARDS')}</span><h2>{L('زيارات تتراكم، ومكافأة يختارها الطبيب.','Visits add up. You choose the reward.')}</h2><p>{L('مثلاً: خمس زيارات مكتملة، وتنظيف مجاني في الزيارة التالية. أنت تحدد العرض المناسب لعيادتك.','For example: five completed visits, then complimentary cleaning at the next visit. Set the offer that suits your clinic.')}</p><span className="release-location">{L('متاحة ضمن باقة Pro','Available with Pro')}</span></div>
+          <div className="release-art" aria-hidden="true"><div className="release-paper back"/><div className="release-paper"><Gift size={25}/><i/><i/><i/><span className="release-check"><Check size={18}/></span></div><span className="release-art-dot"/></div>
         </section>
         <div className="release-features">{features.map(([Icon,title,description],i)=><section className="release-item" key={i}><span className={`release-icon icon-${i}`}><Icon size={20} strokeWidth={1.7}/></span><div><h2>{title}</h2><p>{description}</p></div></section>)}</div>
-        <footer className="release-footer"><span>{L('كل شيء بمكانه المعتاد.','Everything is right where you left it.')}</span><button autoFocus className="release-start" onClick={()=>onClose()}>{L('يلا نبدأ','Let’s get started')}{ar?<ArrowLeft size={17}/>:<ArrowRight size={17}/>}</button></footer>
+        <footer className="release-footer"><span>{L('كل شيء بمكانه المعتاد.','Everything is right where you left it.')}</span><button autoFocus className="release-start" onClick={()=>onExplore ? onExplore() : onClose()}>{L('اكتشف بطاقات الولاء','Explore loyalty cards')}{ar?<ArrowLeft size={17}/>:<ArrowRight size={17}/>}</button></footer>
       </div>
     </dialog>
   )

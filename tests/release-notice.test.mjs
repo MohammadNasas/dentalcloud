@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { createReleaseNoticeGate, RELEASE_NOTICE_KEY } from '../src/lib/releaseNotice.js'
 
 function fixture() {
-  const user = { id:'doctor-a', user_metadata:{ display_name:'Doctor' } }
+  const user = { id:'doctor-a', user_metadata:{ display_name:'Doctor', dc_seen_clinic_tools_20261013:true } }
   let reads = 0, writes = 0, fail = false
   const auth = {
     async getUser() { reads++; return {data:{user:structuredClone(user)}} },
@@ -18,6 +18,7 @@ test('first account visit displays once; another device reads server marker',asy
   assert.equal(await createReleaseNoticeGate(f.auth)('doctor-a'),false)
   assert.equal(f.counts().writes,1)
   assert.equal(f.user.user_metadata.display_name,'Doctor')
+  assert.equal(f.user.user_metadata.dc_seen_clinic_tools_20261013,true)
 })
 test('concurrent checks in one runtime only open one notice',async()=>{
   const f=fixture(), gate=createReleaseNoticeGate(f.auth)

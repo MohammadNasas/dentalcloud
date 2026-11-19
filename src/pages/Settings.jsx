@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Building2, Users, DollarSign, FileText, Lightbulb, Crown, Database,
@@ -31,6 +31,7 @@ export default function Settings() {
   const { t, lang } = useI18n()
   const [search] = useSearchParams()
   const [section, setSection] = useState(search.get('section') === 'loyalty' ? 'loyalty' : 'clinic')
+  useEffect(() => { if (search.get('section') === 'loyalty') setSection('loyalty') }, [search])
   useOnboardingAction('clinic', () => setSection('clinic'))
 
   return (

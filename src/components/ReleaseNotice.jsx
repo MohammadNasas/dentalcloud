@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '../context/StoreContext'
 import { useI18n } from '../i18n/I18nContext'
 import { supabase } from '../lib/supabaseClient'
@@ -14,6 +15,7 @@ const claim = createReleaseNoticeGate(supabase?.auth, storage)
 export default function ReleaseNotice() {
   const { currentUser, demoMode, mode, paymentResult } = useStore()
   const { lang } = useI18n()
+  const navigate = useNavigate()
   const [visibleFor, setVisibleFor] = useState(null)
   const userId = currentUser?.id
   useEffect(() => {
@@ -34,5 +36,5 @@ export default function ReleaseNotice() {
     document.addEventListener('visibilitychange', check)
     return () => { active = false; clearTimeout(timer); window.removeEventListener('online', check); document.removeEventListener('visibilitychange', check) }
   }, [userId, demoMode, mode, paymentResult])
-  return <ReleaseNoticeDialog open={Boolean(userId && visibleFor === userId && !demoMode && !paymentResult)} lang={lang} onClose={()=>setVisibleFor(null)}/>
+  return <ReleaseNoticeDialog open={Boolean(userId && visibleFor === userId && !demoMode && !paymentResult)} lang={lang} onExplore={()=>{setVisibleFor(null); navigate('/settings?section=loyalty')}} onClose={()=>setVisibleFor(null)}/>
 }

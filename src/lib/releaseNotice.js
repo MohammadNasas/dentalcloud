@@ -1,4 +1,4 @@
-export const RELEASE_NOTICE_KEY = 'dc_seen_clinic_tools_20261013'
+export const RELEASE_NOTICE_KEY = 'dc_seen_loyalty_cards_20261118'
 
 // Auth metadata is account-scoped and shared by web and desktop. No clinic or
 // billing records are changed. Offline checks defer the notice until reconnect.

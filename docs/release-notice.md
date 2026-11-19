@@ -1,10 +1,10 @@
-# Clinic tools release notice
+# Loyalty cards release notice
 
 The authenticated layout shows the approved bilingual release card. Public
 pages, demonstration accounts and an open payment-result dialog do not show it.
 The visual is shared with the development-only `/updates-preview.html` page.
 
-`dc_seen_clinic_tools_20261013` is stored as a single merged field in Supabase
+`dc_seen_loyalty_cards_20261118` is stored as a single merged field in Supabase
 Auth user metadata. Each new device reads the server's user record before
 showing this release; a successful marker save is required before display.
 The field grants no authorization and does not modify billing or clinic data.
@@ -20,3 +20,8 @@ requires a new key and reviewed copy. No database migration is needed.
 
 Tests cover sequential web/desktop sessions, concurrent checks in one runtime,
 account isolation, cancelled checks, write failures and unavailable storage.
+
+The notice announces loyalty settings, eligible visits and patient QR sharing.
+It appears for every authenticated account, including students; the Pro
+requirement is explicit. The action opens Settings → Loyalty cards, retaining
+the normal subscription gate. No email or WhatsApp messages are sent.
