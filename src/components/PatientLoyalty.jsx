@@ -7,8 +7,11 @@ import { useI18n } from '../i18n/I18nContext'
 import { useStore } from '../context/StoreContext'
 import { Modal, Field } from './ui'
 import LoyaltyCard from './LoyaltyCard'
+import WhatsAppIcon from './WhatsAppIcon'
+import { waLink } from '../lib/utils'
+import { instructionRecipientPhone } from '../lib/instructionRecipient'
 import { loyaltyRpc, loyaltyError } from '../lib/loyaltyApi'
-import { loyaltyLink, loyaltyProgress, DEMO_LOYALTY_TOKEN } from '../lib/loyalty'
+import { loyaltyLink, loyaltyProgress, loyaltyWhatsAppMessage, DEMO_LOYALTY_TOKEN } from '../lib/loyalty'
 
 export default function PatientLoyalty({ patient }) {
   const { lang } = useI18n(); const ar = lang === 'ar'
@@ -18,6 +21,7 @@ export default function PatientLoyalty({ patient }) {
   const [share, setShare] = useState(false); const [qr, setQr] = useState('')
   const [redeem, setRedeem] = useState(false); const [appointmentId, setAppointmentId] = useState('')
   const [rotate, setRotate] = useState(false); const [copied, setCopied] = useState(false)
+  const [phoneWarning, setPhoneWarning] = useState(false)
   const requestId = useRef(0)
   const load = useCallback(async () => {
     const request = ++requestId.current
@@ -33,6 +37,12 @@ export default function PatientLoyalty({ patient }) {
   useEffect(() => { load(); return () => { requestId.current++ } }, [load])
   const demoOrigin = location.protocol === 'file:' ? 'https://dentalcloudapp.com' : location.origin
   const url = demoMode ? loyaltyLink(card?.token, demoOrigin).replace('/loyalty#','/loyalty?demo=1#') : loyaltyLink(card?.token)
+  const recipient = instructionRecipientPhone(patient.phone)
+  const whatsappUrl = recipient.status === 'ready' && url ? waLink(recipient.number, loyaltyWhatsAppMessage({
+    lang, patientName: ar ? patient.nameAr || patient.name : patient.name || patient.nameAr,
+    clinicName: ar ? clinic?.nameAr || clinic?.name : clinic?.name || clinic?.nameAr, url,
+  })) : ''
+  const whatsappClass = 'btn-outline !border-emerald-200 !bg-emerald-50 !text-emerald-700 hover:!bg-emerald-100'
   useEffect(() => {
     let active = true; setQr('')
     if (share && url) QRCode.toDataURL(url, { width: 280, margin: 3, errorCorrectionLevel: 'M', color: { dark: '#103c3b', light: '#ffffff' } })
@@ -54,6 +64,12 @@ export default function PatientLoyalty({ patient }) {
       <div className="card flex flex-col justify-center gap-3 p-5">
         <p className="text-sm font-bold text-ink-700">{ar ? 'خطوات صغيرة… واهتمام يستمر' : 'Small steps. Lasting care.'}</p>
         <button disabled={!url} onClick={() => { setCopied(false); setShare(true) }} className="btn-outline"><QrCode size={17} />{ar ? 'عرض رمز QR للبطاقة' : 'Show card QR code'}</button>
+        {whatsappUrl ? <a className={whatsappClass} href={whatsappUrl} target="_blank" rel="noopener noreferrer"><WhatsAppIcon size={17} />{ar ? 'إرسال البطاقة عبر واتساب' : 'Share card via WhatsApp'}</a>
+          : <button disabled={!url} className={whatsappClass} onClick={()=>setPhoneWarning(true)}><WhatsAppIcon size={17} />{ar ? 'إرسال البطاقة عبر واتساب' : 'Share card via WhatsApp'}</button>}
+        {phoneWarning && recipient.status !== 'ready' && <p role="alert" className="rounded-lg bg-amber-50 p-2 text-xs leading-6 text-amber-800">{recipient.status === 'missing'
+          ? (ar ? 'لا يوجد رقم هاتف لهذا المريض. أضف رقم واتساب مع رمز الدولة من تعديل ملف المريض.' : 'No phone number is saved. Edit the patient profile and add their WhatsApp number with country code.')
+          : (ar ? 'أكمل رقم المريض برمز الدولة أو صحّحه من تعديل ملف المريض، ثم أعد المحاولة.' : 'Edit the patient profile to correct the phone number and include its country code, then try again.')}</p>}
+        <p className="text-xs leading-5 text-ink-400">{ar ? 'تفتح رسالة جاهزة؛ اضغط إرسال داخل واتساب.' : 'Opens a prepared message. Press Send in WhatsApp.'}</p>
         <button disabled={readOnly || !card.enabled || !loyaltyProgress(card).ready} onClick={() => { setAppointmentId(''); setRedeem(true) }} className="btn-primary"><Gift size={17} />{ar ? 'استخدام المكافأة' : 'Redeem reward'}</button>
         {!!card.adjustment && <p className="text-xs text-amber-700">{ar ? 'تم إلغاء زيارات استُخدمت لمكافأة سابقة؛ الزيارات الجديدة تعوّض الفرق أولاً.' : 'Reversed visits were used for a past reward. New visits first cover that adjustment.'}</p>}
         {demoMode && <p className="text-xs text-ink-400">{ar ? 'الرمز يفتح بطاقة تجريبية، بدون بيانات مرضى حقيقية.' : 'The QR opens a demo card, without real patient data.'}</p>}
