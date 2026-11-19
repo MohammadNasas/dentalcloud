@@ -23,6 +23,7 @@
     "release": "vite build --mode electron && electron-builder --publish always"
   },
   "dependencies": {
+    "@block65/webcrypto-web-push": "2.0.0",
     "@supabase/supabase-js": "^2.107.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",

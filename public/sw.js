@@ -6,6 +6,32 @@ const CACHE = 'dentalcloud-v2'
 
 self.addEventListener('install', () => self.skipWaiting())
 
+self.addEventListener('push', e => {
+  e.waitUntil((async()=>{
+    let data={}
+    try { data=e.data?.json() || {} } catch {}
+    let url='/loyalty'
+    try { const u=new URL(data.url,self.location.origin); if(u.origin===self.location.origin && u.pathname==='/loyalty') url=u.href } catch {}
+    let body=String(data.body || 'افتح بطاقة زياراتك للاطلاع على التذكير.').slice(0,300)
+    if (data.appointmentStart && Number.isFinite(Date.parse(data.appointmentStart))) {
+      body+=' '+new Date(data.appointmentStart).toLocaleString(data.lang==='en'?'en-GB':'ar',{dateStyle:'medium',timeStyle:'short'})
+    }
+    await self.registration.showNotification('DentalCloud',{body,icon:'/icon-192.png',badge:'/icon-192.png',
+      tag:String(data.tag || 'dentalcloud-reminder'),data:{url}})
+  })())
+})
+self.addEventListener('notificationclick',e=>{
+  e.notification.close()
+  e.waitUntil((async()=>{
+    const target=new URL(e.notification.data?.url || '/loyalty',self.location.origin)
+    if(target.origin!==self.location.origin || target.pathname!=='/loyalty') return
+    const tabs=await self.clients.matchAll({type:'window',includeUncontrolled:true})
+    const existing=tabs.find(tab=>tab.url===target.href)
+    if(existing) await existing.focus()
+    else await self.clients.openWindow(target.href)
+  })())
+})
+
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
     const keys = await caches.keys()

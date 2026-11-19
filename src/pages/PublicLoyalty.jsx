@@ -3,21 +3,32 @@ import { Gift, RefreshCw } from 'lucide-react'
 import LoyaltyCard from '../components/LoyaltyCard'
 import { paymentApiUrl } from '../lib/apiUrl'
 import { DEMO_LOYALTY_TOKEN } from '../lib/loyalty'
+import PatientPushOptIn from '../components/PatientPushOptIn'
 export default function PublicLoyalty() {
   const [lang, setLang] = useState('ar'); const ar = lang === 'ar'
   const [card, setCard] = useState(null); const [error, setError] = useState(''); const [loading, setLoading] = useState(true)
   const [refresh, setRefresh] = useState(0)
+  const [token] = useState(()=>{
+    const hash=location.hash.slice(1)
+    if (/^[a-f0-9]{64}$/.test(hash)) {
+      if(hash!==DEMO_LOYALTY_TOKEN) try {localStorage.setItem('dc_patient_card',hash)} catch {}
+      return hash
+    }
+    if(hash) return ''
+    try {const saved=localStorage.getItem('dc_patient_card');if(/^[a-f0-9]{64}$/.test(saved || '')) {history.replaceState(null,'','/loyalty#'+saved);return saved}} catch {}
+    return ''
+  })
   useEffect(() => {
     document.title = ar ? 'بطاقة زياراتك — DentalCloud' : 'Your visit card — DentalCloud'
     let robots = document.querySelector('meta[name="robots"]')
     if (!robots) { robots = document.createElement('meta'); robots.name = 'robots'; document.head.appendChild(robots) }
     robots.content = 'noindex, nofollow, noarchive'
     document.querySelectorAll('link[rel="canonical"],link[rel="alternate"][hreflang],script[type="application/ld+json"]').forEach(el=>el.remove())
+    const manifest=document.querySelector('link[rel="manifest"]'); if(manifest) manifest.href='/loyalty.webmanifest'
   }, [ar])
   useEffect(() => {
     const controller = new AbortController(); let active = true
     setLoading(true); setError('')
-    const token = window.location.hash.slice(1)
     const load = async () => {
       try {
         if (token === DEMO_LOYALTY_TOKEN && new URLSearchParams(location.search).get('demo') === '1') {
@@ -37,7 +48,7 @@ export default function PublicLoyalty() {
     }
     load()
     return () => { active = false; controller.abort() }
-  }, [refresh])
+  }, [refresh,token])
   return <main dir={ar ? 'rtl' : 'ltr'} className="flex min-h-[100dvh] flex-col items-center bg-[#f3f6f2] px-5 py-9">
     <div className="flex w-full max-w-md items-center justify-between text-[#103c3b]"><span className="text-sm font-bold">DentalCloud</span><button onClick={() => setLang(ar ? 'en' : 'ar')} className="rounded-full border border-[#103c3b]/15 px-3 py-1 text-xs">{ar ? 'English' : 'العربية'}</button></div>
     <div className="my-auto w-full max-w-md py-10">
@@ -46,6 +57,7 @@ export default function PublicLoyalty() {
       {loading ? <div className="rounded-3xl bg-white p-10 text-center text-ink-400">{ar ? 'جارٍ تحميل بطاقتك…' : 'Loading your card…'}</div>
         : card ? <LoyaltyCard card={card} lang={lang} />
           : <div role="alert" className="rounded-3xl bg-white p-7 text-center"><Gift className="mx-auto mb-4 text-brand-600" /><p>{error === 'missing' ? (ar ? 'الرابط غير صالح أو تم تغييره. اطلب رمز البطاقة من عيادتك.' : 'This link is invalid or replaced. Ask your clinic for your card QR.') : (ar ? 'تعذّر تحميل البطاقة. تحقق من الاتصال وأعد المحاولة.' : 'Could not load the card. Check your connection and retry.')}</p></div>}
+      {card && <PatientPushOptIn key={refresh} token={token} lang={lang} demo={token===DEMO_LOYALTY_TOKEN}/>}
       <button disabled={loading} onClick={() => setRefresh(v => v + 1)} className="mx-auto mt-6 flex items-center gap-2 text-sm text-brand-700"><RefreshCw size={15} />{ar ? 'تحديث البطاقة' : 'Refresh card'}</button>
     </div>
     <p className="text-center text-xs text-ink-400">{ar ? 'الرعاية تستمر، والاهتمام يكبر.' : 'Care continues. Appreciation grows.'}</p>

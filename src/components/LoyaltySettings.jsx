@@ -16,16 +16,17 @@ export default function LoyaltySettings() {
   const [reward, setReward] = useState(''); const [categories, setCategories] = useState(LOYALTY_CATEGORIES.map(c => c.value))
   const [error, setError] = useState(''); const [loaded, setLoaded] = useState(false)
   const [busy, setBusy] = useState(false); const [saved, setSaved] = useState(false)
+  const [pushReview,setPushReview]=useState(true),[pushAppointment,setPushAppointment]=useState(true),[hasProgram,setHasProgram]=useState(false)
   useEffect(() => {
     let active = true
     async function load() {
       if (demoMode) { setReward(ar ? 'تنظيف أسنان مجاني' : 'Complimentary cleaning'); setEnabled(true); setLoaded(true); return }
       try {
         if (!supabase) throw new Error('setup_required')
-        const { data, error } = await supabase.from('loyalty_programs').select('enabled,target,reward,categories').eq('clinic_id', clinic.id).maybeSingle()
+        const { data, error } = await supabase.from('loyalty_programs').select('enabled,target,reward,categories,push_review,push_appointment').eq('clinic_id', clinic.id).maybeSingle()
         if (error) throw error
         if (!active) return
-        if (data) { setEnabled(data.enabled); setTarget(data.target); setReward(data.reward); setCategories(data.categories) }
+        if (data) { setEnabled(data.enabled); setTarget(data.target); setReward(data.reward); setCategories(data.categories);setPushReview(data.push_review);setPushAppointment(data.push_appointment);setHasProgram(true) }
         setLoaded(true)
       } catch(e) { if (active) setError(loyaltyError(e, lang)) }
     }
@@ -34,8 +35,14 @@ export default function LoyaltySettings() {
   async function save() {
     if (busy || readOnly || !owner) return
     setBusy(true); setError(''); setSaved(false)
-    try { await loyaltyRpc('save_loyalty_program', { p_enabled: enabled, p_target: Number(target), p_reward: reward.trim(), p_categories: categories }); setSaved(true) }
+    try { await loyaltyRpc('save_loyalty_program', { p_enabled: enabled, p_target: Number(target), p_reward: reward.trim(), p_categories: categories }); setSaved(true);setHasProgram(true) }
     catch(e) { setError(loyaltyError(e, lang)) } finally { setBusy(false) }
+  }
+  async function setReminders(review,appointment) {
+    if(busy || readOnly || !owner) return
+    setBusy(true);setError('')
+    try {await loyaltyRpc('set_loyalty_push_settings',{p_review:review,p_appointment:appointment});setPushReview(review);setPushAppointment(appointment)}
+    catch(e){setError(loyaltyError(e,lang))} finally {setBusy(false)}
   }
   return <div className="space-y-6">
     <div className="card p-5 sm:p-6">
@@ -54,6 +61,12 @@ export default function LoyaltySettings() {
         <div><p className="mb-3 text-xs font-semibold text-ink-400">{ar ? 'معاينة بطاقة المريض' : 'Patient card preview'}</p><LoyaltyCard compact lang={lang} card={{ target, visits: Math.min(3,Number(target)), reward: reward || (ar ? 'مكافأتك المميزة' : 'Your special reward'), clinicName: clinic.name, clinicNameAr: clinic.nameAr, enabled }} /></div>
       </div>
       {error && <p role="alert" className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
+      <fieldset disabled={busy || readOnly || !owner || !hasProgram} className="mt-6 space-y-3 border-t border-ink-100 pt-5">
+        <legend className="pt-4 font-bold text-ink-700">{ar?'تذكيرات المريض':'Patient reminders'}</legend>
+        <p className="text-xs leading-6 text-ink-500">{ar?'تصل فقط للمريض الذي وافق على الإشعارات من بطاقته. يمكنك إيقاف كل نوع لعيادتك. احفظ عرض الولاء أولًا لتعديلها.':'Only patients who opt in on their card receive notifications. You can pause each type for your clinic. Save your loyalty program first.'}</p>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pushAppointment} onChange={e=>setReminders(pushReview,e.target.checked)}/>{ar?'تذكير بالموعد قبل يوم':'Appointment reminder one day before'}</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={pushReview} onChange={e=>setReminders(e.target.checked,pushAppointment)}/>{ar?'تذكير بحجز مراجعة كل 30 يوم':'Check-up booking reminder every 30 days'}</label>
+      </fieldset>
     </div>
   </div>
 }
