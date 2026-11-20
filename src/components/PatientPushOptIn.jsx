@@ -32,17 +32,24 @@ export default function PatientPushOptIn({token,lang,demo=false}) {
   if(demo) {setState(s=>({...s,subscribed:true}));return}
   setBusy(true);setError('')
   // Request directly from the patient's click, before any network awaits (iOS).
-  const permission=Notification.requestPermission()
+  let stage='permission'
   try {
-   if(await permission!=='granted') throw Error('denied')
-   const reg=await navigator.serviceWorker.register('/sw.js');await navigator.serviceWorker.ready
+   if(await Notification.requestPermission()!=='granted') throw Error('denied')
+   stage='browser'
+   await navigator.serviceWorker.register('/sw.js')
+   const reg=await navigator.serviceWorker.ready
    const key=Uint8Array.from(atob(config.publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))
    let sub=await reg.pushManager.getSubscription()
    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key})
-   setState(await api('subscribe',sub.toJSON()))
-  } catch(e) {setError(e.message==='denied'
+   stage='save'
+   const result=await api('subscribe',sub.toJSON())
+   if(!result.subscribed) throw Error('not_saved')
+   setState(result)
+  } catch(e) {setError(e.message==='denied' || e.name==='NotAllowedError'
     ? (ar?'الإشعارات غير مسموحة. يمكنك السماح بها من إعدادات الموقع في المتصفح.':'Notifications are blocked. You can allow them in your browser’s site settings.')
-    : (ar?'لم يتم تفعيل التذكيرات. تحقق من الاتصال وأعد المحاولة.':'Reminders were not enabled. Check your connection and try again.'))}
+    : stage==='save'
+      ? (ar?'تعذّر حفظ تفعيل الإشعارات. أعد المحاولة، وإذا استمرت المشكلة تواصل مع العيادة.':'Could not save your notification preferences. Try again or contact your clinic if this continues.')
+      : (ar?'تعذّر تفعيل الإشعارات في هذا المتصفح. افتح رابط البطاقة في Chrome أو Safari خارج التطبيقات، وتأكد من السماح بالإشعارات.':'This browser could not enable notifications. Open the card in Chrome or Safari outside other apps and check notification permissions.'))}
   finally {setBusy(false)}
  }
  async function disable() {
@@ -56,12 +63,12 @@ export default function PatientPushOptIn({token,lang,demo=false}) {
  if(!config && !error) return null
  return <section className="mt-5 rounded-2xl border border-[#103c3b]/10 bg-white p-5 text-[#103c3b]" aria-label={ar?'تذكيراتك':'Your reminders'}>
   <h2 className="flex items-center gap-2 font-bold"><Bell size={19}/>{ar?'خلّينا نذكّرك بابتسامتك':'A little reminder for your smile'}</h2>
-  <p className="mt-2 text-sm leading-7 text-ink-500">{ar?'بموافقتك، نرسل إشعارًا قبل موعدك بيوم وتذكيرًا لحجز مراجعة كل 30 يوم، حسب إعدادات عيادتك. الإشعارات اختيارية ويمكنك إيقافها من هنا.':'With your permission, receive an appointment reminder one day before and a check-up booking reminder every 30 days, according to your clinic’s settings. You can turn these optional notifications off here.'}</p>
+  <p className="mt-2 text-sm leading-7 text-ink-500">{ar?'فعّل الإشعارات ليصلك تذكير بحجز مراجعتك، وبموعدك قبل يوم.':'Enable notifications for a reminder to book your check-up and a reminder one day before your appointment.'}</p>
   {demo && <p className="mt-2 text-xs text-amber-700">{ar?'معاينة فقط — لا يُطلب إذن ولا تُرسل إشعارات.':'Preview only — no permission request or notifications.'}</p>}
   {state?.subscribed ? <div className="mt-4"><p role="status" className="mb-3 text-sm text-emerald-700">{ar?'التذكيرات مفعّلة لهذه البطاقة على هذا الجهاز.':'Reminders are enabled for this card on this device.'}</p><button disabled={busy} className="btn-outline w-full" onClick={disable}><BellOff size={16}/>{ar?'إيقاف التذكيرات':'Turn reminders off'}</button></div>
    : ios && !installed ? <p className="mt-4 rounded-xl bg-amber-50 p-3 text-sm leading-7 text-amber-900">{ar?'على الآيفون: افتح البطاقة في Safari، اضغط مشاركة ← إضافة إلى الشاشة الرئيسية، ثم افتحها من الأيقونة وفعّل التذكيرات.':'On iPhone: open this card in Safari, tap Share → Add to Home Screen, then open its icon to enable reminders.'}</p>
    : !supported && !demo ? <p className="mt-3 text-sm text-ink-500">{ar?'هذا المتصفح لا يدعم الإشعارات. افتح البطاقة في متصفح يدعمها.':'This browser does not support notifications. Open your card in a supported browser.'}</p>
-   : <button disabled={busy || !state?.available} onClick={enable} className="btn-primary mt-4 w-full"><Bell size={16}/>{busy?'…':ar?'فعّل تذكيراتي':'Enable my reminders'}</button>}
+   : <button disabled={busy || !state?.available} onClick={enable} className="btn-primary mt-4 w-full"><Bell size={16}/>{busy?'…':ar?'تفعيل الإشعارات':'Enable notifications'}</button>}
   {state && !state.available && <p className="mt-3 text-xs text-ink-500">{ar?'التذكيرات متوقفة حاليًا لدى العيادة.':'Your clinic’s reminders are currently paused.'}</p>}
   {error && <p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}
  </section>
