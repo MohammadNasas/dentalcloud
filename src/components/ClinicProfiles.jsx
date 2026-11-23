@@ -9,10 +9,11 @@ import { manageProfiles, rememberProfiles, profileDirectory, forgetProfiles, ann
 const errorText = ar => ar ? 'تعذّر إتمام العملية. تحقق من الاتصال والصلاحيات وحاول مجددًا.' : 'Could not complete this action. Check your connection and permissions, then try again.'
 
 export function ProfileSwitcher() {
-  const { clinic, currentUser, logout } = useStore()
+  const { clinic, currentUser, logout, demoMode, mode } = useStore()
   const { lang } = useI18n(); const ar = lang === 'ar'
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
+  if (demoMode || mode !== 'cloud') return null
   async function lock() {
     setBusy(true); setError('')
     try {
@@ -69,7 +70,7 @@ export function ProfileSelector() {
 }
 
 export default function ClinicProfiles() {
-  const { clinic, currentUser, refreshClinic } = useStore(); const { lang } = useI18n(); const ar = lang === 'ar'
+  const { clinic, currentUser, refreshClinic, doctors, demoMode, readOnly } = useStore(); const { lang } = useI18n(); const ar = lang === 'ar'
   const [profiles, setProfiles] = useState([]); const [form, setForm] = useState(null)
   const [busy, setBusy] = useState(false); const [error, setError] = useState(''); const [notice, setNotice] = useState('')
   async function refresh() {
@@ -77,7 +78,7 @@ export default function ClinicProfiles() {
     const rows = data.profiles.map(p => p.owner ? { ...p, email: currentUser.email } : p)
     setProfiles(rows); rememberProfiles(clinic, rows)
   }
-  useEffect(() => { refresh().catch(() => setError(errorText(ar))) }, [])
+  useEffect(() => { if (demoMode) { setProfiles(doctors.map(d => ({ ...d, active:true, owner:d.id===currentUser.id }))); return } refresh().catch(() => setError(errorText(ar))) }, [])
   async function save(e) {
     e.preventDefault(); if (busy) return
     setBusy(true); setError(''); setNotice('')
@@ -93,10 +94,10 @@ export default function ClinicProfiles() {
     catch { setError(errorText(ar)) } finally { setBusy(false) }
   }
   return <div className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold text-ink-900">{ar ? 'بروفايلات العيادة' : 'Clinic profiles'}</h2><p className="mt-2 text-sm text-ink-500">{ar ? 'التقويم مشترك. حساب المريض يظهر للطبيب المسؤول وصاحب العيادة فقط.' : 'Shared calendar. Patient finances are visible only to the assigned clinician and clinic owner.'}</p></div><button onClick={() => { setError(''); setForm({ action: 'create', name: '', password: '', role: 'doctor' }) }} className="btn-primary"><Plus size={16}/>{ar ? 'إضافة بروفايل' : 'Add profile'}</button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold text-ink-900">{ar ? 'بروفايلات العيادة' : 'Clinic profiles'}</h2><p className="mt-2 text-sm text-ink-500">{ar ? 'التقويم مشترك. حساب المريض يظهر للطبيب المسؤول وصاحب العيادة فقط.' : 'Shared calendar. Patient finances are visible only to the assigned clinician and clinic owner.'}</p></div><button disabled={demoMode || readOnly} onClick={() => { setError(''); setForm({ action: 'create', name: '', password: '', role: 'doctor' }) }} className="btn-primary"><Plus size={16}/>{ar ? 'إضافة بروفايل' : 'Add profile'}</button></div>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-600">{error}</p>}
     {notice && <p role="status" className="rounded-xl bg-brand-50 p-3 text-sm text-brand-700">{notice}</p>}
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{profiles.map(p => <div key={p.id} className="card p-5"><div className="flex items-center gap-3"><Avatar name={p.name} size={48}/><div><p className="font-bold">{p.name}</p><p className="mt-1 text-xs text-ink-400">{p.owner ? (ar ? 'صاحب العيادة · جميع الصلاحيات' : 'Owner · full access') : p.active ? (ar ? 'مفعّل · صلاحيات الفريق' : 'Active · team access') : (ar ? 'موقوف' : 'Disabled')}</p></div></div>{p.owner ? <p className="mt-4 text-xs text-ink-500">{ar ? 'محمي بكلمة مرور حسابك الحالية.' : 'Protected by your existing account password.'}</p> : <div className="mt-5 flex flex-wrap gap-2"><button className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'update', id: p.id, name: p.name, specialty: p.specialty }) }}>{ar ? 'تعديل' : 'Edit'}</button><button className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'password', id: p.id, password: '' }) }}>{ar ? 'كلمة المرور' : 'Password'}</button><button disabled={busy} className="btn-ghost !px-3 !py-2 text-xs" onClick={() => toggle(p)}>{p.active ? (ar ? 'إيقاف' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}</button></div>}</div>)}</div>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{profiles.map(p => <div key={p.id} className="card p-5"><div className="flex items-center gap-3"><Avatar name={p.name} size={48}/><div><p className="font-bold">{p.name}</p><p className="mt-1 text-xs text-ink-400">{p.owner ? (ar ? 'صاحب العيادة · جميع الصلاحيات' : 'Owner · full access') : p.active ? (ar ? 'مفعّل · صلاحيات الفريق' : 'Active · team access') : (ar ? 'موقوف' : 'Disabled')}</p></div></div>{p.owner ? <p className="mt-4 text-xs text-ink-500">{ar ? 'محمي بكلمة مرور حسابك الحالية.' : 'Protected by your existing account password.'}</p> : <div className="mt-5 flex flex-wrap gap-2"><button disabled={demoMode} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'update', id: p.id, name: p.name, specialty: p.specialty }) }}>{ar ? 'تعديل' : 'Edit'}</button><button disabled={demoMode} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'password', id: p.id, password: '' }) }}>{ar ? 'كلمة المرور' : 'Password'}</button><button disabled={busy || demoMode} className="btn-ghost !px-3 !py-2 text-xs" onClick={() => toggle(p)}>{p.active ? (ar ? 'إيقاف' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}</button></div>}</div>)}</div>
     <p className="text-xs leading-6 text-ink-500">{ar ? 'تعيين المريض يتم من ملفه. الملفات القديمة تبقى عند الشخص الذي أضافها إلى أن تغيّر التعيين. افتح حساب صاحب العيادة على جهاز الفريق مرة واحدة، ثم اضغط «قفل وتبديل البروفايل».' : 'Assign patients from their files. Existing records stay with their creator until reassigned. On a team device, sign in as the owner once, then use “Lock & switch profile”.'}</p>
     <Modal open={Boolean(form)} onClose={() => { if (!busy) setForm(null) }} title={ar ? 'إعداد البروفايل' : 'Profile settings'} size="sm">
       {form && <form onSubmit={save} className="space-y-4">
