@@ -55,11 +55,11 @@ async function authenticatedUser(supaUrl, serviceKey, request) {
   return user?.id ? user : null
 }
 
-async function userBelongsToClinic(supaUrl, headers, userId, clinicId) {
-  const url = new URL(`${supaUrl}/rest/v1/doctors`)
+async function userOwnsClinic(supaUrl, headers, userId, clinicId) {
+  const url = new URL(`${supaUrl}/rest/v1/clinics`)
   url.searchParams.set('select', 'id')
-  url.searchParams.set('id', `eq.${userId}`)
-  url.searchParams.set('clinic_id', `eq.${clinicId}`)
+  url.searchParams.set('owner_id', `eq.${userId}`)
+  url.searchParams.set('id', `eq.${clinicId}`)
   const r = await fetch(url, { headers })
   const rows = await r.json().catch(() => [])
   return r.ok && Array.isArray(rows) && rows.length > 0
@@ -176,7 +176,7 @@ async function finalizeSubscription({ base, accessToken, supaUrl, headers, userI
   const plan = subscriptionPlan(originalTier)
   const checkoutMode = refMode === 'paid' ? 'paid' : 'trial'
   if (!clinicId || !plan || !validTier(originalTier) || !PRICES[tier]) return json({ ok: false, error: 'bad_subscription_reference' }, 400)
-  if (!await userBelongsToClinic(supaUrl, headers, userId, clinicId)) return json({ ok: false, error: 'clinic_access_denied' }, 403)
+  if (!await userOwnsClinic(supaUrl, headers, userId, clinicId)) return json({ ok: false, error: 'clinic_access_denied' }, 403)
   if (sub.status !== 'ACTIVE') return json({ ok: false, error: 'subscription_not_active', status: sub.status }, 400)
 
   const clinic = await getClinic(supaUrl, headers, clinicId)
@@ -295,7 +295,7 @@ async function finalizeLegacyOrder({ base, accessToken, supaUrl, headers, userId
   const [clinicId, originalTier, coupon] = String(reference).split('--')
   const tier = canonicalTier(originalTier)
   if (!clinicId || originalTier === 'pro_monthly' || !validTier(originalTier) || !PRICES[tier]) return json({ ok: false, error: 'bad_reference' }, 400)
-  if (!await userBelongsToClinic(supaUrl, headers, userId, clinicId)) return json({ ok: false, error: 'clinic_access_denied' }, 403)
+  if (!await userOwnsClinic(supaUrl, headers, userId, clinicId)) return json({ ok: false, error: 'clinic_access_denied' }, 403)
 
   const expected = expectedPrice(originalTier, coupon)
   if (Math.abs(paid - expected) > 0.01) return json({ ok: false, error: 'amount_mismatch', paid, expected }, 400)

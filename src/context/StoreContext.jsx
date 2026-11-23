@@ -13,6 +13,7 @@ import { createUndoDelete, withoutDeletedRecords } from '../lib/undoDelete.js'
 import { confirmOnboardingSave } from '../lib/onboarding.js'
 import { validExpense } from '../lib/clinicFinances.js'
 import { prepareImport, patientBalance } from '../lib/patientImport.js'
+import { patientFinanceAllowed, watchProfileSwitch } from '../lib/clinicProfiles'
 
 const StoreContext = createContext(null)
 
@@ -87,12 +88,12 @@ export function StoreProvider({ children }) {
         let clinic = data.clinic || me.clinic
         // Economy was retired in July 2026. Upgrade legacy accounts in place so
         // they immediately receive the complete Pro feature set.
-        if (clinic?.tier === 'economy') {
+        if (clinic?.tier === 'economy' && !me.user.staffProfile) {
           clinic = { ...clinic, tier: 'pro' }
           clinic = await backend.saveClinic(clinic)
         }
         // Complimentary accounts → free Pro (skip the paywall).
-        if (backend.mode === 'cloud' && (!clinic.paid || clinic.tier !== 'pro') && await isComplimentary(me.user?.email)) {
+        if (!me.user.staffProfile && backend.mode === 'cloud' && (!clinic.paid || clinic.tier !== 'pro') && await isComplimentary(me.user?.email)) {
           clinic = { ...clinic, tier: 'pro', paid: true }
           clinic = await backend.saveClinic(clinic)
         }
@@ -139,8 +140,10 @@ export function StoreProvider({ children }) {
 
   // Detect the password-recovery link (user clicked the reset email).
   useEffect(() => {
-    const { data } = backend.onAuthEvent((event) => {
+    const { data } = backend.onAuthEvent((event, session) => {
       if (event === 'PASSWORD_RECOVERY') setRecovery(true)
+      if (event === 'SIGNED_OUT') { queueRef.current.reset(); setState(EMPTY) }
+      if (event === 'SIGNED_IN' && stateRef.current.currentUser?.id && session?.user?.id !== stateRef.current.currentUser.id) window.location.reload()
     })
     return () => data?.subscription?.unsubscribe?.()
   }, [])
@@ -189,6 +192,31 @@ export function StoreProvider({ children }) {
   }, [loadSession])
 
   const { clinic, currentUser } = state
+  const canViewPatientFinance = useCallback((patient) => patientFinanceAllowed(currentUser, typeof patient === 'string' ? state.patients.find(p => p.id === patient) : patient), [currentUser, state.patients])
+  const refreshAppointments = useCallback(async () => {
+    if (backend.mode !== 'cloud' || isDemo || !stateRef.current.currentUser || queueRef.current.hasUnsaved()) return
+    const uid = stateRef.current.currentUser.id
+    const appointments = await backend.sharedAppointments()
+    if (stateRef.current.currentUser?.id === uid && !queueRef.current.hasUnsaved() && !undoRef.current.hasPending()) {
+      if (appointments.some(a => !stateRef.current.patients.some(p => p.id === a.patientId))) await loadSession()
+      else setState(s => ({ ...s, appointments }))
+    }
+  }, [isDemo, loadSession])
+  useEffect(() => {
+    if (!currentUser || isDemo || backend.mode !== 'cloud') return
+    const refresh = () => { if (document.visibilityState === 'visible') refreshAppointments().catch(() => {}) }
+    const timer = setInterval(refresh, 30000)
+    window.addEventListener('focus', refresh)
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh) }
+  }, [currentUser?.id, refreshAppointments, isDemo])
+  useEffect(() => watchProfileSwitch(() => { window.location.reload() }), [])
+  useEffect(() => {
+    if (!currentUser?.staffProfile) return
+    const refresh = () => { if (!queueRef.current.hasUnsaved() && !undoRef.current.hasPending()) loadSession() }
+    const timer = setInterval(refresh, 45000)
+    window.addEventListener('focus', refresh)
+    return () => { clearInterval(timer); window.removeEventListener('focus', refresh) }
+  }, [currentUser?.id, currentUser?.staffProfile, loadSession])
   const [accessNow, setAccessNow] = useState(Date.now())
   useEffect(() => {
     const tick = () => setAccessNow(Date.now())
@@ -284,7 +312,7 @@ export function StoreProvider({ children }) {
   const resendOtp = useCallback(() => (pendingOtp ? backend.resendOtp(pendingOtp.email) : Promise.resolve({ ok: false })), [pendingOtp])
   const cancelOtp = useCallback(() => setPendingOtp(null), [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
     if (importPendingRef.current) { toast('انتظر تأكيد الاستيراد. / Wait for the import to finish.'); return }
     if (undoRef.current.hasPending()) {
       toast('انتظر تأكيد الحذف أو اضغط تراجع قبل تسجيل الخروج. / Wait for deletion or undo before signing out.', 'info')
@@ -294,15 +322,24 @@ export function StoreProvider({ children }) {
       toast('يوجد تعديلات لم تُحفظ. أعد المحاولة قبل تسجيل الخروج. / Please retry unsaved changes before signing out.')
       return
     }
-    clearDraftScope(draftScope(stateRef.current.currentUser?.id, stateRef.current.clinic?.id)).catch(() => toast('تعذّر مسح مسودات الجهاز. / Could not clear device drafts.'))
+    await clearDraftScope(draftScope(stateRef.current.currentUser?.id, stateRef.current.clinic?.id))
+    await backend.signOut()
     queueRef.current.reset()
     setState(EMPTY)
-    backend.signOut().catch((e) => console.error(e))
+    return true
   }, [])
 
   // Drafts update immediately for typing. Success is reported only after the
   // server confirms; failed drafts remain visible with an explicit retry.
   const upsert = useCallback((key, table, obj) => {
+    if (stateRef.current.currentUser?.staffProfile) {
+      const patient = stateRef.current.patients.find(p => p.id === (table === 'patients' ? obj.id : obj.patientId))
+      if (!['patients','toothRecords','appointments','payments'].includes(table)
+        || (table !== 'appointments' && patient && !patientFinanceAllowed(stateRef.current.currentUser, patient))) {
+        toast('التعديل متاح للطبيب المسؤول فقط. / Only the assigned clinician can edit this file.')
+        return Promise.resolve(null)
+      }
+    }
     if (undoRef.current.has(`${key}:${obj.id}`)) return Promise.resolve(null)
     if (obj.patientId && undoRef.current.has(`patients:${obj.patientId}`)) return Promise.resolve(null)
     if (rejectExpiredWrite()) return Promise.resolve(null)
@@ -321,6 +358,7 @@ export function StoreProvider({ children }) {
   }, [isDemo])
 
   const drop = useCallback((key, table, id, extra) => {
+    if (stateRef.current.currentUser?.staffProfile) { toast('الحذف لصاحب العيادة فقط. / Only the clinic owner can delete records.'); return Promise.resolve(null) }
     const existing = stateRef.current[key].find((item) => item.id === id)
     if (existing?.patientId && undoRef.current.has(`patients:${existing.patientId}`)) return Promise.resolve(null)
     if (rejectExpiredWrite()) return Promise.resolve(null)
@@ -331,6 +369,7 @@ export function StoreProvider({ children }) {
   }, [isDemo])
 
   const scheduleDelete = useCallback((key, table, id, kind) => {
+    if (stateRef.current.currentUser?.staffProfile) { toast('الحذف لصاحب العيادة فقط. / Only the clinic owner can delete records.'); return Promise.resolve(null) }
     if (isDemo || rejectExpiredWrite()) return Promise.resolve(null)
     if (queueRef.current.hasUnsaved()) {
       toast('انتظر حفظ التعديلات قبل الحذف. / Save pending changes before deleting.', 'info')
@@ -404,6 +443,7 @@ export function StoreProvider({ children }) {
       history: data.history || { dental: {}, medical: {}, systems: {}, allergies: [], medications: [], social: {} },
       exam: data.exam || {}, orthodontics: data.orthodontics || {}, perio: data.perio || {}, plaque: data.plaque || {}, photos: [],
       createdBy: currentUser?.id, createdAt: new Date().toISOString(),
+      assignedDoctorId: currentUser?.staffProfile ? currentUser.id : (data.assignedDoctorId || currentUser?.id),
     }
     return upsert('patients', 'patients', patient)
   }, [clinic, currentUser, state.patients.length, upsert])
@@ -538,6 +578,7 @@ export function StoreProvider({ children }) {
     otpEmail: pendingOtp?.email || null, verifyOtp, resendOtp, cancelOtp,
     paymentResult, dismissPaymentResult,
     clinic, currentUser, tier, can, isOwner, readOnly: isDemo || subscriptionReadOnly, subscriptionReadOnly, demoMode: isDemo,
+    canViewPatientFinance, refreshAppointments, refreshClinic: loadSession,
     login, logout, register, resetPassword, updatePassword,
     patients: state.patients, doctors: state.doctors, appointments: state.appointments,
     toothRecords: state.toothRecords, payments: state.payments, suggestions: state.suggestions,
@@ -559,4 +600,13 @@ export function useStore() {
   const ctx = useContext(StoreContext)
   if (!ctx) throw new Error('useStore must be used within StoreProvider')
   return ctx
+}
+
+export function PatientAccessScope({ patient, children }) {
+  const store = useContext(StoreContext)
+  const restricted = !store.canViewPatientFinance(patient)
+  return <StoreContext.Provider value={{ ...store, patientReadOnly: restricted,
+    readOnly: store.readOnly || restricted,
+    can: feature => restricted && ['clinicBalances','priceCatalog'].includes(feature) ? false : store.can(feature),
+  }}>{children}</StoreContext.Provider>
 }

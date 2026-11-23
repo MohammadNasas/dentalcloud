@@ -17,6 +17,7 @@ import logo from '../lib/logo'
 import PageLoader from './PageLoader'
 import GettingStarted from './GettingStarted'
 import ReleaseNotice from './ReleaseNotice'
+import { ProfileSwitcher } from './ClinicProfiles'
 
 const NAV_CONTAINER = {
   hidden: {},
@@ -162,6 +163,7 @@ function SidebarInner({ onNavigate, navItems, can, t, L, lang, clinic, currentUs
 
       {/* User */}
       <div className="mt-auto border-t border-white/10 p-3">
+        <ProfileSwitcher />
         <div className="flex items-center gap-3 rounded-xl px-2 py-2">
           <Avatar name={currentUser?.name} size={38} />
           <div className="min-w-0 flex-1">
@@ -183,6 +185,7 @@ export default function Layout() {
   const { t, L, lang, toggleLang } = useI18n()
   const { currentUser, clinic, logout, can, appointments, getPatient, isOwner, readOnly, subscriptionReadOnly } = useStore()
   const navItems = (() => {
+    if (currentUser?.staffProfile) return NAV.filter(n => ['/patients','/appointments','/instructions','/download'].includes(n.to))
     if (!isOwner) return NAV
     const items = [...NAV]
     const i = items.findIndex((n) => n.to === '/settings')
@@ -287,7 +290,7 @@ export default function Layout() {
         </main>
       </div>
 
-      <GettingStarted />
+      {!currentUser?.staffProfile && <GettingStarted />}
       <ReleaseNotice />
 
       {/* Mobile bottom tab bar */}
@@ -295,7 +298,7 @@ export default function Layout() {
         className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-ink-100 bg-white/95 backdrop-blur lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        {BOTTOM_NAV.map((item) => (
+        {BOTTOM_NAV.filter(item => !currentUser?.staffProfile || ['/patients','/appointments'].includes(item.to)).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

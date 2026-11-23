@@ -16,6 +16,7 @@ import { useSaveAction } from '../lib/useSaveAction'
 import { backend } from '../lib/backend'
 import { useOnboardingAction } from '../lib/useOnboardingAction'
 import LoyaltySettings from '../components/LoyaltySettings'
+import ClinicProfiles from '../components/ClinicProfiles'
 
 const SECTIONS = [
   { id: 'clinic', icon: Building2, key: 'clinic' },
@@ -30,8 +31,8 @@ const SECTIONS = [
 export default function Settings() {
   const { t, lang } = useI18n()
   const [search] = useSearchParams()
-  const [section, setSection] = useState(search.get('section') === 'loyalty' ? 'loyalty' : 'clinic')
-  useEffect(() => { if (search.get('section') === 'loyalty') setSection('loyalty') }, [search])
+  const [section, setSection] = useState(['loyalty','doctors'].includes(search.get('section')) ? search.get('section') : 'clinic')
+  useEffect(() => { if (['loyalty','doctors'].includes(search.get('section'))) setSection(search.get('section')) }, [search])
   useOnboardingAction('clinic', () => setSection('clinic'))
 
   return (
@@ -41,14 +42,14 @@ export default function Settings() {
           <button key={s.id} onClick={() => setSection(s.id)}
             className={cx('flex shrink-0 items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition-all',
               section === s.id ? 'bg-brand-600 text-white shadow-soft' : 'bg-white text-ink-500 hover:text-brand-600')}>
-            <s.icon size={16} /> {s.id === 'loyalty' ? (lang === 'ar' ? 'بطاقات الولاء' : 'Loyalty cards') : t(`settings.${s.key}`)}
+            <s.icon size={16} /> {s.id === 'doctors' ? (lang === 'ar' ? 'بروفايلات العيادة' : 'Clinic profiles') : s.id === 'loyalty' ? (lang === 'ar' ? 'بطاقات الولاء' : 'Loyalty cards') : t(`settings.${s.key}`)}
           </button>
         ))}
       </div>
 
       <div className="page-enter" key={section}>
         {section === 'clinic' && <ClinicSection />}
-        {section === 'doctors' && <DoctorsSection />}
+        {section === 'doctors' && <FeatureLock feature="multiDoctor"><ClinicProfiles /></FeatureLock>}
         {section === 'prices' && <PricesSection />}
         {section === 'loyalty' && <FeatureLock feature="appointments"><LoyaltySettings /></FeatureLock>}
         {section === 'performance' && <PerformanceSection />}

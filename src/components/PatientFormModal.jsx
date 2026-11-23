@@ -19,12 +19,13 @@ const empty = {
 
 export default function PatientFormModal({ open, onClose, patient, onSaved }) {
   const { t, lang } = useI18n()
-  const { addPatient, updatePatient } = useStore()
+  const { addPatient, updatePatient, doctors, currentUser, can } = useStore()
   const navigate = useNavigate()
   const draft = useFormDraft('patient:' + (patient?.id || 'new'), () => ({
     ...empty,
     ...Object.fromEntries(Object.keys(empty).map((key) => [key, patient?.[key] ?? empty[key]])),
     id: patient?.id || backend.genId('patient'),
+    assignedDoctorId: patient?.assignedDoctorId || patient?.createdBy || currentUser?.id,
     name: patient ? (lang === 'ar' ? patient.nameAr || patient.name : patient.name || patient.nameAr) : '',
   }), open)
   const form = draft.value
@@ -70,6 +71,7 @@ export default function PatientFormModal({ open, onClose, patient, onSaved }) {
     >
       <DraftNotice draft={draft} />
       <fieldset disabled={saving || draft.blocked} className="grid gap-4 sm:grid-cols-2">
+        {!currentUser?.staffProfile && can('multiDoctor') && <Field label={lang === 'ar' ? 'الطبيب المسؤول عن المريض' : 'Assigned clinician'} className="sm:col-span-2"><select className="input" value={form.assignedDoctorId} onChange={e => set('assignedDoctorId',e.target.value)}>{doctors.map(d => <option key={d.id} value={d.id}>{d.nameAr || d.name}</option>)}</select></Field>}
         <Field label={t('patient.name')} required className="sm:col-span-2">
           <input className="input" value={form.name} onChange={(e) => set('name', e.target.value)} autoFocus />
         </Field>

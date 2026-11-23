@@ -43,11 +43,11 @@ async function authenticatedUser(supaUrl, serviceKey, request) {
   return user?.id && email ? { id: user.id, email } : null
 }
 
-async function userBelongsToClinic(supaUrl, headers, userId, clinicId) {
-  const url = new URL(`${supaUrl}/rest/v1/doctors`)
+async function userOwnsClinic(supaUrl, headers, userId, clinicId) {
+  const url = new URL(`${supaUrl}/rest/v1/clinics`)
   url.searchParams.set('select', 'id')
-  url.searchParams.set('id', `eq.${userId}`)
-  url.searchParams.set('clinic_id', `eq.${clinicId}`)
+  url.searchParams.set('owner_id', `eq.${userId}`)
+  url.searchParams.set('id', `eq.${clinicId}`)
   const r = await fetch(url, { headers })
   const rows = await r.json().catch(() => [])
   return r.ok && Array.isArray(rows) && rows.length > 0
@@ -172,7 +172,7 @@ export const onRequestPost = async ({ request, env }) => {
     const user = await authenticatedUser(supaUrl, serviceKey, request)
     if (!user) return json({ ok: false, error: 'unauthorized' }, 401)
     const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' }
-    if (!await userBelongsToClinic(supaUrl, headers, user.id, clinicId)) return json({ ok: false, error: 'clinic_access_denied' }, 403)
+    if (!await userOwnsClinic(supaUrl, headers, user.id, clinicId)) return json({ ok: false, error: 'clinic_access_denied' }, 403)
 
     const base = (env.PAYPAL_BASE || 'https://api-m.paypal.com').replace(/\/$/, '')
     const tok = await token(base, id, secret)

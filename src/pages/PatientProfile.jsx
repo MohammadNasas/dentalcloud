@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import {
   ArrowLeft, ArrowRight, Pencil, FileDown, Trash2, Phone, MapPin, Briefcase,
-  CalendarClock, Wallet, ClipboardList, Stethoscope, Grid3x3, Activity,
+  CalendarClock, CalendarPlus, Wallet, ClipboardList, Stethoscope, Grid3x3, Activity,
   Images, History, NotebookPen, FileSignature, ScanFace, Gift,
 } from 'lucide-react'
 import { useI18n } from '../i18n/I18nContext'
-import { useStore } from '../context/StoreContext'
+import { useStore, PatientAccessScope } from '../context/StoreContext'
+import { PatientAssignment } from '../components/ClinicProfiles'
 import { Avatar, Badge, Segmented, Modal } from '../components/ui'
 import PatientFormModal from '../components/PatientFormModal'
 import FeatureLock from '../components/FeatureLock'
@@ -25,6 +26,7 @@ import { dayLabel, parseISO } from '../lib/dates'
 import WhatsAppIcon from '../components/WhatsAppIcon'
 import { useSaveAction } from '../lib/useSaveAction'
 import PatientLoyalty from '../components/PatientLoyalty'
+import AppointmentModal from '../components/AppointmentModal'
 
 const TABS = [
   { id: 'overview', icon: ClipboardList, key: 'overview' },
@@ -48,6 +50,7 @@ export default function PatientProfile() {
   const { getPatient, getDoctor, deletePatient, apptsForPatient, balanceForPatient, recordsForPatient, paymentsForPatient, clinic, can } = store
   const [tab, setTab] = useState('overview')
   const [editOpen, setEditOpen] = useState(false)
+  const [appointmentOpen, setAppointmentOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
   const { saving: deleting, runSave } = useSaveAction()
@@ -57,12 +60,13 @@ export default function PatientProfile() {
   if (!patient) return <Navigate to="/patients" replace />
 
   const currency = clinic?.settings?.currency || 'JOD'
-  const bal = can('clinicBalances') ? balanceForPatient(patient.id) : null
+  const financeAllowed = store.canViewPatientFinance(patient)
+  const bal = can('clinicBalances') && financeAllowed ? balanceForPatient(patient.id) : null
   const nextAppt = apptsForPatient(patient.id)
     .filter((a) => parseISO(a.start) >= new Date() && a.status === 'scheduled')
     .sort((a, b) => a.start.localeCompare(b.start))[0]
 
-  const visibleTabs = TABS.filter((tb) => !tb.feature || can(tb.feature) || true) // show all, lock inside
+  const visibleTabs = TABS.filter(tb => tb.id !== 'payments' || financeAllowed)
 
   const pName = lang === 'ar' ? (patient.nameAr || patient.name) : patient.name
   const clinicName = lang === 'ar' ? (clinic?.nameAr || clinic?.name) : clinic?.name
@@ -123,10 +127,11 @@ export default function PatientProfile() {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {can('appointments') && <button onClick={() => setAppointmentOpen(true)} disabled={store.readOnly} className="btn-primary !py-2"><CalendarPlus size={15}/>{lang === 'ar' ? 'إضافة موعد' : 'Add appointment'}</button>}
             {can('appointments') && <button onClick={() => setTab('loyalty')} className="btn-outline !py-2"><Gift size={15} />{lang === 'ar' ? 'بطاقة الولاء' : 'Loyalty card'}</button>}
-            <button onClick={() => setEditOpen(true)} className="btn-outline !py-2"><Pencil size={15} /> {t('common.edit')}</button>
-            <button onClick={doExport} disabled={exporting} className="btn-outline !py-2"><FileDown size={15} /> Word</button>
-            <button onClick={() => setDeleteOpen(true)} disabled={deleting || store.readOnly} aria-label={lang === 'ar' ? 'حذف ملف المريض' : 'Delete patient file'} className="btn-ghost !py-2 text-rose-500 hover:bg-rose-50"><Trash2 size={15} /></button>
+            {financeAllowed && <button onClick={() => setEditOpen(true)} className="btn-outline !py-2"><Pencil size={15} /> {t('common.edit')}</button>}
+            {!store.currentUser?.staffProfile && <button onClick={doExport} disabled={exporting} className="btn-outline !py-2"><FileDown size={15} /> Word</button>}
+            {!store.currentUser?.staffProfile && <button onClick={() => setDeleteOpen(true)} disabled={deleting || store.readOnly} aria-label={lang === 'ar' ? 'حذف ملف المريض' : 'Delete patient file'} className="btn-ghost !py-2 text-rose-500 hover:bg-rose-50"><Trash2 size={15} /></button>}
           </div>
         </div>
 
@@ -170,22 +175,27 @@ export default function PatientProfile() {
         })}
       </div>
 
+      {can('multiDoctor') && !store.demoMode && <PatientAssignment patient={patient} />}
+      {!financeAllowed && <p className="rounded-xl bg-sky-50 px-4 py-3 text-sm text-sky-900">{lang === 'ar' ? 'عرض الحالة الطبية فقط. الحساب المالي والتعديل متاحان للطبيب المسؤول وصاحب العيادة.' : 'Clinical view only. Finances and editing are available to the assigned clinician and clinic owner.'}</p>}
       {/* Tab content */}
+      <PatientAccessScope patient={patient}>
       <div className="page-enter" key={tab}>
         {tab === 'overview' && <Overview patient={patient} onTab={setTab} />}
         {tab === 'loyalty' && <FeatureLock feature="appointments"><PatientLoyalty key={patient.id} patient={patient} /></FeatureLock>}
-        {tab === 'history' && <HistoryForm patient={patient} />}
+        {tab === 'history' && <fieldset disabled={!financeAllowed}><HistoryForm patient={patient} /></fieldset>}
         {tab === 'chart' && <DentalChart patient={patient} />}
-        {tab === 'orthodontics' && <FeatureLock feature="orthodontics"><OrthodonticsPanel patient={patient} /></FeatureLock>}
-        {tab === 'perio' && <FeatureLock feature="perio"><PerioChart patient={patient} /></FeatureLock>}
+        {tab === 'orthodontics' && <fieldset disabled={!financeAllowed}><FeatureLock feature="orthodontics"><OrthodonticsPanel patient={patient} /></FeatureLock></fieldset>}
+        {tab === 'perio' && <fieldset disabled={!financeAllowed}><FeatureLock feature="perio"><PerioChart patient={patient} /></FeatureLock></fieldset>}
         {tab === 'treatments' && <TreatmentsPanel patient={patient} />}
-        {tab === 'consent' && <FeatureLock feature="consent"><ConsentForm patient={patient} /></FeatureLock>}
-        {tab === 'payments' && <FeatureLock feature="clinicBalances"><PaymentsPanel patient={patient} /></FeatureLock>}
+        {tab === 'consent' && <fieldset disabled={!financeAllowed}><FeatureLock feature="consent"><ConsentForm patient={patient} /></FeatureLock></fieldset>}
+        {tab === 'payments' && financeAllowed && <FeatureLock feature="clinicBalances"><PaymentsPanel patient={patient} /></FeatureLock>}
         {tab === 'gallery' && <Gallery patient={patient} />}
         {tab === 'timeline' && <Timeline patient={patient} />}
       </div>
+      </PatientAccessScope>
 
       <PatientFormModal open={editOpen} onClose={() => setEditOpen(false)} patient={patient} />
+      <AppointmentModal open={appointmentOpen} onClose={() => setAppointmentOpen(false)} defaultPatientId={patient.id} />
       <Modal open={deleteOpen} onClose={() => { if (!deleting) setDeleteOpen(false) }} size="sm"
         title={lang === 'ar' ? 'حذف ملف المريض؟' : 'Delete patient file?'}
         icon={<Trash2 size={19} className="text-rose-500" />}

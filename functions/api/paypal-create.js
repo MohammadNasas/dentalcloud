@@ -181,11 +181,11 @@ async function loadClinic(supaUrl, headers, clinicId) {
   return r.ok && Array.isArray(rows) ? rows[0] || null : null
 }
 
-async function userBelongsToClinic(supaUrl, headers, userId, clinicId) {
-  const url = new URL(`${supaUrl}/rest/v1/doctors`)
+async function userOwnsClinic(supaUrl, headers, userId, clinicId) {
+  const url = new URL(`${supaUrl}/rest/v1/clinics`)
   url.searchParams.set('select', 'id')
-  url.searchParams.set('id', `eq.${userId}`)
-  url.searchParams.set('clinic_id', `eq.${clinicId}`)
+  url.searchParams.set('owner_id', `eq.${userId}`)
+  url.searchParams.set('id', `eq.${clinicId}`)
   const r = await fetch(url, { headers })
   const rows = await r.json().catch(() => [])
   return r.ok && Array.isArray(rows) && rows.length > 0
@@ -310,7 +310,7 @@ export const onRequestPost = async ({ request, env }) => {
     const headers = { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' }
     const user = await authenticatedUser(supaUrl, serviceKey, request)
     if (!user) return json({ error: 'unauthorized' }, 401)
-    if (!await userBelongsToClinic(supaUrl, headers, user.id, clinicId)) return json({ error: 'clinic_access_denied' }, 403)
+    if (!await userOwnsClinic(supaUrl, headers, user.id, clinicId)) return json({ error: 'clinic_access_denied' }, 403)
 
     const clinicRow = await loadClinic(supaUrl, headers, clinicId)
     if (!clinicRow) return json({ error: 'clinic_not_found' }, 404)

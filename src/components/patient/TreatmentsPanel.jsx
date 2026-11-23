@@ -16,7 +16,7 @@ import { format, parseISO } from 'date-fns'
 
 export default function TreatmentsPanel({ patient }) {
   const { t, lang } = useI18n()
-  const { recordsForPatient, updateToothRecord, deleteToothRecord, getDoctor, clinic, can } = useStore()
+  const { recordsForPatient, updateToothRecord, deleteToothRecord, getDoctor, clinic, can, patientReadOnly, currentUser } = useStore()
   const [addOpen, setAddOpen] = useState(false)
   const [instrFor, setInstrFor] = useState(null)
   const currency = clinic?.settings?.currency || 'JOD'
@@ -30,7 +30,7 @@ export default function TreatmentsPanel({ patient }) {
       <div className="flex flex-wrap items-center gap-3">
         <Badge color="green"><CheckCircle2 size={13} /> {done} {t('chart.done')}</Badge>
         <Badge color="amber"><Clock size={13} /> {planned} {t('chart.planned')}</Badge>
-        <button onClick={() => setAddOpen(true)} className="btn-primary ms-auto"><Plus size={16} /> {t('patient.treatments')}</button>
+        {!patientReadOnly && <button onClick={() => setAddOpen(true)} className="btn-primary ms-auto"><Plus size={16} /> {t('patient.treatments')}</button>}
       </div>
 
       <div className="card overflow-hidden">
@@ -46,7 +46,7 @@ export default function TreatmentsPanel({ patient }) {
                   <th className="px-4 py-3 text-start">{t('settings.treatment')}</th>
                   <th className="px-4 py-3 text-start">{t('common.status')}</th>
                   {can('multiDoctor') && <th className="px-4 py-3 text-start">{t('appt.doctor')}</th>}
-                  <th className="px-4 py-3 text-start">{t('chart.price')}</th>
+                  {!patientReadOnly && <th className="px-4 py-3 text-start">{t('chart.price')}</th>}
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
@@ -67,6 +67,7 @@ export default function TreatmentsPanel({ patient }) {
                       </td>
                       <td className="px-4 py-2.5">
                         <button
+                          disabled={patientReadOnly}
                           onClick={() => updateToothRecord(r.id, { status: r.status === 'done' ? 'planned' : 'done' })}
                           className={cx('chip', r.status === 'done' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600')}
                         >
@@ -81,13 +82,13 @@ export default function TreatmentsPanel({ patient }) {
                           </span>}
                         </td>
                       )}
-                      <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-ink-700">{r.price > 0 ? money(r.price, currency) : '—'}</td>
+                      {!patientReadOnly && <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-ink-700">{r.price > 0 ? money(r.price, currency) : '—'}</td>}
                       <td className="px-4 py-2.5">
                         <div className="flex items-center justify-end gap-1">
                           {r.kind === 'treatment' && can('instructions') && (
                             <button onClick={() => setInstrFor(r.itemKey)} title={t('instructions.title')} className="rounded-lg p-1.5 text-ink-400 hover:bg-brand-50 hover:text-brand-600"><Printer size={15} /></button>
                           )}
-                          <button onClick={() => deleteToothRecord(r.id)} className="rounded-lg p-1.5 text-ink-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>
+                          {!currentUser?.staffProfile && <button onClick={() => deleteToothRecord(r.id)} className="rounded-lg p-1.5 text-ink-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>}
                         </div>
                       </td>
                     </tr>

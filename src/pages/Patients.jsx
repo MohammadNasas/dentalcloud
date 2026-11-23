@@ -18,7 +18,7 @@ const PatientImportModal = lazy(() => import('../components/PatientImportModal')
 export default function Patients() {
   const { t, lang, isRTL } = useI18n()
   const navigate = useNavigate()
-  const { patients, appointments, clinic, can, balanceForPatient, getDoctor, recordsForPatient, paymentsForPatient, importPatients, readOnly } = useStore()
+  const { patients, appointments, clinic, can, balanceForPatient, getDoctor, recordsForPatient, paymentsForPatient, importPatients, readOnly, currentUser, canViewPatientFinance } = useStore()
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState('all')
   const [addOpen, setAddOpen] = useState(false)
@@ -38,7 +38,7 @@ export default function Patients() {
     return map
   }, [appointments])
 
-  const allowBalances = can('clinicBalances')
+  const allowBalances = can('clinicBalances') && !currentUser?.staffProfile
   const allowAppointments = can('appointments')
   const localDay = new Date().toDateString()
   const { list, counts, activeFilter } = useMemo(() => filterPatients({
@@ -68,10 +68,10 @@ export default function Patients() {
         subtitle={countLabel}
         actions={
           <>
-            <button onClick={() => setImportOpen(true)} className="btn bg-white/15 font-bold text-white hover:bg-white/25"><FileUp size={16} />{lang === 'ar' ? 'نقل ملفات المرضى' : 'Import patients'}</button>
-            <button onClick={doExportAll} className="btn bg-white/15 font-bold text-white backdrop-blur hover:bg-white/25" disabled={exporting || list.length === 0}>
+            {!currentUser?.staffProfile && <button onClick={() => setImportOpen(true)} className="btn bg-white/15 font-bold text-white hover:bg-white/25"><FileUp size={16} />{lang === 'ar' ? 'نقل ملفات المرضى' : 'Import patients'}</button>}
+            {!currentUser?.staffProfile && <button onClick={doExportAll} className="btn bg-white/15 font-bold text-white backdrop-blur hover:bg-white/25" disabled={exporting || list.length === 0}>
               <FileDown size={16} /> {filtered ? (lang === 'ar' ? `حفظ النتائج (${list.length}) · ZIP` : `Export results (${list.length}) · ZIP`) : t('export.exportAll')}
-            </button>
+            </button>}
             <button onClick={() => setAddOpen(true)} className="btn bg-white font-bold text-brand-700 hover:bg-white/90"><UserPlus size={16} /> {t('patient.addPatient')}</button>
           </>
         }
@@ -100,7 +100,7 @@ export default function Patients() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((p, i) => {
-            const bal = can('clinicBalances') ? balanceForPatient(p.id) : null
+            const bal = can('clinicBalances') && canViewPatientFinance(p) ? balanceForPatient(p.id) : null
             const next = nextApptFor[p.id]
             const name = lang === 'ar' ? p.nameAr || p.name : p.name
             return (

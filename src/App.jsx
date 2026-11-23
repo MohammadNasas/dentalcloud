@@ -15,6 +15,7 @@ import SaveStatus from './components/SaveStatus'
 import PageLoader from './components/PageLoader'
 import Layout from './components/Layout'
 import PublicEntry from './pages/PublicEntry'
+import { ProfileSelector } from './components/ClinicProfiles'
 import { postLoginPath } from './lib/routing'
 
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
@@ -167,7 +168,9 @@ export default function App() {
     <button onClick={retryLoad} className="btn-primary">{lang === 'ar' ? 'إعادة المحاولة' : 'Retry'}</button>
   </div>
   if (recovery) return <PageLoader><ResetPassword /></PageLoader>
-  if (!currentUser) return <>{<PublicEntry />}{overlay}<ToastHost /></>
+  if (!currentUser) return <>{location.pathname === '/profiles' ? <ProfileSelector /> : <PublicEntry />}{overlay}<ToastHost /></>
+
+  if (currentUser.staffProfile && !/^\/(patients(?:\/[^/]+)?|appointments|instructions|download)$/.test(location.pathname)) return <Navigate to="/patients" replace />
   const trialEnd = Date.parse(clinic?.trialEndsAt || '')
   const trialActive = Number.isFinite(trialEnd) && Math.max(accessClock, Date.now()) < trialEnd
   // Pro access is allowed during the free month or after a verified payment.

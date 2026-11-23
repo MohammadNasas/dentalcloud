@@ -9,7 +9,7 @@ import PaymentModal from '../PaymentModal'
 
 export default function PaymentsPanel({ patient }) {
   const { t, lang, L } = useI18n()
-  const { paymentsForPatient, balanceForPatient, deletePayment, clinic } = useStore()
+  const { paymentsForPatient, balanceForPatient, deletePayment, clinic, currentUser } = useStore()
   const [open, setOpen] = useState(false)
   const currency = clinic?.settings?.currency || 'JOD'
 
@@ -60,7 +60,7 @@ export default function PaymentsPanel({ patient }) {
                     {p.note && <span>· {p.note}</span>}
                   </div>
                 </div>
-                <button onClick={() => deletePayment(p.id)} className="rounded-lg p-1.5 text-ink-300 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>
+                {!currentUser?.staffProfile && <button onClick={() => deletePayment(p.id)} className="rounded-lg p-1.5 text-ink-300 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>}
               </div>
             ))}
           </div>

@@ -53,12 +53,13 @@ function computeDisplay(records, viewMode) {
 
 export default function DentalChart({ patient }) {
   const { t, lang } = useI18n()
-  const { recordsForPatient, clinic, updateClinic } = useStore()
+  const { recordsForPatient, clinic, updateClinic, currentUser } = useStore()
   const [dentition, setDentition] = useState('permanent')
   const [viewMode, setViewMode] = useState('condition')
   const [selected, setSelected] = useState(null)
-  const numbering = clinic?.settings?.numbering || 'fdi'
-  const setNumbering = (v) => updateClinic({ settings: { ...clinic.settings, numbering: v } })
+  const [localNumbering, setLocalNumbering] = useState(null)
+  const numbering = localNumbering || clinic?.settings?.numbering || 'fdi'
+  const setNumbering = (v) => currentUser?.staffProfile ? setLocalNumbering(v) : updateClinic({ settings: { ...clinic.settings, numbering: v } })
 
   const allRecords = recordsForPatient(patient.id)
   const rows = chartRows(dentition)
@@ -164,7 +165,7 @@ export default function DentalChart({ patient }) {
 
 function ToothModal({ patient, toothId, dentition, onClose }) {
   const { t, lang } = useI18n()
-  const { recordsForPatient, addToothRecord, updateToothRecord, deleteToothRecord, doctors, getDoctor, can, clinic, currentUser } = useStore()
+  const { recordsForPatient, addToothRecord, updateToothRecord, deleteToothRecord, doctors, getDoctor, can, clinic, currentUser, patientReadOnly } = useStore()
   const tooth = getTooth(toothId)
   const currency = clinic?.settings?.currency || 'JOD'
   const numbering = clinic?.settings?.numbering || 'fdi'
@@ -297,7 +298,7 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
         </div>
 
         {/* Add form */}
-        <div className="space-y-3">
+        {!patientReadOnly && <div className="space-y-3">
           <p className="text-xs font-bold text-ink-500">{t('chart.addEntry')}</p>
 
           <div>
@@ -402,7 +403,7 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
           </Field>
 
           <button onClick={save} className="btn-primary w-full"><Plus size={16} /> {t('chart.saveRecord')}</button>
-        </div>
+        </div>}
       </fieldset>
 
       {instrFor && (
@@ -415,6 +416,7 @@ function ToothModal({ patient, toothId, dentition, onClose }) {
 // One tooth-history row that can be edited inline (status, doctor, price, date,
 // notes) so corrections don't require deleting and re-adding the treatment.
 function EditableRecord({ record: r, lang, t, currency, doctors, getDoctor, can, onUpdate, onDelete, onInstructions }) {
+  const { patientReadOnly, currentUser } = useStore()
   const [editing, setEditing] = useState(false)
   const [status, setStatus] = useState(r.status)
   const [doctorId, setDoctorId] = useState(r.doctorId)
@@ -486,8 +488,8 @@ function EditableRecord({ record: r, lang, t, currency, doctors, getDoctor, can,
         <span className="h-3 w-3 shrink-0 rounded" style={{ background: recordColor(r) }} />
         <span className="flex-1 text-sm font-bold text-ink-800">{recordName(r, lang)}</span>
         <Badge color={r.status === 'done' ? 'green' : 'amber'}>{r.status === 'done' ? t('chart.done') : t('chart.planned')}</Badge>
-        <button onClick={start} title={t('common.edit')} className="text-ink-300 hover:text-brand-600"><Pencil size={13} /></button>
-        <button onClick={() => onDelete(r.id)} className="text-ink-300 hover:text-rose-500"><Trash2 size={14} /></button>
+        {!patientReadOnly && <button onClick={start} title={t('common.edit')} className="text-ink-300 hover:text-brand-600"><Pencil size={13} /></button>}
+        {!currentUser?.staffProfile && <button onClick={() => onDelete(r.id)} className="text-ink-300 hover:text-rose-500"><Trash2 size={14} /></button>}
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-ink-400">
         <span>{fmtDate(r.date, lang)}</span>

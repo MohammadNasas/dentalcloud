@@ -21,6 +21,7 @@ import { isStudentEmail } from './studentEmail.js'
 // ──────────────────────────────────────────────────────────────────────────
 import { isCloud, supabase } from './supabaseClient'
 import { createCloudWrites } from './cloudWrites.js'
+import { profileRPC, staffBootstrap, profileTables } from './clinicProfiles'
 import {
   getOrInitDB, saveDB, genId as localGenId, hashPassword, DOCTOR_COLORS,
 } from './db'
@@ -166,14 +167,7 @@ const localBackend = {
 
 // ── CLOUD (Supabase) ─────────────────────────────────────────────────────
 async function loadMe(uid) {
-  const d = await supabase.from('doctors').select('*').eq('id', uid).maybeSingle()
-  if (d.error) throw d.error
-  if (!d.data) return null
-  const user = { ...d.data.data, id: d.data.id, clinicId: d.data.clinic_id }
-  const c = await supabase.from('clinics').select('*').eq('id', user.clinicId).maybeSingle()
-  if (c.error) throw c.error
-  const clinic = c.data ? { ...c.data.data, id: c.data.id } : null
-  return { user, clinic }
+  return profileRPC('clinic_profile_context')
 }
 
 // Creates the clinic + owner-doctor rows for a freshly-authenticated user.
@@ -198,7 +192,7 @@ const cloudBackend = {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return null
     const me = await loadMe(session.user.id)
-    if (me) me.user.user_metadata = session.user.user_metadata
+    if (me) { me.user.user_metadata = session.user.user_metadata; me.user.email = session.user.email }
     return me
   },
 
@@ -241,9 +235,24 @@ const cloudBackend = {
     return { ok: !error, error: error?.message }
   },
 
-  async signOut() { await supabase.auth.signOut() },
+  async signOut() {
+    const { error } = await supabase.auth.signOut({ scope: 'local' })
+    if (error) throw error
+  },
+
+  async sharedAppointments() {
+    const result = []; let after = null
+    do {
+      const page = await profileRPC('clinic_profile_rows', { p_table: 'appointments', p_after: after })
+      result.push(...page.rows); after = page.next
+    } while (after)
+    return result
+  },
 
   async bootstrap(clinicId) {
+    const context = await profileRPC('clinic_profile_context')
+    if (!context || context.clinic.id !== clinicId) throw new Error('Profile unavailable')
+    if (context.user.staffProfile) return staffBootstrap(context.clinic)
     const out = { clinic: null, doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [], expenses: [] }
     const cl = await supabase.from('clinics').select('*').eq('id', clinicId).single()
     if (cl.error) throw cl.error
@@ -268,6 +277,14 @@ const cloudBackend = {
   },
 
   ...createCloudWrites(supabase),
+
+  async save(table, obj) {
+    const context = await profileRPC('clinic_profile_context')
+    if (!context) throw new Error('Profile unavailable')
+    if (!context.user.staffProfile) return createCloudWrites(supabase).save(table, obj)
+    if (!profileTables[table]) throw new Error('Owner access required')
+    return profileRPC('clinic_profile_save', { p_table: profileTables[table], p_data: obj })
+  },
 
   // Sends a reset link to the account's registered email (identity = inbox).
   async resetPassword(email) {

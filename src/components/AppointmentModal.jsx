@@ -13,7 +13,15 @@ import { LOYALTY_CATEGORIES } from '../lib/loyalty'
 
 export default function AppointmentModal({ open, onClose, appointment, defaultDate, defaultPatientId }) {
   const { t, lang } = useI18n()
-  const { patients, doctors, appointments, addAppointment, updateAppointment, deleteAppointment, currentUser, can } = useStore()
+  const { patients, doctors, appointments, addAppointment, updateAppointment, deleteAppointment, currentUser, can, refreshAppointments } = useStore()
+  const [calendarReady, setCalendarReady] = useState(false)
+  const [calendarError, setCalendarError] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    let active = true; setCalendarReady(false); setCalendarError(false)
+    refreshAppointments().then(() => { if (active) setCalendarReady(true) }).catch(() => { if (active) setCalendarError(true) })
+    return () => { active = false }
+  }, [open, refreshAppointments])
 
   const [acceptedConflict, setAcceptedConflict] = useState(null)
   const { saving, runSave } = useSaveAction()
@@ -78,12 +86,13 @@ export default function AppointmentModal({ open, onClose, appointment, defaultDa
       icon={<CalendarPlus size={18} className="text-brand-500" />}
       footer={
         <>
-          {appointment && <button onClick={remove} disabled={saving} className="btn-ghost me-auto text-rose-500 hover:bg-rose-50"><Trash2 size={15} /> {t('common.delete')}</button>}
+          {appointment && !currentUser?.staffProfile && <button onClick={remove} disabled={saving} className="btn-ghost me-auto text-rose-500 hover:bg-rose-50"><Trash2 size={15} /> {t('common.delete')}</button>}
           <button onClick={onClose} disabled={saving} className="btn-ghost">{t('common.cancel')}</button>
-          <button onClick={save} disabled={saving || draft.blocked || !form.patientId || !validTime || needsConfirmation} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
+          <button onClick={save} disabled={!calendarReady || saving || draft.blocked || !form.patientId || !validTime || needsConfirmation} className="btn-primary">{saving ? (lang === 'ar' ? 'جارٍ الحفظ…' : 'Saving…') : t('common.save')}</button>
         </>
       }
     >
+      {calendarError && <p role="alert" className="mb-3 text-sm text-rose-600">{lang === 'ar' ? 'تعذّر تحديث التقويم المشترك. أغلق النافذة وحاول مجددًا.' : 'Could not refresh the shared calendar. Close this window and try again.'}</p>}
       <DraftNotice draft={draft} />
       <fieldset disabled={saving || draft.blocked} className="space-y-3">
         <Field label={t('appt.selectPatient')}>

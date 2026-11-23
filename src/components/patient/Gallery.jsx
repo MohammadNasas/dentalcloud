@@ -169,7 +169,7 @@ export default function Gallery({ patient }) {
           )}
           <input ref={fileRef} type="file" accept="image/*" multiple hidden
             onChange={(e) => { if (e.target.files?.length) { onFiles([...e.target.files]); e.target.value = '' } }} />
-          <button onClick={() => fileRef.current?.click()} disabled={busy} className="btn-primary ms-auto">
+          <button onClick={() => fileRef.current?.click()} disabled={busy || readOnly} className="btn-primary ms-auto">
             <Upload size={16} /> {busy ? (lang === 'ar' ? 'جاري الرفع…' : 'Uploading…') : t('common.upload')}
           </button>
         </div>

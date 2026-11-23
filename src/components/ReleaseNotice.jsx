@@ -36,5 +36,5 @@ export default function ReleaseNotice() {
     document.addEventListener('visibilitychange', check)
     return () => { active = false; clearTimeout(timer); window.removeEventListener('online', check); document.removeEventListener('visibilitychange', check) }
   }, [userId, demoMode, mode, paymentResult])
-  return <ReleaseNoticeDialog open={Boolean(userId && visibleFor === userId && !demoMode && !paymentResult)} lang={lang} onExplore={()=>{setVisibleFor(null); navigate('/settings?section=loyalty')}} onClose={()=>setVisibleFor(null)}/>
+  return <ReleaseNoticeDialog open={Boolean(userId && visibleFor === userId && !demoMode && !paymentResult)} lang={lang} onExplore={()=>{setVisibleFor(null); navigate(currentUser?.staffProfile ? '/patients' : '/settings?section=doctors')}} onClose={()=>setVisibleFor(null)}/>
 }
