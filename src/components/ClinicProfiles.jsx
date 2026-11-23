@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { LockKeyhole, Plus, ShieldCheck, Users, ArrowRight } from 'lucide-react'
+import { LockKeyhole, Plus, ShieldCheck, Users, ArrowRight, Trash2 } from 'lucide-react'
 import { useStore } from '../context/StoreContext'
 import { useI18n } from '../i18n/I18nContext'
 import { Avatar, Modal, Field } from './ui'
@@ -94,6 +94,14 @@ export default function ClinicProfiles() {
     setBusy(true); setError(''); setNotice('')
     try {
       await manageProfiles(form)
+      if (form.action === 'delete') {
+        const remaining = profiles.filter(p => p.id !== form.id)
+        setProfiles(remaining)
+        rememberProfiles(clinic, remaining)
+        setForm(null)
+        setNotice(ar ? 'تم حذف البروفايل وإلغاء وصوله للعيادة. ملفات المرضى والمواعيد محفوظة.' : 'Profile deleted and clinic access revoked. Patient files and appointments are preserved.')
+        return
+      }
       await Promise.all([refresh(), refreshClinic()]); setForm(null)
       setNotice(ar ? 'تم حفظ البروفايل. كلمة المرور لا تظهر مرة أخرى؛ شاركها مع صاحبها مباشرة.' : 'Profile saved. Passwords are never displayed again; share it directly with its owner.')
     } catch { setError(errorText(ar)) } finally { setBusy(false) }
@@ -107,15 +115,29 @@ export default function ClinicProfiles() {
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold text-ink-900">{ar ? 'بروفايلات العيادة' : 'Clinic profiles'}</h2><p className="mt-2 text-sm text-ink-500">{ar ? 'التقويم مشترك. حساب المريض يظهر للطبيب المسؤول وصاحب العيادة فقط.' : 'Shared calendar. Patient finances are visible only to the assigned clinician and clinic owner.'}</p></div><button disabled={demoMode || readOnly} onClick={() => { setError(''); setForm({ action: 'create', name: '', password: '', role: 'doctor' }) }} className="btn-primary"><Plus size={16}/>{ar ? 'إضافة بروفايل' : 'Add profile'}</button></div>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-600">{error}</p>}
     {notice && <p role="status" className="rounded-xl bg-brand-50 p-3 text-sm text-brand-700">{notice}</p>}
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{profiles.map(p => <div key={p.id} className="card p-5"><div className="flex items-center gap-3"><Avatar name={p.name} size={48}/><div><p className="font-bold">{p.name}</p><p className="mt-1 text-xs text-ink-400">{p.owner ? (ar ? 'صاحب العيادة · جميع الصلاحيات' : 'Owner · full access') : p.active ? (ar ? 'مفعّل · صلاحيات الفريق' : 'Active · team access') : (ar ? 'موقوف' : 'Disabled')}</p></div></div>{p.owner ? <p className="mt-4 text-xs text-ink-500">{ar ? 'محمي بكلمة مرور حسابك الحالية.' : 'Protected by your existing account password.'}</p> : <div className="mt-5 flex flex-wrap gap-2"><button disabled={demoMode} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'update', id: p.id, name: p.name, specialty: p.specialty }) }}>{ar ? 'تعديل' : 'Edit'}</button><button disabled={demoMode} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'password', id: p.id, password: '' }) }}>{ar ? 'كلمة المرور' : 'Password'}</button><button disabled={busy || demoMode} className="btn-ghost !px-3 !py-2 text-xs" onClick={() => toggle(p)}>{p.active ? (ar ? 'إيقاف' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}</button></div>}</div>)}</div>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{profiles.map(p => <div key={p.id} className="card p-5">
+      <div className="flex items-center gap-3"><Avatar name={p.name} size={48}/><div><p className="font-bold">{p.name}</p><p className="mt-1 text-xs text-ink-400">{p.owner ? (ar ? 'صاحب العيادة · جميع الصلاحيات' : 'Owner · full access') : p.active ? (ar ? 'مفعّل · صلاحيات الفريق' : 'Active · team access') : (ar ? 'موقوف' : 'Disabled')}</p></div></div>
+      {p.owner ? <p className="mt-4 text-xs text-ink-500">{ar ? 'محمي بكلمة مرور حسابك الحالية.' : 'Protected by your existing account password.'}</p> : <div className="mt-5 flex flex-wrap gap-2">
+        <button disabled={busy || demoMode} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'update', id: p.id, name: p.name, specialty: p.specialty }) }}>{ar ? 'تعديل' : 'Edit'}</button>
+        <button disabled={busy || demoMode} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'password', id: p.id, password: '' }) }}>{ar ? 'كلمة المرور' : 'Password'}</button>
+        <button disabled={busy || demoMode} className="btn-ghost !px-3 !py-2 text-xs" onClick={() => toggle(p)}>{p.active ? (ar ? 'إيقاف' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}</button>
+        <button disabled={busy || demoMode} className="btn-ghost !px-3 !py-2 text-xs !text-rose-600 hover:!bg-rose-50" onClick={() => { setError(''); setForm({ action: 'delete', id: p.id, name: p.name }) }}><Trash2 size={14}/>{ar ? 'حذف' : 'Delete'}</button>
+      </div>}
+    </div>)}</div>
     <p className="text-xs leading-6 text-ink-500">{ar ? 'تعيين المريض يتم من ملفه. الملفات القديمة تبقى عند الشخص الذي أضافها إلى أن تغيّر التعيين. افتح حساب صاحب العيادة على جهاز الفريق مرة واحدة، ثم اضغط «قفل وتبديل البروفايل».' : 'Assign patients from their files. Existing records stay with their creator until reassigned. On a team device, sign in as the owner once, then use “Lock & switch profile”.'}</p>
-    <Modal open={Boolean(form)} onClose={() => { if (!busy) setForm(null) }} title={ar ? 'إعداد البروفايل' : 'Profile settings'} size="sm">
+    <Modal open={Boolean(form)} onClose={() => { if (!busy) setForm(null) }} title={form?.action === 'delete' ? (ar ? 'حذف البروفايل' : 'Delete profile') : ar ? 'إعداد البروفايل' : 'Profile settings'} size="sm">
       {form && <form onSubmit={save} className="space-y-4">
-        {form.action !== 'password' && <Field label={ar ? 'الاسم' : 'Name'}><input autoFocus className="input" maxLength={80} required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field>}
+        {form.action === 'delete' && <div className="space-y-3 text-sm leading-7 text-ink-600">
+          <p>{ar ? 'هل تريد حذف بروفايل' : 'Delete the profile for'} <strong className="text-ink-900">{form.name}</strong>{ar ? '؟' : '?'}</p>
+          <p>{ar ? 'سيُلغى وصوله للعيادة ويُزال من قائمة البروفايلات. تبقى ملفات المرضى والمدفوعات والمواعيد محفوظة، ويمكنك إعادة تعيين مرضاه من ملفاتهم.' : 'Clinic access will be revoked and the profile removed from the picker. Patient files, payments and appointments remain intact. You can reassign their patients from each patient’s file.'}</p>
+          <p className="text-xs text-ink-500">{ar ? 'لمنع الدخول مؤقتًا، استخدم «إيقاف» بدل الحذف.' : 'To block access temporarily, use Disable instead.'}</p>
+        </div>}
+        {['create', 'update'].includes(form.action) && <Field label={ar ? 'الاسم' : 'Name'}><input autoFocus className="input" maxLength={80} required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}/></Field>}
         {form.action === 'create' && <Field label={ar ? 'الصفة' : 'Role'}><select className="input" value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}><option value="doctor">{ar ? 'طبيب' : 'Doctor'}</option><option value="assistant">{ar ? 'مساعد' : 'Assistant'}</option></select></Field>}
-        {form.action !== 'update' && <Field label={ar ? 'كلمة المرور · 10 أحرف على الأقل' : 'Password · at least 10 characters'}><input className="input" type="password" autoComplete="new-password" minLength={10} maxLength={128} required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}/></Field>}
+        {['create', 'password'].includes(form.action) && <Field label={ar ? 'كلمة المرور · 10 أحرف على الأقل' : 'Password · at least 10 characters'}><input className="input" type="password" autoComplete="new-password" minLength={10} maxLength={128} required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}/></Field>}
         {error && <p role="alert" className="text-sm text-rose-600">{error}</p>}
-        <button disabled={busy} className="btn-primary w-full">{busy ? '…' : ar ? 'حفظ' : 'Save'}</button>
+        <button disabled={busy} className={`btn-primary w-full ${form.action === 'delete' ? '!bg-rose-600 hover:!bg-rose-700' : ''}`}>{busy ? (ar ? 'جارٍ التنفيذ…' : 'Working…') : form.action === 'delete' ? (ar ? 'تأكيد حذف البروفايل' : 'Confirm deletion') : ar ? 'حفظ' : 'Save'}</button>
+        {form.action === 'delete' && <button autoFocus type="button" disabled={busy} className="btn-outline w-full" onClick={() => setForm(null)}>{ar ? 'إلغاء' : 'Cancel'}</button>}
       </form>}
     </Modal>
   </div>

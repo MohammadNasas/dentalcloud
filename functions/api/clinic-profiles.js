@@ -57,7 +57,14 @@ export const onRequestPost = ({ request, env }) => handle(request, async () => {
     return { ok: true, id }
   }
   if (!uuid(input.id) || !members.some(p => p.user_id === input.id) || input.id === context.user.id) throw new ApiError('unknown_profile', 404)
-  if (input.action === 'update') {
+  if (input.action === 'delete') {
+    // Revoke membership first: existing JWTs must lose clinic access immediately.
+    // Retain the doctor identity for clinical/audit references; deleting Auth or
+    // doctor rows could cascade into historical records. This login stays banned.
+    await db(`clinic_profiles?user_id=eq.${input.id}&clinic_id=eq.${cid}`, 'PATCH', { active: false })
+    await authAdmin(env, `users/${input.id}`, 'PUT', { ban_duration: '876000h' })
+    await db(`clinic_profiles?user_id=eq.${input.id}&clinic_id=eq.${cid}`, 'DELETE')
+  } else if (input.action === 'update') {
     const old = (await db(`doctors?id=eq.${input.id}&clinic_id=eq.${cid}&select=data`))[0]
     if (!old || typeof input.name !== 'string' || !input.name.trim() || input.name.length > 80) throw new ApiError('invalid_profile')
     await db(`doctors?id=eq.${input.id}&clinic_id=eq.${cid}`, 'PATCH', { data: { ...old.data, name: input.name.trim(), nameAr: input.name.trim(), specialty: String(input.specialty || '').slice(0, 100) } })
