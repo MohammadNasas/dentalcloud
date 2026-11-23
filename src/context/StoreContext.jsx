@@ -51,6 +51,7 @@ export function StoreProvider({ children }) {
   if (!undoRef.current) undoRef.current = createUndoDelete(setPendingDeletes)
   const state = useMemo(() => withoutDeletedRecords(storedState, pendingDeletes), [storedState, pendingDeletes])
   const stateRef = useRef(storedState)
+  const sessionLoadVersion = useRef(0)
   const setState = useCallback((update) => {
     const next = typeof update === 'function' ? update(stateRef.current) : update
     stateRef.current = next
@@ -80,6 +81,7 @@ export function StoreProvider({ children }) {
 
   // ── Boot: restore existing session ─────────────────────────────────────
   const loadSession = useCallback(async () => {
+    const version = ++sessionLoadVersion.current
     setLoadError(false)
     try {
       const me = await backend.restore()
@@ -104,6 +106,7 @@ export function StoreProvider({ children }) {
         if (backend.mode === 'cloud') {
           purgeCloudBackedImageCache(data.patients).catch((e) => console.warn('Could not clear old patient image cache', e))
         }
+        if (version !== sessionLoadVersion.current) return
         setState({
           clinic,
           currentUser: me.user,
@@ -113,10 +116,11 @@ export function StoreProvider({ children }) {
           expenses: data.expenses || [],
         })
       } else {
+        if (version !== sessionLoadVersion.current) return
         setState(EMPTY)
       }
     } catch {
-      setLoadError(true)
+      if (version === sessionLoadVersion.current) setLoadError(true)
     }
   }, [])
 
@@ -142,7 +146,7 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     const { data } = backend.onAuthEvent((event, session) => {
       if (event === 'PASSWORD_RECOVERY') setRecovery(true)
-      if (event === 'SIGNED_OUT') { queueRef.current.reset(); setState(EMPTY) }
+      if (event === 'SIGNED_OUT') { sessionLoadVersion.current++; queueRef.current.reset(); undoRef.current.reset(); setState(EMPTY) }
       if (event === 'SIGNED_IN' && stateRef.current.currentUser?.id && session?.user?.id !== stateRef.current.currentUser.id) window.location.reload()
     })
     return () => data?.subscription?.unsubscribe?.()
