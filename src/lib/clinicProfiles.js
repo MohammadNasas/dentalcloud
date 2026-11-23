@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient'
 import { paymentApiUrl } from './apiUrl'
+import { loadStaffClinic } from './clinicBootstrap.js'
 
 const DIRECTORY = 'dc_clinic_profile_directory_v1'
 const CHANNEL = 'dc_profile_session_changed'
@@ -35,16 +36,7 @@ export async function manageProfiles(input) {
   return data
 }
 export async function staffBootstrap(clinic) {
-  const out = { clinic, doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [], expenses: [] }
-  for (const [table, key] of [['doctors', 'doctors'], ['patients', 'patients'], ['tooth_records', 'toothRecords'], ['appointments', 'appointments'], ['payments', 'payments'], ['lab_orders', 'labOrders']]) {
-    let after = null
-    do {
-      const page = await profileRPC('clinic_profile_rows', { p_table: table, p_after: after })
-      out[key].push(...page.rows.filter(row => !row._restricted))
-      after = page.next
-    } while (after)
-  }
-  return out
+  return loadStaffClinic(profileRPC, clinic)
 }
 export const profileTables = { patients: 'patients', toothRecords: 'tooth_records', appointments: 'appointments', payments: 'payments' }
 export function patientFinanceAllowed(user, patient) {

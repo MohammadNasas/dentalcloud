@@ -22,6 +22,7 @@ import { isStudentEmail } from './studentEmail.js'
 import { isCloud, supabase } from './supabaseClient'
 import { createCloudWrites } from './cloudWrites.js'
 import { profileRPC, staffBootstrap, profileTables } from './clinicProfiles'
+import { loadOwnerClinic } from './clinicBootstrap.js'
 import {
   getOrInitDB, saveDB, genId as localGenId, hashPassword, DOCTOR_COLORS,
 } from './db'
@@ -249,31 +250,12 @@ const cloudBackend = {
     return result
   },
 
-  async bootstrap(clinicId) {
-    const context = await profileRPC('clinic_profile_context')
+  async bootstrap(clinicId, restoredContext) {
+    // Reuse only this restore's server response, never a cached profile/session.
+    const context = restoredContext || await profileRPC('clinic_profile_context')
     if (!context || context.clinic.id !== clinicId) throw new Error('Profile unavailable')
     if (context.user.staffProfile) return staffBootstrap(context.clinic)
-    const out = { clinic: null, doctors: [], patients: [], toothRecords: [], appointments: [], payments: [], suggestions: [], labOrders: [], expenses: [] }
-    const cl = await supabase.from('clinics').select('*').eq('id', clinicId).single()
-    if (cl.error) throw cl.error
-    if (cl.data) out.clinic = { ...cl.data.data, id: cl.data.id }
-    const pairs = [['doctors', 'doctors'], ['patients', 'patients'], ['tooth_records', 'toothRecords'],
-      ['appointments', 'appointments'], ['payments', 'payments'], ['suggestions', 'suggestions'],
-      ['lab_orders', 'labOrders'], ['clinic_expenses', 'expenses']]
-    for (const [sb, key] of pairs) {
-      // Supabase caps result pages. Never present a truncated or failed load
-      // as an empty clinic that the doctor can unknowingly overwrite.
-      for (let offset = 0; ; offset += 500) {
-        let query = supabase.from(sb).select('*')
-        // The app owner's existing RLS policy permits the global inbox.
-        if (sb !== 'suggestions') query = query.eq('clinic_id', clinicId)
-        const r = await query.order('id').range(offset, offset + 499)
-        if (r.error) throw r.error
-        out[key].push(...(r.data || []).map((row) => ({ ...row.data, id: row.id, clinicId: row.clinic_id })))
-        if ((r.data || []).length < 500) break
-      }
-    }
-    return out
+    return loadOwnerClinic(supabase, context.clinic)
   },
 
   ...createCloudWrites(supabase),

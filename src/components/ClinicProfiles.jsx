@@ -13,22 +13,32 @@ export function ProfileSwitcher() {
   const { lang } = useI18n(); const ar = lang === 'ar'
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
+  useEffect(() => {
+    if (demoMode || mode !== 'cloud' || currentUser?.staffProfile) return
+    let active = true
+    // Refresh names off the lock path, including profiles created on another device.
+    manageProfiles({ action: 'list' }).then(data => {
+      if (active) rememberProfiles(clinic, data.profiles.map(p => p.owner ? { ...p, email: currentUser.email } : p))
+    }).catch(() => {})
+    return () => { active = false }
+  }, [currentUser?.id, clinic?.id, demoMode, mode])
   if (demoMode || mode !== 'cloud') return null
   async function lock() {
     setBusy(true); setError('')
     try {
-      if (!currentUser.staffProfile) {
+      const saved = profileDirectory()
+      if (!currentUser.staffProfile && (saved?.clinicId !== clinic.id || !saved.profiles.some(p => p.owner && p.email === currentUser.email))) {
         const data = await manageProfiles({ action: 'list' })
         rememberProfiles(clinic, data.profiles.map(p => p.owner ? { ...p, email: currentUser.email } : p))
       }
       if (await logout()) { announceProfileSwitch(); navigate('/profiles', { replace: true }) }
     } catch { setError(errorText(ar)) } finally { setBusy(false) }
   }
-  return <div className="px-2"><button disabled={busy} onClick={lock} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-xs text-white hover:bg-white/10"><LockKeyhole size={14}/>{ar ? 'قفل وتبديل البروفايل' : 'Lock & switch profile'}</button>{error && <p className="mt-2 text-xs text-rose-300" role="alert">{error}</p>}</div>
+  return <div className="px-2"><button disabled={busy} onClick={lock} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 px-3 py-2 text-xs text-white hover:bg-white/10"><LockKeyhole size={14}/>{busy ? (ar ? 'جارٍ قفل البروفايل…' : 'Locking profile…') : ar ? 'قفل وتبديل البروفايل' : 'Lock & switch profile'}</button>{error && <p className="mt-2 text-xs text-rose-300" role="alert">{error}</p>}</div>
 }
 
 export function ProfileSelector() {
-  const { login } = useStore(); const { lang } = useI18n(); const ar = lang === 'ar'
+  const { enterProfile } = useStore(); const { lang } = useI18n(); const ar = lang === 'ar'
   const navigate = useNavigate()
   const [directory, setDirectory] = useState(profileDirectory)
   const [selected, setSelected] = useState(null); const [password, setPassword] = useState('')
@@ -37,9 +47,9 @@ export function ProfileSelector() {
     e.preventDefault(); if (busy) return
     setBusy(true); setError('')
     try {
-      const result = await login(selected.email, password)
+      const result = await enterProfile(selected.email, password)
       if (!result.ok) setError(ar ? 'كلمة المرور غير صحيحة أو البروفايل موقوف.' : 'Incorrect password or disabled profile.')
-      else { setPassword(''); announceProfileSwitch(); navigate(selected.owner ? '/' : '/patients', { replace: true }) }
+      else { setPassword(''); announceProfileSwitch(); navigate(result.owner ? '/' : '/patients', { replace: true }) }
     } catch { setError(errorText(ar)) } finally { setBusy(false) }
   }
   return <main dir={ar ? 'rtl' : 'ltr'} className="flex min-h-screen items-center justify-center bg-[#f3f8f7] p-6">
@@ -49,7 +59,7 @@ export function ProfileSelector() {
       <h1 className="text-3xl font-extrabold text-ink-900">{ar ? 'مين معنا اليوم؟' : 'Who’s working today?'}</h1>
       <p className="mt-3 text-sm text-ink-500">{ar ? 'مساحة لكل شخص، ومواعيد تجمع العيادة.' : 'Your own workspace. One shared clinic calendar.'}</p>
       <div className="mt-10 flex flex-wrap justify-center gap-5">
-        {directory?.profiles.map(p => <button key={p.id} onClick={() => { setSelected(p); setPassword(''); setError('') }} className="group flex w-40 flex-col items-center gap-4 rounded-3xl border border-ink-100 bg-white px-4 py-7 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand-300 hover:shadow-lg">
+        {directory?.profiles.map(p => <button disabled={busy} key={p.id} onClick={() => { setSelected(p); setPassword(''); setError('') }} className="group flex w-40 flex-col items-center gap-4 rounded-3xl border border-ink-100 bg-white px-4 py-7 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand-300 hover:shadow-lg">
           <Avatar name={p.name} size={68}/><span className="font-bold text-ink-800">{p.name}</span>
           <span className="flex items-center gap-1 text-xs text-ink-400">{p.owner ? <ShieldCheck size={13}/> : <LockKeyhole size={13}/>}{p.owner ? (ar ? 'صاحب العيادة' : 'Clinic owner') : (ar ? 'فريق العيادة' : 'Clinic team')}</span>
         </button>)}
@@ -63,7 +73,7 @@ export function ProfileSelector() {
         <p className="text-sm text-ink-500">{selected?.owner ? (ar ? 'أدخل كلمة مرور حساب صاحب العيادة.' : 'Enter the clinic owner’s account password.') : (ar ? 'أدخل كلمة مرور بروفايلك.' : 'Enter your profile password.')}</p>
         <input autoFocus type="password" autoComplete="current-password" className="input" value={password} onChange={e => setPassword(e.target.value)} aria-label={ar ? 'كلمة المرور' : 'Password'} required/>
         {error && <p role="alert" className="text-sm text-rose-600">{error}</p>}
-        <button disabled={busy || !password} className="btn-primary w-full">{busy ? '…' : ar ? 'دخول' : 'Enter'}</button>
+        <button disabled={busy || !password} className="btn-primary w-full">{busy ? (ar ? 'جارٍ فتح بروفايلك…' : 'Opening your profile…') : ar ? 'دخول' : 'Enter'}</button>
       </form>
     </Modal>
   </main>
@@ -84,7 +94,7 @@ export default function ClinicProfiles() {
     setBusy(true); setError(''); setNotice('')
     try {
       await manageProfiles(form)
-      await refresh(); await refreshClinic(); setForm(null)
+      await Promise.all([refresh(), refreshClinic()]); setForm(null)
       setNotice(ar ? 'تم حفظ البروفايل. كلمة المرور لا تظهر مرة أخرى؛ شاركها مع صاحبها مباشرة.' : 'Profile saved. Passwords are never displayed again; share it directly with its owner.')
     } catch { setError(errorText(ar)) } finally { setBusy(false) }
   }

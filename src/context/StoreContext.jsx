@@ -35,6 +35,7 @@ const EMPTY = {
 }
 
 export function StoreProvider({ children }) {
+  const [profileWelcome, setProfileWelcome] = useState(null)
   const [booting, setBooting] = useState(true)
   const [recovery, setRecovery] = useState(false)
   const [pendingOtp, setPendingOtp] = useState(null) // { email, pending } when email confirmation is on
@@ -80,13 +81,16 @@ export function StoreProvider({ children }) {
   }, [])
 
   // ── Boot: restore existing session ─────────────────────────────────────
-  const loadSession = useCallback(async () => {
+  const loadSession = useCallback(async (onProfileReady) => {
     const version = ++sessionLoadVersion.current
     setLoadError(false)
     try {
       const me = await backend.restore()
       if (me && me.clinic) {
-        const data = await backend.bootstrap(me.clinic.id)
+        if (version !== sessionLoadVersion.current) return false
+        if (typeof onProfileReady === 'function') onProfileReady(me.user)
+        const data = await backend.bootstrap(me.clinic.id, me)
+        if (version !== sessionLoadVersion.current) return false
         let clinic = data.clinic || me.clinic
         // Economy was retired in July 2026. Upgrade legacy accounts in place so
         // they immediately receive the complete Pro feature set.
@@ -98,10 +102,6 @@ export function StoreProvider({ children }) {
         if (!me.user.staffProfile && backend.mode === 'cloud' && (!clinic.paid || clinic.tier !== 'pro') && await isComplimentary(me.user?.email)) {
           clinic = { ...clinic, tier: 'pro', paid: true }
           clinic = await backend.saveClinic(clinic)
-        }
-        if (backend.mode === 'cloud' && clinic?.paypalSubscriptionId) {
-          const synced = await syncPaypalSubscription({ subscriptionId: clinic.paypalSubscriptionId, clinicId: clinic.id })
-          if (synced.ok && synced.clinic) clinic = synced.clinic
         }
         if (backend.mode === 'cloud') {
           purgeCloudBackedImageCache(data.patients).catch((e) => console.warn('Could not clear old patient image cache', e))
@@ -115,6 +115,7 @@ export function StoreProvider({ children }) {
           labOrders: data.labOrders || [],
           expenses: data.expenses || [],
         })
+        return true
       } else {
         if (version !== sessionLoadVersion.current) return
         setState(EMPTY)
@@ -122,6 +123,7 @@ export function StoreProvider({ children }) {
     } catch {
       if (version === sessionLoadVersion.current) setLoadError(true)
     }
+    return false
   }, [])
 
   useEffect(() => {
@@ -146,7 +148,7 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     const { data } = backend.onAuthEvent((event, session) => {
       if (event === 'PASSWORD_RECOVERY') setRecovery(true)
-      if (event === 'SIGNED_OUT') { sessionLoadVersion.current++; queueRef.current.reset(); undoRef.current.reset(); setState(EMPTY) }
+      if (event === 'SIGNED_OUT') { setProfileWelcome(null); sessionLoadVersion.current++; queueRef.current.reset(); undoRef.current.reset(); setState(EMPTY) }
       if (event === 'SIGNED_IN' && stateRef.current.currentUser?.id && session?.user?.id !== stateRef.current.currentUser.id) window.location.reload()
     })
     return () => data?.subscription?.unsubscribe?.()
@@ -209,9 +211,11 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     if (!currentUser || isDemo || backend.mode !== 'cloud') return
     const refresh = () => { if (document.visibilityState === 'visible') refreshAppointments().catch(() => {}) }
+    // Staff's focus refresh below already includes the shared appointments.
+    const onFocus = () => { if (!stateRef.current.currentUser?.staffProfile) refresh() }
     const timer = setInterval(refresh, 30000)
-    window.addEventListener('focus', refresh)
-    return () => { clearInterval(timer); window.removeEventListener('focus', refresh) }
+    window.addEventListener('focus', onFocus)
+    return () => { clearInterval(timer); window.removeEventListener('focus', onFocus) }
   }, [currentUser?.id, refreshAppointments, isDemo])
   useEffect(() => watchProfileSwitch(() => { window.location.reload() }), [])
   useEffect(() => {
@@ -271,20 +275,24 @@ export function StoreProvider({ children }) {
 
   // Keep subscription-gated access aligned with PayPal while the app is open.
   useEffect(() => {
-    if (backend.mode !== 'cloud' || isDemo || !clinic?.id || !clinic?.paypalSubscriptionId) return
+    if (backend.mode !== 'cloud' || isDemo || currentUser?.staffProfile || !clinic?.id || !clinic?.paypalSubscriptionId) return
     let stopped = false
+    const uid = currentUser?.id
     const sync = async () => {
       const latest = stateRef.current.clinic
       if (!latest?.paypalSubscriptionId) return
       const res = await syncPaypalSubscription({ subscriptionId: latest.paypalSubscriptionId, clinicId: latest.id })
-      if (!stopped && res.ok && res.clinic && !queueRef.current.hasUnsaved()) setState((s) => ({ ...s, clinic: res.clinic }))
+      if (!stopped && stateRef.current.currentUser?.id === uid && res.ok && res.clinic && !queueRef.current.hasUnsaved()) setState((s) => ({ ...s, clinic: res.clinic }))
     }
-    const timer = setInterval(sync, 10 * 60 * 1000)
+    // Reconcile without blocking profile entry. Server entitlement stays authoritative.
+    const refresh = () => sync().catch(() => {})
+    refresh()
+    const timer = setInterval(refresh, 10 * 60 * 1000)
     return () => {
       stopped = true
       clearInterval(timer)
     }
-  }, [clinic?.id, clinic?.paypalSubscriptionId, isDemo])
+  }, [clinic?.id, clinic?.paypalSubscriptionId, currentUser?.id, currentUser?.staffProfile, isDemo])
 
   // Resolve the app-owner flag whenever the logged-in user changes (async hash).
   useEffect(() => {
@@ -299,6 +307,19 @@ export function StoreProvider({ children }) {
     if (res.ok) await loadSession()
     return res
   }, [loadSession])
+
+  // Only the profile picker uses this greeting; ordinary account login does not.
+  const enterProfile = useCallback(async (identifier, password) => {
+    const result = await backend.signIn(identifier, password)
+    if (!result.ok) return result
+    const loaded = await loadSession(user => setProfileWelcome({
+      id: user.id, name: user.name, nameAr: user.nameAr, ready: false,
+    }))
+    if (!loaded) { setProfileWelcome(null); return { ok: false } }
+    setProfileWelcome(value => value ? { ...value, ready: true } : null)
+    return { ok: true, owner: !stateRef.current.currentUser?.staffProfile }
+  }, [loadSession])
+  const dismissProfileWelcome = useCallback(() => setProfileWelcome(null), [])
 
   const register = useCallback(async (payload) => {
     const res = await backend.signUp(payload)
@@ -328,6 +349,8 @@ export function StoreProvider({ children }) {
     }
     await clearDraftScope(draftScope(stateRef.current.currentUser?.id, stateRef.current.clinic?.id))
     await backend.signOut()
+    sessionLoadVersion.current++
+    setProfileWelcome(null)
     queueRef.current.reset()
     setState(EMPTY)
     return true
@@ -583,7 +606,7 @@ export function StoreProvider({ children }) {
     paymentResult, dismissPaymentResult,
     clinic, currentUser, tier, can, isOwner, readOnly: isDemo || subscriptionReadOnly, subscriptionReadOnly, demoMode: isDemo,
     canViewPatientFinance, refreshAppointments, refreshClinic: loadSession,
-    login, logout, register, resetPassword, updatePassword,
+    login, enterProfile, profileWelcome, dismissProfileWelcome, logout, register, resetPassword, updatePassword,
     patients: state.patients, doctors: state.doctors, appointments: state.appointments,
     toothRecords: state.toothRecords, payments: state.payments, suggestions: state.suggestions,
     labOrders: state.labOrders,

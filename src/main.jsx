@@ -4,7 +4,8 @@ import { BrowserRouter, HashRouter } from 'react-router-dom'
 import { MotionConfig } from 'framer-motion'
 import App from './App.jsx'
 import { I18nProvider } from './i18n/I18nContext.jsx'
-import { StoreProvider } from './context/StoreContext.jsx'
+import { StoreProvider, useStore } from './context/StoreContext.jsx'
+import ProfileWelcome from './components/ProfileWelcome'
 import { applyReduceMotionOnBoot, useReduceMotion } from './lib/motionPref'
 import './index.css'
 import { isElectron } from './lib/downloads'
@@ -21,10 +22,12 @@ applyReduceMotionOnBoot()
 // app-wide (CSS animations/transitions are handled by the .reduce-motion class).
 function Root() {
   const [reduce] = useReduceMotion()
+  const { profileWelcome, dismissProfileWelcome } = useStore()
   return (
     <MotionConfig reducedMotion={reduce ? 'always' : 'never'}>
       <PageMetadata />
-      <App />
+      <div inert={profileWelcome ? '' : undefined} aria-hidden={profileWelcome ? true : undefined}><App /></div>
+      <ProfileWelcome profile={profileWelcome} onClose={dismissProfileWelcome} />
     </MotionConfig>
   )
 }
