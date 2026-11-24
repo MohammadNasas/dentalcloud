@@ -38,7 +38,7 @@ export async function manageProfiles(input) {
 export async function staffBootstrap(clinic) {
   return loadStaffClinic(profileRPC, clinic)
 }
-export const profileTables = { patients: 'patients', toothRecords: 'tooth_records', appointments: 'appointments', payments: 'payments' }
+export const profileTables = { patients: 'patients', toothRecords: 'tooth_records', appointments: 'appointments', payments: 'payments', lab_orders: 'lab_orders' }
 export function patientFinanceAllowed(user, patient) {
   return !user?.staffProfile || patient?.canViewFinance === true
 }

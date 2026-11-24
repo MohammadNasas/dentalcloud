@@ -361,7 +361,8 @@ export function StoreProvider({ children }) {
   const upsert = useCallback((key, table, obj) => {
     if (stateRef.current.currentUser?.staffProfile) {
       const patient = stateRef.current.patients.find(p => p.id === (table === 'patients' ? obj.id : obj.patientId))
-      if (!['patients','toothRecords','appointments','payments'].includes(table)
+      if (!['patients','toothRecords','appointments','payments','lab_orders'].includes(table)
+        || (table === 'lab_orders' && !patient)
         || (table !== 'appointments' && patient && !patientFinanceAllowed(stateRef.current.currentUser, patient))) {
         toast('التعديل متاح للطبيب المسؤول فقط. / Only the assigned clinician can edit this file.')
         return Promise.resolve(null)

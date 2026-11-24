@@ -56,7 +56,8 @@ export default function Lab() {
 function LabContent() {
   const { lang } = useI18n()
   const { labOrders = [], addLabOrder, updateLabOrder, deleteLabOrder,
-          clinic, updateClinic } = useStore()
+          clinic, updateClinic, currentUser, getPatient } = useStore()
+  const staff = Boolean(currentUser?.staffProfile)
   const currency = clinic?.settings?.currency || 'JOD'
   const labs = clinic?.labs || []
 
@@ -92,23 +93,23 @@ function LabContent() {
       <PageHero
         icon={<FlaskConical size={22} />}
         title={lang === 'ar' ? 'إدارة المختبر' : 'Lab Management'}
-        subtitle={lang === 'ar' ? 'تتبّع طلبات المختبر والمدفوعات' : 'Track lab orders and payments'}
+        subtitle={staff ? (lang === 'ar' ? 'طلبات المختبر لمرضاك فقط' : 'Lab orders for your assigned patients') : lang === 'ar' ? 'تتبّع طلبات المختبر والمدفوعات' : 'Track lab orders and payments'}
         actions={<div className="flex flex-wrap gap-2">
-          <button onClick={() => setLabsOpen(true)} className="btn bg-white/15 font-bold text-white ring-1 ring-white/20 hover:bg-white/25">
+          {!staff && <button onClick={() => setLabsOpen(true)} className="btn bg-white/15 font-bold text-white ring-1 ring-white/20 hover:bg-white/25">
             <BookUser size={16} /> {lang === 'ar' ? 'المختبرات' : 'Labs'}
-          </button>
+          </button>}
           <button onClick={() => setAddOpen(true)} className="btn bg-white font-bold text-brand-700 hover:bg-white/90">
             <Plus size={16} /> {lang === 'ar' ? 'طلب جديد' : 'New Order'}
           </button>
         </div>}
       >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className={cx('grid grid-cols-2 gap-3', !staff && 'sm:grid-cols-4')}>
           {[
             { label: lang === 'ar' ? 'إجمالي الطلبات' : 'Total Orders', value: labOrders.length },
             { label: lang === 'ar' ? 'قيد الانتظار' : 'Pending', value: pending },
             { label: lang === 'ar' ? 'إجمالي المدفوع' : 'Total Paid', value: money(totalPaid, currency) },
             { label: lang === 'ar' ? 'المتبقي للمختبر' : 'Owed to Lab', value: money(totalOwed, currency) },
-          ].map((s, i) => (
+          ].filter((_, i) => !staff || i < 2).map((s, i) => (
             <div key={i} className="rounded-2xl bg-white/10 p-3.5 backdrop-blur ring-1 ring-white/10">
               <p className="text-[11px] font-semibold text-white/70">{s.label}</p>
               <p className="mt-1 text-xl font-extrabold">{s.value}</p>
@@ -122,9 +123,9 @@ function LabContent() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 font-bold text-ink-800"><BookUser size={18} className="text-violet-500" /> {lang === 'ar' ? 'المختبرات المحفوظة' : 'Saved Labs'}</h2>
-            <p className="mt-0.5 text-xs text-ink-400">{lang === 'ar' ? 'احفظ اسم المختبر ورقم واتسابه مرة واحدة ثم اختره داخل أي طلب.' : 'Save each lab and its WhatsApp number once, then select it in any order.'}</p>
+            <p className="mt-0.5 text-xs text-ink-400">{staff ? (lang === 'ar' ? 'اختر مختبرًا محفوظًا عند إضافة الطلب، أو أدخل بيانات مختبر آخر.' : 'Choose a saved lab in your order, or enter another lab’s details.') : lang === 'ar' ? 'احفظ اسم المختبر ورقم واتسابه مرة واحدة ثم اختره داخل أي طلب.' : 'Save each lab and its WhatsApp number once, then select it in any order.'}</p>
           </div>
-          <button onClick={() => setLabsOpen(true)} className="btn-outline !py-2"><Plus size={15} /> {lang === 'ar' ? 'إضافة / تعديل' : 'Add / edit'}</button>
+          {!staff && <button onClick={() => setLabsOpen(true)} className="btn-outline !py-2"><Plus size={15} /> {lang === 'ar' ? 'إضافة / تعديل' : 'Add / edit'}</button>}
         </div>
         {labs.length > 0 ? (
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -143,8 +144,8 @@ function LabContent() {
             ))}
           </div>
         ) : (
-          <button onClick={() => setLabsOpen(true)} className="mt-3 w-full rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-4 text-sm font-semibold text-violet-600 hover:bg-violet-50">
-            {lang === 'ar' ? '+ أضف أول مختبر ورقم واتسابه' : '+ Add the first lab and WhatsApp number'}
+          <button disabled={staff} onClick={() => setLabsOpen(true)} className="mt-3 w-full rounded-xl border border-dashed border-violet-200 bg-violet-50/40 p-4 text-sm font-semibold text-violet-600 hover:bg-violet-50">
+            {staff ? (lang === 'ar' ? 'يمكنك إدخال بيانات المختبر داخل الطلب.' : 'You can enter lab details inside an order.') : lang === 'ar' ? '+ أضف أول مختبر ورقم واتسابه' : '+ Add the first lab and WhatsApp number'}
           </button>
         )}
       </div>
@@ -177,11 +178,12 @@ function LabContent() {
         <div className="space-y-3">
           {filtered.map((order) => (
             <LabOrderCard key={order.id} order={order}
+              patient={getPatient(order.patientId)}
               currency={currency} lang={lang} clinic={clinic} labs={labs}
               expanded={expandedId === order.id}
               onToggle={() => setExpandedId(expandedId === order.id ? null : order.id)}
               onEdit={() => setEditingId(order.id)}
-              onDelete={() => deleteLabOrder(order.id)}
+              onDelete={staff ? null : () => deleteLabOrder(order.id)}
               onStatusChange={(s) => updateLabOrder(order.id, { status: s })}
             />
           ))}
@@ -193,13 +195,13 @@ function LabContent() {
         <LabOrderModal
           order={editingId ? labOrders.find((o) => o.id === editingId) : null}
           currency={currency} lang={lang} clinic={clinic} labs={labs}
-          onManageLabs={() => { setAddOpen(false); setEditingId(null); setLabsOpen(true) }}
+          onManageLabs={staff ? null : () => { setAddOpen(false); setEditingId(null); setLabsOpen(true) }}
           onSave={(data) => editingId ? updateLabOrder(editingId, data) : addLabOrder(data)}
           onClose={() => { setAddOpen(false); setEditingId(null) }}
         />
       )}
 
-      {labsOpen && (
+      {labsOpen && !staff && (
         <LabsDirectoryModal
           labs={labs} lang={lang}
           onSave={(nextLabs) => updateClinic({ labs: nextLabs })}
@@ -210,7 +212,7 @@ function LabContent() {
   )
 }
 
-function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle, onEdit, onDelete, onStatusChange }) {
+function LabOrderCard({ order, patient, currency, lang, clinic, labs, expanded, onToggle, onEdit, onDelete, onStatusChange }) {
   const [copied, setCopied] = useState(false)
   const wt = WORK_TYPES.find((w) => w.key === order.workType)
   const st = STATUS_CONFIG[order.status] || STATUS_CONFIG.draft
@@ -269,6 +271,7 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
             <Badge color={st.color}><StatusIcon size={11} /> {lang === 'ar' ? st.ar : st.en}</Badge>
           </div>
           <p className="mt-0.5 text-sm text-ink-500">
+            {patient && <span className="me-2 font-semibold">{lang === 'ar' ? patient.nameAr || patient.name : patient.name}</span>}
             {(savedLab?.name || order.labName) && <span className="font-semibold">{savedLab?.name || order.labName}</span>}
             {order.shade && <> · {lang === 'ar' ? 'اللون:' : 'Shade:'} {order.shade}</>}
             {order.pieces > 1 && <> · {order.pieces} {lang === 'ar' ? 'قطع' : 'pcs'}</>}
@@ -297,7 +300,7 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
               className="rounded-lg bg-emerald-50 p-1.5 text-emerald-600 hover:bg-emerald-100"><WhatsAppIcon size={15} /></a>
           )}
           <button onClick={onEdit} className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-50 hover:text-brand-600"><Edit2 size={15} /></button>
-          <button onClick={onDelete} className="rounded-lg p-1.5 text-ink-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>
+          {onDelete && <button onClick={onDelete} className="rounded-lg p-1.5 text-ink-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>}
           <button onClick={onToggle} className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-50">
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           </button>
@@ -342,11 +345,13 @@ function LabOrderCard({ order, currency, lang, clinic, labs, expanded, onToggle,
 }
 
 function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSave, onClose }) {
-
+  const { patients, currentUser, canViewPatientFinance } = useStore()
+  const staff = Boolean(currentUser?.staffProfile)
+  const availablePatients = patients.filter(p => !staff || canViewPatientFinance(p))
   const { saving, runSave } = useSaveAction()
   const matchedLab = order && (labs.find((lab) => lab.id === order.labId) || labs.find((lab) => lab.name === order.labName))
-  const draft = useFormDraft('lab-order:' + (order?.id || 'new'), () => ({ id: order?.id || backend.genId('labOrder'), ...(order ? {
-    labId: matchedLab?.id || '',
+  const draft = useFormDraft('lab-order:' + (order?.id || 'new'), () => ({ id: order?.id || backend.genId('labOrder'), patientId: order?.patientId || '', ...(order ? {
+    labId: matchedLab?.id || (order.labName ? 'manual' : ''),
     labName: matchedLab?.name || order.labName || '',
     labPhone: matchedLab?.phone || order.labPhone || '',
     workType: order.workType || 'crown',
@@ -363,6 +368,7 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
   const form = draft.value
   const setForm = draft.set
   const draftId = form.id
+  const invalidOrder = !form.labId || !form.labName?.trim() || (staff && !availablePatients.some(p => p.id === form.patientId))
 
   const f = (k, v) => setForm((prev) => ({ ...prev, [k]: v }))
 
@@ -388,7 +394,7 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
       ...form,
       id: draftId,
       status: statusOverride || form.status,
-      patientId: undefined,
+      patientId: form.patientId || undefined,
       patientName: undefined,
       pieces: Math.max(1, Number(form.pieces) || 1),
       price: Number(form.price) || 0,
@@ -397,7 +403,7 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
   }
 
   function submit(sendWhatsApp = false) { return runSave(async () => {
-    if (draft.blocked) return
+    if (draft.blocked || invalidOrder) return
     const data = buildData(sendWhatsApp ? 'sent' : undefined)
     // Reserve the user-initiated tab before awaiting so mobile browsers allow it.
     const chat = sendWhatsApp && waNumber(data.labPhone).length >= 8 ? window.open('about:blank', '_blank') : null
@@ -434,25 +440,36 @@ function LabOrderModal({ order, currency, lang, clinic, labs, onManageLabs, onSa
       icon={<FlaskConical size={18} className="text-violet-500" />}
       footer={<>
         <button onClick={onClose} disabled={saving} className="btn-ghost">{lang === 'ar' ? 'إلغاء' : 'Cancel'}</button>
-        <button onClick={() => submit(false)} disabled={saving || draft.blocked || !form.labId} className="btn-outline"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
-        <button onClick={() => submit(true)} disabled={saving || draft.blocked || !form.labId || waNumber(form.labPhone).length < 8}
+        <button onClick={() => submit(false)} disabled={saving || draft.blocked || invalidOrder} className="btn-outline"><Save size={16} /> {lang === 'ar' ? 'حفظ' : 'Save'}</button>
+        <button onClick={() => submit(true)} disabled={saving || draft.blocked || invalidOrder || waNumber(form.labPhone).length < 8}
           className="btn bg-emerald-500 text-white hover:bg-emerald-600"><WhatsAppIcon size={16} /> {lang === 'ar' ? 'حفظ وإرسال واتساب' : 'Save & send WhatsApp'}</button>
       </>}
     >
       <DraftNotice draft={draft} />
       <fieldset disabled={saving || draft.blocked}>
       <div className="grid gap-4 md:grid-cols-2">
+        <Field label={lang === 'ar' ? 'المريض' : 'Patient'} required={staff} hint={staff ? (lang === 'ar' ? 'يمكنك إدارة طلبات المرضى المسجّلين باسمك فقط.' : 'Only patients assigned to your profile are available.') : undefined}>
+          <select className="input" value={form.patientId || ''} disabled={staff && Boolean(order)} onChange={e => f('patientId', e.target.value)}>
+            <option value="">{staff ? (lang === 'ar' ? 'اختر المريض' : 'Choose patient') : (lang === 'ar' ? 'طلب عام للعيادة' : 'General clinic order')}</option>
+            {availablePatients.map(p => <option key={p.id} value={p.id}>{lang === 'ar' ? p.nameAr || p.name : p.name}</option>)}
+          </select>
+        </Field>
         {/* Saved lab */}
         <Field label={lang === 'ar' ? 'المختبر' : 'Lab'} required hint={form.labPhone ? `${lang === 'ar' ? 'واتساب' : 'WhatsApp'}: ${form.labPhone}` : undefined}>
           <div className="flex gap-2">
             <select className="input" value={form.labId} onChange={(e) => selectLab(e.target.value)}>
+              <option value="manual">{lang === 'ar' ? 'إدخال بيانات مختبر آخر' : 'Enter another lab'}</option>
               <option value="">{lang === 'ar' ? '— اختر مختبراً —' : '— Select lab —'}</option>
               {labs.map((lab) => <option key={lab.id} value={lab.id}>{lab.name} · {lab.phone}</option>)}
             </select>
-            <button type="button" onClick={onManageLabs} disabled={saving} className="btn-outline shrink-0 !px-3" title={lang === 'ar' ? 'إدارة المختبرات' : 'Manage labs'}><Plus size={16} /></button>
+            {onManageLabs && <button type="button" onClick={onManageLabs} disabled={saving} className="btn-outline shrink-0 !px-3" title={lang === 'ar' ? 'إدارة المختبرات' : 'Manage labs'}><Plus size={16} /></button>}
           </div>
-          {labs.length === 0 && <button type="button" onClick={onManageLabs} className="mt-2 text-xs font-bold text-violet-600 hover:underline">{lang === 'ar' ? 'أضف مختبراً ورقم واتسابه أولًا' : 'Add a lab and its WhatsApp number first'}</button>}
+          {labs.length === 0 && onManageLabs && <button type="button" onClick={onManageLabs} className="mt-2 text-xs font-bold text-violet-600 hover:underline">{lang === 'ar' ? 'أضف مختبراً ورقم واتسابه أولًا' : 'Add a lab and its WhatsApp number first'}</button>}
         </Field>
+        {form.labId === 'manual' && <>
+          <Field label={lang === 'ar' ? 'اسم المختبر' : 'Lab name'} required><input className="input" value={form.labName} maxLength={120} onChange={e => f('labName', e.target.value)}/></Field>
+          <Field label={lang === 'ar' ? 'رقم واتساب المختبر' : 'Lab WhatsApp number'}><input dir="ltr" className="input" value={form.labPhone} maxLength={30} onChange={e => f('labPhone', e.target.value)}/></Field>
+        </>}
 
         {/* Work type */}
         <Field label={lang === 'ar' ? 'نوع الشغل' : 'Work Type'}>

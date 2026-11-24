@@ -170,7 +170,7 @@ export default function App() {
   if (recovery) return <PageLoader><ResetPassword /></PageLoader>
   if (!currentUser) return <>{location.pathname === '/profiles' ? <ProfileSelector /> : <PublicEntry />}{overlay}<ToastHost /></>
 
-  if (currentUser.staffProfile && !/^\/(patients(?:\/[^/]+)?|appointments|instructions|download)$/.test(location.pathname)) return <Navigate to="/patients" replace />
+  if (currentUser.staffProfile && !/^\/(patients(?:\/[^/]+)?|appointments|instructions|lab|download)$/.test(location.pathname)) return <Navigate to="/patients" replace />
   const trialEnd = Date.parse(clinic?.trialEndsAt || '')
   const trialActive = Number.isFinite(trialEnd) && Math.max(accessClock, Date.now()) < trialEnd
   // Pro access is allowed during the free month or after a verified payment.

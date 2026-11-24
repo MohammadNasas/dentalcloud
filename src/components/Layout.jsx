@@ -185,7 +185,7 @@ export default function Layout() {
   const { t, L, lang, toggleLang } = useI18n()
   const { currentUser, clinic, logout, can, appointments, getPatient, isOwner, readOnly, subscriptionReadOnly } = useStore()
   const navItems = (() => {
-    if (currentUser?.staffProfile) return NAV.filter(n => ['/patients','/appointments','/instructions','/download'].includes(n.to))
+    if (currentUser?.staffProfile) return NAV.filter(n => ['/patients','/appointments','/instructions','/lab','/download'].includes(n.to))
     if (!isOwner) return NAV
     const items = [...NAV]
     const i = items.findIndex((n) => n.to === '/settings')

@@ -120,6 +120,7 @@ begin
   else
     level:=dentalcloud_private.access_level(cid);
     safe:=dentalcloud_private.profile_pick(c.data,array['name','nameAr','prices','customInstructions','customSheets','tier']);
+    safe:=safe || jsonb_build_object('labs',coalesce((select jsonb_agg(dentalcloud_private.profile_pick(lab,array['id','name','phone'])) from jsonb_array_elements(case when jsonb_typeof(c.data->'labs')='array' then c.data->'labs' else '[]'::jsonb end) lab),'[]'::jsonb));
     safe:=safe || jsonb_build_object('settings',dentalcloud_private.profile_pick(coalesce(c.data->'settings','{}'),array['currency','logo']),
       'paid',level>=0,'subscriptionProvider','profile','paidThrough',case when level>=0 then to_jsonb(now()+interval '2 minutes') else to_jsonb(now()-interval '1 minute') end,
       'trialUsedAt','2000-01-01T00:00:00Z');
@@ -163,7 +164,7 @@ returns jsonb language plpgsql security definer set search_path='' as $$
 declare cid uuid:=public.current_clinic_id(); rid uuid; pid uuid; old_data jsonb; incoming jsonb; saved jsonb; keys text[]; existing_cid uuid;
 begin
   if cid is null or auth.uid() is null or dentalcloud_private.access_level(cid)<1 then raise exception 'Active clinic profile required' using errcode='42501'; end if;
-  if p_table not in ('patients','tooth_records','appointments','payments') or jsonb_typeof(p_data)<>'object' then raise exception 'Not allowed' using errcode='42501'; end if;
+  if p_table not in ('patients','tooth_records','appointments','payments','lab_orders') or jsonb_typeof(p_data)<>'object' then raise exception 'Not allowed' using errcode='42501'; end if;
   rid:=(p_data->>'id')::uuid;
   if rid is null then raise exception 'Record ID required'; end if;
   -- Serialize same-record writes, including simultaneous INSERT attempts.
@@ -186,6 +187,10 @@ begin
   elsif p_table='tooth_records' then
     keys:=array['patientId','date','status','surfaces','toothId','dentition','type','treatment','treatmentKey','itemKey','name','nameAr','notes','price','kind','label','cariesClass'];
     if coalesce((p_data->>'price')::numeric,0)<0 then raise exception 'Invalid price'; end if;
+  elsif p_table='lab_orders' then
+    keys:=array['patientId','labId','labName','labPhone','workType','customWorkType','shade','pieces','toothIds','specs','price','paid','dueDate','status'];
+    if coalesce((p_data->>'price')::numeric,0)<0 or coalesce((p_data->>'paid')::numeric,0)<0 then raise exception 'Invalid lab amount'; end if;
+    if coalesce(p_data->>'status','') not in ('draft','sent','received','completed') then raise exception 'Invalid lab status'; end if;
   else
     keys:=array['patientId','date','note','methods','amount','currency','method'];
     if coalesce((p_data->>'amount')::numeric,0)<0 then raise exception 'Invalid amount'; end if;
