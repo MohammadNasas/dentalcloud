@@ -1,13 +1,16 @@
 import { Component, Suspense } from 'react'
 import { useI18n } from '../i18n/I18nContext'
 import { Spinner } from './ui'
+import { isPageAssetError } from '../lib/pageLoadError.js'
 
 class PageLoadError extends Component {
-  state = { failed: false }
-  static getDerivedStateFromError() { return { failed: true } }
+  state = { failed: false, assetError: false }
+  static getDerivedStateFromError(error) { return { failed: true, assetError: isPageAssetError(error) } }
   render() {
     if (this.state.failed) return <div role="alert" className="space-y-3 p-6 text-center">
-      <p>{this.props.ar ? 'تعذّر فتح الصفحة. تحقق من الاتصال وأعد تحميلها.' : 'Could not open this page. Check your connection and reload.'}</p>
+      <p>{this.state.assetError
+        ? (this.props.ar ? 'تعذّر تحميل جزء من الصفحة. أعد تحميلها للحصول على أحدث نسخة.' : 'Part of this page could not load. Reload to get the latest version.')
+        : (this.props.ar ? 'تعذّر عرض الصفحة. أعد المحاولة، وإذا تكررت المشكلة تواصل معنا.' : 'This page could not be displayed. Retry, or contact us if the problem continues.')}</p>
       <button className="btn-primary" onClick={() => window.location.reload()}>{this.props.ar ? 'إعادة تحميل' : 'Reload'}</button>
     </div>
     return this.props.children

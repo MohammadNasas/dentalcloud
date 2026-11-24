@@ -4,6 +4,16 @@
 // Vite content-hashes asset filenames, so cached assets never shadow a new build.
 const CACHE = 'dentalcloud-v2'
 
+// Removed hashed chunks can receive the SPA's HTML fallback after deployment.
+// Never retain that HTML under a JS/CSS URL, or retries keep failing offline too.
+function validAsset(url, response) {
+  if (!response || response.status !== 200) return false
+  const type = response.headers.get('content-type') || ''
+  if (/\.(?:m?js)$/i.test(url.pathname)) return /(?:javascript|ecmascript)/i.test(type)
+  if (/\.css$/i.test(url.pathname)) return /text\/css/i.test(type)
+  return true
+}
+
 self.addEventListener('install', () => self.skipWaiting())
 
 self.addEventListener('push', e => {
@@ -58,7 +68,7 @@ self.addEventListener('fetch', (e) => {
         // Bypass the HTTP redirect cache as well as the offline shell cache.
         const fresh = await fetch(req, { cache: 'reload' })
         const cache = await caches.open(CACHE)
-        cache.put(req, fresh.clone())
+        if (fresh.ok) cache.put(req, fresh.clone()).catch(() => {})
         return fresh
       } catch {
         const cache = await caches.open(CACHE)
@@ -70,9 +80,13 @@ self.addEventListener('fetch', (e) => {
 
   e.respondWith((async () => {
     const cache = await caches.open(CACHE)
-    const cached = await cache.match(req)
+    let cached = await cache.match(req)
+    if (cached && !validAsset(url, cached)) {
+      await cache.delete(req)
+      cached = undefined
+    }
     const network = fetch(req).then((res) => {
-      if (res && res.status === 200) cache.put(req, res.clone())
+      if (validAsset(url, res)) cache.put(req, res.clone()).catch(() => {})
       return res
     }).catch(() => null)
     return cached || (await network) || Response.error()
