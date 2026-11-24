@@ -32,7 +32,7 @@ export const onRequestPost = ({ request, env }) => handle(request, async () => {
   }
   if (input.action === 'create') {
     if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 80
-      || typeof input.password !== 'string' || input.password.length < 10 || input.password.length > 128) throw new ApiError('invalid_profile')
+      || typeof input.password !== 'string' || input.password.length < 6 || input.password.length > 128) throw new ApiError('invalid_profile')
     if (members.length >= 30) throw new ApiError('profile_limit')
     // A no-op owner assignment is not used as an entitlement bypass. Validate the
     // same subscription helper through the database's owner-only provisioning RPC.
@@ -69,7 +69,7 @@ export const onRequestPost = ({ request, env }) => handle(request, async () => {
     if (!old || typeof input.name !== 'string' || !input.name.trim() || input.name.length > 80) throw new ApiError('invalid_profile')
     await db(`doctors?id=eq.${input.id}&clinic_id=eq.${cid}`, 'PATCH', { data: { ...old.data, name: input.name.trim(), nameAr: input.name.trim(), specialty: String(input.specialty || '').slice(0, 100) } })
   } else if (input.action === 'password') {
-    if (typeof input.password !== 'string' || input.password.length < 10 || input.password.length > 128) throw new ApiError('invalid_password')
+    if (typeof input.password !== 'string' || input.password.length < 6 || input.password.length > 128) throw new ApiError('invalid_password')
     await authAdmin(env, `users/${input.id}`, 'PUT', { password: input.password })
   } else if (input.action === 'active') {
     if (typeof input.active !== 'boolean') throw new ApiError('invalid_profile')
