@@ -4,8 +4,12 @@ import { LockKeyhole, Plus, ShieldCheck, Users, ArrowRight, Trash2 } from 'lucid
 import { useStore } from '../context/StoreContext'
 import { useI18n } from '../i18n/I18nContext'
 import { Avatar, Modal, Field } from './ui'
-import { manageProfiles, rememberProfiles, profileDirectory, forgetProfiles, announceProfileSwitch, profileRPC } from '../lib/clinicProfiles'
+import { manageProfiles, rememberProfiles, profileDirectory, forgetProfiles, announceProfileSwitch, profileRPC, prepareProfileDevice } from '../lib/clinicProfiles'
 
+const createdLabel = (value, ar) => {
+  const date = new Date(value)
+  return value && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(ar ? 'ar' : 'en', { year: 'numeric', month: 'short', day: 'numeric' }).format(date) : (ar ? 'غير مسجّل' : 'Not recorded')
+}
 const errorText = ar => ar ? 'تعذّر إتمام العملية. تحقق من الاتصال والصلاحيات وحاول مجددًا.' : 'Could not complete this action. Check your connection and permissions, then try again.'
 
 export function ProfileSwitcher() {
@@ -26,11 +30,11 @@ export function ProfileSwitcher() {
   async function lock() {
     setBusy(true); setError('')
     try {
-      const saved = profileDirectory()
-      if (!currentUser.staffProfile && (saved?.clinicId !== clinic.id || !saved.profiles.some(p => p.owner && p.email === currentUser.email))) {
+      if (!currentUser.staffProfile) {
         const data = await manageProfiles({ action: 'list' })
         rememberProfiles(clinic, data.profiles.map(p => p.owner ? { ...p, email: currentUser.email } : p))
       }
+      if (!currentUser.staffProfile) await prepareProfileDevice()
       if (await logout()) { announceProfileSwitch(); navigate('/profiles', { replace: true }) }
     } catch { setError(errorText(ar)) } finally { setBusy(false) }
   }
@@ -43,6 +47,17 @@ export function ProfileSelector() {
   const [directory, setDirectory] = useState(profileDirectory)
   const [selected, setSelected] = useState(null); const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
+  async function enterDevice(p) {
+    if (busy) return
+    setBusy(true); setError('')
+    try {
+      const result = await enterProfile(null, null, p.id)
+      if (!result.ok) setError(result.error === 'device_sign_in_required'
+        ? (ar ? 'يسجّل صاحب العيادة دخوله ثم يضغط قفل وتبديل البروفايل لتجهيز الدخول على هذا الجهاز.' : 'The clinic owner must sign in and use Lock & switch profile to authorize this device.')
+        : (ar ? 'تعذّر فتح البروفايل. قد يكون موقوفًا أو محذوفًا.' : 'This profile is unavailable. It may be disabled or deleted.'))
+      else { announceProfileSwitch(); navigate('/patients', { replace: true }) }
+    } catch { setError(errorText(ar)) } finally { setBusy(false) }
+  }
   async function enter(e) {
     e.preventDefault(); if (busy) return
     setBusy(true); setError('')
@@ -59,11 +74,13 @@ export function ProfileSelector() {
       <h1 className="text-3xl font-extrabold text-ink-900">{ar ? 'مين معنا اليوم؟' : 'Who’s working today?'}</h1>
       <p className="mt-3 text-sm text-ink-500">{ar ? 'مساحة لكل شخص، ومواعيد تجمع العيادة.' : 'Your own workspace. One shared clinic calendar.'}</p>
       <div className="mt-10 flex flex-wrap justify-center gap-5">
-        {directory?.profiles.map(p => <button disabled={busy} key={p.id} onClick={() => { setSelected(p); setPassword(''); setError('') }} className="group flex w-40 flex-col items-center gap-4 rounded-3xl border border-ink-100 bg-white px-4 py-7 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand-300 hover:shadow-lg">
+        {directory?.profiles.map(p => <button disabled={busy} key={p.id} onClick={() => { if (p.passwordless) { enterDevice(p); return } setSelected(p); setPassword(''); setError('') }} className="group flex w-40 flex-col items-center gap-4 rounded-3xl border border-ink-100 bg-white px-4 py-7 shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand-300 hover:shadow-lg">
           <Avatar name={p.name} size={68}/><span className="font-bold text-ink-800">{p.name}</span>
+          <span className="text-[11px] text-ink-400">{ar ? 'أُنشئ في ' : 'Created '}{createdLabel(p.createdAt, ar)}</span>
           <span className="flex items-center gap-1 text-xs text-ink-400">{p.owner ? <ShieldCheck size={13}/> : <LockKeyhole size={13}/>}{p.owner ? (ar ? 'صاحب العيادة' : 'Clinic owner') : (ar ? 'فريق العيادة' : 'Clinic team')}</span>
         </button>)}
       </div>
+      {error && !selected && <p role="alert" className="mt-5 text-sm text-rose-600">{error}</p>}
       {!directory && <p className="mt-8 text-ink-500">{ar ? 'يسجّل صاحب العيادة دخوله أولًا لتجهيز البروفايلات على هذا الجهاز.' : 'The clinic owner can sign in to set up profiles on this device.'}</p>}
       <button className="btn-ghost mt-8" onClick={() => navigate('/login')}>{ar ? 'تسجيل الدخول بحساب آخر' : 'Sign in with another account'}<ArrowRight size={15}/></button>
       {directory && <button className="mx-auto mt-3 block text-xs text-ink-400" onClick={() => { forgetProfiles(); setDirectory(null) }}>{ar ? 'إزالة أسماء العيادة من هذا الجهاز' : 'Remove this clinic’s names from this device'}</button>}
@@ -98,6 +115,7 @@ export default function ClinicProfiles() {
         const remaining = profiles.filter(p => p.id !== form.id)
         setProfiles(remaining)
         rememberProfiles(clinic, remaining)
+        await refreshClinic()
         setForm(null)
         setNotice(ar ? 'تم حذف البروفايل وإلغاء وصوله للعيادة. ملفات المرضى والمواعيد محفوظة.' : 'Profile deleted and clinic access revoked. Patient files and appointments are preserved.')
         return
@@ -112,19 +130,21 @@ export default function ClinicProfiles() {
     catch { setError(errorText(ar)) } finally { setBusy(false) }
   }
   return <div className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold text-ink-900">{ar ? 'بروفايلات العيادة' : 'Clinic profiles'}</h2><p className="mt-2 text-sm text-ink-500">{ar ? 'التقويم مشترك. حساب المريض يظهر للطبيب المسؤول وصاحب العيادة فقط.' : 'Shared calendar. Patient finances are visible only to the assigned clinician and clinic owner.'}</p></div><button disabled={demoMode || readOnly} onClick={() => { setError(''); setForm({ action: 'create', name: '', password: '', role: 'doctor' }) }} className="btn-primary"><Plus size={16}/>{ar ? 'إضافة بروفايل' : 'Add profile'}</button></div>
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-extrabold text-ink-900">{ar ? 'بروفايلات العيادة' : 'Clinic profiles'}</h2><p className="mt-2 text-sm text-ink-500">{ar ? 'الأطباء يتعاملون مع كل المرضى ومدفوعاتهم. إيرادات العيادة ومصاريفها وإدارتها لصاحب الحساب فقط.' : 'Doctors can manage all patients and their payments. Clinic revenue, expenses and administration remain owner-only.'}</p></div><button disabled={demoMode || readOnly} onClick={() => { setError(''); setForm({ action: 'create', name: '', password: '', role: 'doctor' }) }} className="btn-primary"><Plus size={16}/>{ar ? 'إضافة بروفايل' : 'Add profile'}</button></div>
     {error && <p role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-600">{error}</p>}
     {notice && <p role="status" className="rounded-xl bg-brand-50 p-3 text-sm text-brand-700">{notice}</p>}
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{profiles.map(p => <div key={p.id} className="card p-5">
       <div className="flex items-center gap-3"><Avatar name={p.name} size={48}/><div><p className="font-bold">{p.name}</p><p className="mt-1 text-xs text-ink-400">{p.owner ? (ar ? 'صاحب العيادة · جميع الصلاحيات' : 'Owner · full access') : p.active ? (ar ? 'مفعّل · صلاحيات الفريق' : 'Active · team access') : (ar ? 'موقوف' : 'Disabled')}</p></div></div>
+      <p className="mt-3 text-xs text-ink-400">{ar ? 'تاريخ الإنشاء: ' : 'Created: '}{createdLabel(p.createdAt, ar)}</p>
+      {p.passwordless && <p className="mt-2 text-xs text-brand-700">{ar ? 'بروفايل قديم · دخول بضغطة على جهاز العيادة' : 'Legacy profile · one-click entry on the clinic device'}</p>}
       {p.owner ? <p className="mt-4 text-xs text-ink-500">{ar ? 'محمي بكلمة مرور حسابك الحالية.' : 'Protected by your existing account password.'}</p> : <div className="mt-5 flex flex-wrap gap-2">
-        <button disabled={busy || demoMode} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'update', id: p.id, name: p.name, specialty: p.specialty }) }}>{ar ? 'تعديل' : 'Edit'}</button>
-        <button disabled={busy || demoMode} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'password', id: p.id, password: '' }) }}>{ar ? 'كلمة المرور' : 'Password'}</button>
-        <button disabled={busy || demoMode} className="btn-ghost !px-3 !py-2 text-xs" onClick={() => toggle(p)}>{p.active ? (ar ? 'إيقاف' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}</button>
+        <button disabled={busy || demoMode || p.needsActivation} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'update', id: p.id, name: p.name, specialty: p.specialty }) }}>{ar ? 'تعديل' : 'Edit'}</button>
+        <button disabled={busy || demoMode || p.passwordless} className="btn-outline !px-3 !py-2 text-xs" onClick={() => { setError(''); setForm({ action: 'password', id: p.id, password: '' }) }}>{ar ? 'كلمة المرور' : 'Password'}</button>
+        <button disabled={busy || demoMode || p.needsActivation} className="btn-ghost !px-3 !py-2 text-xs" onClick={() => toggle(p)}>{p.active ? (ar ? 'إيقاف' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}</button>
         <button disabled={busy || demoMode} className="btn-ghost !px-3 !py-2 text-xs !text-rose-600 hover:!bg-rose-50" onClick={() => { setError(''); setForm({ action: 'delete', id: p.id, name: p.name }) }}><Trash2 size={14}/>{ar ? 'حذف' : 'Delete'}</button>
       </div>}
     </div>)}</div>
-    <p className="text-xs leading-6 text-ink-500">{ar ? 'تعيين المريض يتم من ملفه. الملفات القديمة تبقى عند الشخص الذي أضافها إلى أن تغيّر التعيين. افتح حساب صاحب العيادة على جهاز الفريق مرة واحدة، ثم اضغط «قفل وتبديل البروفايل».' : 'Assign patients from their files. Existing records stay with their creator until reassigned. On a team device, sign in as the owner once, then use “Lock & switch profile”.'}</p>
+    <p className="text-xs leading-6 text-ink-500">{ar ? 'أسماء الأطباء القديمة محفوظة مع مرضاهم ومواعيدهم. حذف البروفايل يلغي دخوله ولا يحذف ملفات مرضاه. لتجهيز الدخول بضغطة، يسجّل صاحب العيادة دخوله ويضغط «قفل وتبديل البروفايل». الإذن صالح 12 ساعة في نافذة العمل الحالية.' : 'Legacy clinicians retain their patients and appointments. Deleting a profile revokes entry without deleting patient files. The owner signs in and uses “Lock & switch profile” to allow one-click entry for 12 hours in this working window.'}</p>
     <Modal open={Boolean(form)} onClose={() => { if (!busy) setForm(null) }} title={form?.action === 'delete' ? (ar ? 'حذف البروفايل' : 'Delete profile') : ar ? 'إعداد البروفايل' : 'Profile settings'} size="sm">
       {form && <form onSubmit={save} className="space-y-4">
         {form.action === 'delete' && <div className="space-y-3 text-sm leading-7 text-ink-600">

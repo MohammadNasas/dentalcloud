@@ -13,7 +13,7 @@ import { createUndoDelete, withoutDeletedRecords } from '../lib/undoDelete.js'
 import { confirmOnboardingSave } from '../lib/onboarding.js'
 import { validExpense } from '../lib/clinicFinances.js'
 import { prepareImport, patientBalance } from '../lib/patientImport.js'
-import { patientFinanceAllowed, watchProfileSwitch } from '../lib/clinicProfiles'
+import { patientFinanceAllowed, watchProfileSwitch, signInDeviceProfile } from '../lib/clinicProfiles'
 
 const StoreContext = createContext(null)
 
@@ -309,8 +309,8 @@ export function StoreProvider({ children }) {
   }, [loadSession])
 
   // Only the profile picker uses this greeting; ordinary account login does not.
-  const enterProfile = useCallback(async (identifier, password) => {
-    const result = await backend.signIn(identifier, password)
+  const enterProfile = useCallback(async (identifier, password, deviceProfileId) => {
+    const result = deviceProfileId ? await signInDeviceProfile(deviceProfileId) : await backend.signIn(identifier, password)
     if (!result.ok) return result
     const loaded = await loadSession(user => setProfileWelcome({
       id: user.id, name: user.name, nameAr: user.nameAr, ready: false,

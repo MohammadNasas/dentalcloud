@@ -93,7 +93,7 @@ function LabContent() {
       <PageHero
         icon={<FlaskConical size={22} />}
         title={lang === 'ar' ? 'إدارة المختبر' : 'Lab Management'}
-        subtitle={staff ? (lang === 'ar' ? 'طلبات المختبر لمرضاك فقط' : 'Lab orders for your assigned patients') : lang === 'ar' ? 'تتبّع طلبات المختبر والمدفوعات' : 'Track lab orders and payments'}
+        subtitle={staff ? (lang === 'ar' ? 'طلبات المختبر لمرضى العيادة المتاحين لك' : 'Lab orders for patients you can manage') : lang === 'ar' ? 'تتبّع طلبات المختبر والمدفوعات' : 'Track lab orders and payments'}
         actions={<div className="flex flex-wrap gap-2">
           {!staff && <button onClick={() => setLabsOpen(true)} className="btn bg-white/15 font-bold text-white ring-1 ring-white/20 hover:bg-white/25">
             <BookUser size={16} /> {lang === 'ar' ? 'المختبرات' : 'Labs'}

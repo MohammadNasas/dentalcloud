@@ -14,11 +14,11 @@ test('profile deletion revokes existing sessions before banning login and preser
     calls.push({ path, method, body })
     if (path.includes('clinic_profile_context')) return Response.json({ user: { id: owner, isClinicOwner: true }, clinic: { id: cid } })
     if (path.includes('clinic_profiles?') && method === 'GET') return Response.json(members)
-    if (path.includes('clinic_profiles?') && method === 'PATCH') {
-      assert.ok(path.includes(`clinic_id=eq.${cid}`) && path.includes(`user_id=eq.${staff}`))
-      assert.deepEqual(body, { active: false }); members[0].active = false
+    if (path.includes('rpc/clinic_profile_archive') && method === 'POST') {
+      assert.deepEqual(body, { p_doctor: staff }); members[0].active = false
       return Response.json(members)
     }
+    if (path.endsWith(`/auth/v1/admin/users/${staff}`) && method === 'GET') return Response.json({id:staff})
     if (path.endsWith(`/auth/v1/admin/users/${staff}`) && method === 'PUT') {
       assert.equal(members[0].active, false)
       assert.deepEqual(body, { ban_duration: '876000h' })
@@ -49,6 +49,7 @@ test('deletion rejects staff, foreign profiles and the owner without any mutatio
     const mock = t.mock.method(globalThis, 'fetch', async url => {
       if (String(url).includes('clinic_profile_context')) return Response.json({ user: { id: owner, isClinicOwner: scenario.isOwner }, clinic: { id: cid } })
       if (String(url).includes('clinic_profiles?')) return Response.json([{ user_id: staff }, { user_id: owner }])
+      if (String(url).includes('doctors?')) return Response.json([])
       throw Error('Unexpected elevated call')
     })
     const result = await onRequestPost({ request: request({ action: 'delete', id: scenario.id }), env })
@@ -62,8 +63,8 @@ test('failed login ban leaves the profile disabled and returns failure so deleti
   let disabled = false, removed = false
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     if (String(url).includes('clinic_profile_context')) return Response.json({ user: { id: owner, isClinicOwner: true }, clinic: { id: cid } })
-    if (options.method === 'GET') return Response.json([{ user_id: staff, active: !disabled }])
-    if (options.method === 'PATCH') { disabled = true; return Response.json([]) }
+    if (String(url).includes('clinic_profiles?') && options.method === 'GET') return Response.json([{ user_id: staff, active: !disabled }])
+    if (String(url).includes('clinic_profile_archive')) { disabled = true; return Response.json(null) }
     if (String(url).includes('/auth/v1/admin/')) return Response.json({}, { status: 503 })
     if (options.method === 'DELETE') removed = true
     throw Error('Unexpected request')

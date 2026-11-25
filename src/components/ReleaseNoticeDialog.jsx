@@ -12,7 +12,7 @@ export default function ReleaseNoticeDialog({ open, onClose, onExplore, lang = '
   }, [open])
   const features = [
     [Settings, L('بروفايل لكل فرد','A profile for each team member'), L('أضف الأطباء والمساعدين بكلمات مرور مستقلة من الإعدادات ← بروفايلات العيادة.','Add doctors and assistants with separate passwords in Settings → Clinic profiles.')],
-    [LockKeyhole, L('خصوصية حسابات المرضى','Patient financial privacy'), L('الفريق يرى الحالة الطبية، ويطّلع على حساب المرضى المعيّنين له فقط. إيرادات العيادة ومصاريفها تبقى لصاحبها.','The team can view clinical details and finances only for their assigned patients. Clinic revenue and expenses remain private to the owner.')],
+    [LockKeyhole, L('خصوصية حسابات المرضى','Patient financial privacy'), L('الأطباء يديرون ملفات جميع المرضى ومدفوعاتهم. المساعد يرى حساب المرضى المعيّنين له. إيرادات العيادة ومصاريفها تبقى لصاحبها.','Doctors can manage all patient files and payments. Assistants see finances for their assigned patients. Clinic revenue and expenses remain private to the owner.')],
     [CalendarCheck, L('موعد من ملف المريض','Book from the patient file'), L('زر إضافة موعد يختار المريض تلقائيًا. التقويم مشترك بين بروفايلات العيادة.','Add appointment selects the patient automatically. All clinic profiles share one calendar.')],
   ]
   return (

@@ -1,15 +1,7 @@
 import { ApiError, bodyJSON, database, handle, response, uuid } from '../_lib/loyaltyAccess.js'
+import { authAdmin, deviceTokenHash, legacyProfile, listedProfiles } from '../_lib/clinicProfileAuth.js'
 
 export const onRequestOptions = ({ request }) => response(request, {})
-
-async function authAdmin(env, path, method, body) {
-  const result = await fetch(`${env.SUPABASE_URL.replace(/\/$/, '')}/auth/v1/admin/${path}`, {
-    method, headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`, 'Content-Type': 'application/json' },
-    ...(body ? { body: JSON.stringify(body) } : {}), signal: AbortSignal.timeout(15000),
-  })
-  if (!result.ok) throw new ApiError('profile_auth_failed', 502)
-  return result.status === 204 ? null : result.json()
-}
 
 export const onRequestPost = ({ request, env }) => handle(request, async () => {
   const bearer = request.headers.get('Authorization')
@@ -22,13 +14,17 @@ export const onRequestPost = ({ request, env }) => handle(request, async () => {
   const db = database(env)
   const input = await bodyJSON(request)
   const members = await db(`clinic_profiles?clinic_id=eq.${cid}&select=user_id,active`)
-  if (input.action === 'list') {
-    const doctors = await db(`doctors?clinic_id=eq.${cid}&select=id,data`)
-    return { ok: true, profiles: doctors.filter(d => d.id === context.user.id || members.some(p => p.user_id === d.id)).map(d => ({
-      id: d.id, name: d.data.name, color: d.data.color, specialty: d.data.specialty || '',
-      email: d.data.email, owner: d.id === context.user.id,
-      active: d.id === context.user.id || members.find(p => p.user_id === d.id)?.active === true,
-    })) }
+  if (input.action === 'list' || input.action === 'device') {
+    const doctors = await db(`doctors?clinic_id=eq.${cid}&select=id,data,created_at`)
+    const profiles = listedProfiles(doctors, members, context.user.id)
+    if (input.action === 'list') return { ok: true, profiles }
+    const ids = profiles.filter(p => p.passwordless && p.active).map(p => p.id)
+    if (!ids.length) return { ok: true, device: null }
+    const deviceToken = (crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', '')
+    const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+    await db('clinic_profile_devices', 'POST', { token_hash: await deviceTokenHash(deviceToken), clinic_id: cid, profile_ids: ids, expires_at: expiresAt })
+    // Capabilities are session-scoped on the client and cannot enter the owner profile.
+    return { ok: true, device: { token: deviceToken, clinicId: cid, expiresAt } }
   }
   if (input.action === 'create') {
     if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 80
@@ -56,14 +52,24 @@ export const onRequestPost = ({ request, env }) => handle(request, async () => {
     }
     return { ok: true, id }
   }
-  if (!uuid(input.id) || !members.some(p => p.user_id === input.id) || input.id === context.user.id) throw new ApiError('unknown_profile', 404)
+  if (!uuid(input.id) || input.id === context.user.id) throw new ApiError('unknown_profile', 404)
+  const member = members.find(p => p.user_id === input.id)
+  if (input.action !== 'delete' && member) {
+    const [record] = await db(`doctors?id=eq.${input.id}&clinic_id=eq.${cid}&select=data`)
+    if (!record || record.data.profileDeletedAt) throw new ApiError('unknown_profile', 404)
+    if (input.action === 'password' && legacyProfile(record.data)) throw new ApiError('passwordless_profile', 400)
+  }
   if (input.action === 'delete') {
-    // Revoke membership first: existing JWTs must lose clinic access immediately.
-    // Retain the doctor identity for clinical/audit references; deleting Auth or
-    // doctor rows could cascade into historical records. This login stays banned.
-    await db(`clinic_profiles?user_id=eq.${input.id}&clinic_id=eq.${cid}`, 'PATCH', { active: false })
-    await authAdmin(env, `users/${input.id}`, 'PUT', { ban_duration: '876000h' })
+    if (!member) {
+      const [old] = await db(`doctors?id=eq.${input.id}&clinic_id=eq.${cid}&select=data`)
+      if (!old || !legacyProfile(old.data)) throw new ApiError('unknown_profile', 404)
+    }
+    await scoped('rpc/clinic_profile_archive', 'POST', { p_doctor: input.id })
+    const auth = await authAdmin(env, `users/${input.id}`, 'GET', null, true)
+    if (auth) await authAdmin(env, `users/${input.id}`, 'PUT', { ban_duration: '876000h' })
     await db(`clinic_profiles?user_id=eq.${input.id}&clinic_id=eq.${cid}`, 'DELETE')
+  } else if (!member) {
+    throw new ApiError('unknown_profile', 404)
   } else if (input.action === 'update') {
     const old = (await db(`doctors?id=eq.${input.id}&clinic_id=eq.${cid}&select=data`))[0]
     if (!old || typeof input.name !== 'string' || !input.name.trim() || input.name.length > 80) throw new ApiError('invalid_profile')

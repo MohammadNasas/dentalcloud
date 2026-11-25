@@ -5,7 +5,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { setup, asUser, ids, denied } from './helpers/securityFixture.mjs'
 const sql = name => readFile(new URL(`../supabase/${name}.sql`, import.meta.url), 'utf8')
 
-test('profiles enforce assigned-patient finance, shared calendar and owner administration', async t => {
+test('assistants retain assigned-patient finance, shared calendar and owner administration', async t => {
   const db = new PGlite(); t.after(() => db.close())
   await setup(db)
   await db.exec(await sql('subscription_enforcement'))
@@ -14,6 +14,8 @@ test('profiles enforce assigned-patient finance, shared calendar and owner admin
   await db.exec(await sql('clinic_profiles'))
   await db.exec(await sql('clinic_profile_lab_access'))
   await db.exec(await sql('clinic_profile_lab_access'))
+  await db.exec(await sql('clinic_profile_shared_patients'))
+  await db.query("update public.doctors set data=data || '{\"role\":\"assistant\"}' where id=$1",[ids.member])
   const other = '40000000-0000-0000-0000-000000000003'
   const recordA = '50000000-0000-0000-0000-000000000001'
   const recordOther = '50000000-0000-0000-0000-000000000002'

@@ -130,7 +130,7 @@ export default function PatientProfile() {
             {can('appointments') && <button onClick={() => setAppointmentOpen(true)} disabled={store.readOnly} className="btn-primary !py-2"><CalendarPlus size={15}/>{lang === 'ar' ? 'إضافة موعد' : 'Add appointment'}</button>}
             {can('appointments') && <button onClick={() => setTab('loyalty')} className="btn-outline !py-2"><Gift size={15} />{lang === 'ar' ? 'بطاقة الولاء' : 'Loyalty card'}</button>}
             {financeAllowed && <button onClick={() => setEditOpen(true)} className="btn-outline !py-2"><Pencil size={15} /> {t('common.edit')}</button>}
-            {!store.currentUser?.staffProfile && <button onClick={doExport} disabled={exporting} className="btn-outline !py-2"><FileDown size={15} /> Word</button>}
+            {financeAllowed && <button onClick={doExport} disabled={exporting} className="btn-outline !py-2"><FileDown size={15} /> Word</button>}
             {!store.currentUser?.staffProfile && <button onClick={() => setDeleteOpen(true)} disabled={deleting || store.readOnly} aria-label={lang === 'ar' ? 'حذف ملف المريض' : 'Delete patient file'} className="btn-ghost !py-2 text-rose-500 hover:bg-rose-50"><Trash2 size={15} /></button>}
           </div>
         </div>
