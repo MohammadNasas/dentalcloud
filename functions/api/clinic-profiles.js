@@ -21,10 +21,10 @@ export const onRequestPost = ({ request, env }) => handle(request, async () => {
     const ids = profiles.filter(p => p.passwordless && p.active).map(p => p.id)
     if (!ids.length) return { ok: true, device: null }
     const deviceToken = (crypto.randomUUID() + crypto.randomUUID()).replaceAll('-', '')
-    const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
-    await db('clinic_profile_devices', 'POST', { token_hash: await deviceTokenHash(deviceToken), clinic_id: cid, profile_ids: ids, expires_at: expiresAt })
+    // Keep the existing NOT NULL column compatible without imposing a time limit.
+    await db('clinic_profile_devices', 'POST', { token_hash: await deviceTokenHash(deviceToken), clinic_id: cid, profile_ids: ids, expires_at: 'infinity' })
     // Capabilities are session-scoped on the client and cannot enter the owner profile.
-    return { ok: true, device: { token: deviceToken, clinicId: cid, expiresAt } }
+    return { ok: true, device: { token: deviceToken, clinicId: cid } }
   }
   if (input.action === 'create') {
     if (typeof input.name !== 'string' || !input.name.trim() || input.name.length > 80

@@ -10,8 +10,8 @@ export const onRequestPost = ({ request, env }) => handle(request, async () => {
   if (!uuid(input.id) || !/^[a-f0-9]{64}$/.test(input.deviceToken || '')) throw new ApiError('device_sign_in_required', 401)
   const db = database(env)
   const hash = await deviceTokenHash(input.deviceToken)
-  const device = (await db(`clinic_profile_devices?token_hash=eq.${hash}&select=clinic_id,profile_ids,expires_at`))[0]
-  if (!device || Date.parse(device.expires_at) <= Date.now() || !device.profile_ids.includes(input.id)) throw new ApiError('device_sign_in_required', 401)
+  const device = (await db(`clinic_profile_devices?token_hash=eq.${hash}&select=clinic_id,profile_ids`))[0]
+  if (!device || !device.profile_ids.includes(input.id)) throw new ApiError('device_sign_in_required', 401)
   const cid = device.clinic_id
   const [doctor] = await db(`doctors?id=eq.${input.id}&clinic_id=eq.${cid}&select=id,data`)
   const [clinic] = await db(`clinics?id=eq.${cid}&select=owner_id`)

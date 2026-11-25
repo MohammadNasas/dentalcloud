@@ -22,7 +22,7 @@ export async function prepareProfileDevice() {
 export async function signInDeviceProfile(id) {
   let device
   try { device = JSON.parse(sessionStorage.getItem(DEVICE)) } catch {}
-  if (!device || device.clinicId !== profileDirectory()?.clinicId || Date.parse(device.expiresAt) <= Date.now()) return { ok: false, error: 'device_sign_in_required' }
+  if (!device || device.clinicId !== profileDirectory()?.clinicId) return { ok: false, error: 'device_sign_in_required' }
   const response = await fetch(paymentApiUrl('/api/clinic-profile-entry', window.location.protocol), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, deviceToken: device.token }),
   })

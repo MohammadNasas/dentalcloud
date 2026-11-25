@@ -144,7 +144,7 @@ export default function ClinicProfiles() {
         <button disabled={busy || demoMode} className="btn-ghost !px-3 !py-2 text-xs !text-rose-600 hover:!bg-rose-50" onClick={() => { setError(''); setForm({ action: 'delete', id: p.id, name: p.name }) }}><Trash2 size={14}/>{ar ? 'حذف' : 'Delete'}</button>
       </div>}
     </div>)}</div>
-    <p className="text-xs leading-6 text-ink-500">{ar ? 'أسماء الأطباء القديمة محفوظة مع مرضاهم ومواعيدهم. حذف البروفايل يلغي دخوله ولا يحذف ملفات مرضاه. لتجهيز الدخول بضغطة، يسجّل صاحب العيادة دخوله ويضغط «قفل وتبديل البروفايل». الإذن صالح 12 ساعة في نافذة العمل الحالية.' : 'Legacy clinicians retain their patients and appointments. Deleting a profile revokes entry without deleting patient files. The owner signs in and uses “Lock & switch profile” to allow one-click entry for 12 hours in this working window.'}</p>
+    <p className="text-xs leading-6 text-ink-500">{ar ? 'أسماء الأطباء القديمة محفوظة مع مرضاهم ومواعيدهم. حذف البروفايل يلغي دخوله ولا يحذف ملفات مرضاه. لتجهيز الدخول بضغطة، يسجّل صاحب العيادة دخوله ويضغط «قفل وتبديل البروفايل».' : 'Legacy clinicians retain their patients and appointments. Deleting a profile revokes entry without deleting patient files. The owner signs in and uses “Lock & switch profile” to allow one-click entry.'}</p>
     <Modal open={Boolean(form)} onClose={() => { if (!busy) setForm(null) }} title={form?.action === 'delete' ? (ar ? 'حذف البروفايل' : 'Delete profile') : ar ? 'إعداد البروفايل' : 'Profile settings'} size="sm">
       {form && <form onSubmit={save} className="space-y-4">
         {form.action === 'delete' && <div className="space-y-3 text-sm leading-7 text-ink-600">

@@ -41,14 +41,15 @@ test('only an owner can issue a device grant; it includes active legacy IDs and 
   const body=await response.json()
   assert.deepEqual(stored.profile_ids,[staff]);assert.equal(stored.clinic_id,cid)
   assert.equal(stored.token_hash,await deviceTokenHash(body.device.token));assert.notEqual(stored.token_hash,body.device.token)
-  assert.ok(Date.parse(stored.expires_at)-Date.now()<=12*60*60*1000)
+  assert.equal(stored.expires_at,'infinity')
+  assert.equal(body.device.expiresAt,undefined)
 })
 
-test('passwordless entry provisions the original ID once, preserves history and returns a single-use login token without sending email',async t=>{
+test('passwordless entry accepts old grants past their former expiry and preserves identity without sending email',async t=>{
   let auth=null, finished=false, created=0
   t.mock.method(globalThis,'fetch',async(url,options)=>{
     const path=String(url), body=options.body?JSON.parse(options.body):null
-    if(path.includes('clinic_profile_devices?')) return Response.json([{clinic_id:cid,profile_ids:[staff],expires_at:'2099-01-01'}])
+    if(path.includes('clinic_profile_devices?')) return Response.json([{clinic_id:cid,profile_ids:[staff],expires_at:'2000-01-01'}])
     if(path.includes('/doctors?')) return Response.json([{id:staff,data:finished?{profileLoginMode:'device'}:{passwordHash:'old'}}])
     if(path.includes('/clinics?')) return Response.json([{owner_id:owner}])
     if(path.includes('/clinic_profiles?'))return Response.json(finished?[{active:true}]:[])
@@ -71,11 +72,11 @@ test('passwordless entry provisions the original ID once, preserves history and 
   assert.equal(created,1)
 })
 
-test('forged, expired, owner, disabled, deleted and ordinary profiles cannot use passwordless entry',async t=>{
-  for(const scenario of ['missing-token','expired','not-listed','owner','disabled','deleted','ordinary','foreign-auth']){
+test('forged, unknown, owner, disabled, deleted and ordinary profiles cannot use passwordless entry',async t=>{
+  for(const scenario of ['missing-token','unknown-token','not-listed','owner','disabled','deleted','ordinary','foreign-auth']){
     const mock=t.mock.method(globalThis,'fetch',async(url)=>{
       const path=String(url)
-      if(path.includes('clinic_profile_devices?'))return Response.json([{clinic_id:cid,profile_ids:scenario==='not-listed'?[]:[staff],expires_at:scenario==='expired'?'2000-01-01':'2099-01-01'}])
+      if(path.includes('clinic_profile_devices?'))return Response.json(scenario==='unknown-token'?[]:[{clinic_id:cid,profile_ids:scenario==='not-listed'?[]:[staff]}])
       if(path.includes('/doctors?'))return Response.json([{id:staff,data:scenario==='ordinary'?{}:{passwordHash:'old',...(scenario==='deleted'?{profileDeletedAt:date}:{})}}])
       if(path.includes('/clinics?'))return Response.json([{owner_id:scenario==='owner'?staff:owner}])
       if(path.includes('/clinic_profiles?'))return Response.json(scenario==='disabled'?[{active:false}]:[])

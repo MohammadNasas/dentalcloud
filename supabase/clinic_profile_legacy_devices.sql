@@ -1,4 +1,4 @@
--- Owner-authorized, short-lived device access for pre-profile doctor identities.
+-- Owner-authorized device access for pre-profile doctor identities (no time limit).
 -- Existing doctor IDs, creation dates and patient/appointment associations stay intact.
 begin;
 create table if not exists public.clinic_profile_devices (
